@@ -1,0 +1,9 @@
+<svg width="160" height="160" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Marca ConstruRio</title>
+  <desc id="desc">Blocos de construcao estilizados formando a letra C.</desc>
+  <rect width="160" height="160" rx="30" fill="#F4F0E8"/>
+  <path d="M114 34H57C39.3 34 25 48.3 25 66v28c0 17.7 14.3 32 32 32h57V99H60c-4.4 0-8-3.6-8-8V69c0-4.4 3.6-8 8-8h54V34Z" fill="#117B73"/>
+  <rect x="60" y="68" width="23" height="17" rx="3" fill="#D6A84F"/>
+  <rect x="88" y="68" width="23" height="17" rx="3" fill="#C84A3C"/>
+  <rect x="60" y="90" width="51" height="17" rx="3" fill="#282522"/>
+</svg>

@@ -1,0 +1,9 @@
+[
+  {
+    "slug": "exemplo-cliente",
+    "client_task_id": "abc123def",
+    "emails": [
+      "contato@cliente-exemplo.com.br"
+    ]
+  }
+]

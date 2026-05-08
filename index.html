@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal de Acesso</title>
+  <style>
+    :root {
+      --bg: #070707;
+      --bg-soft: rgba(255, 255, 255, 0.08);
+      --panel: rgba(12, 12, 12, 0.72);
+      --card: #ffffff;
+      --line: rgba(15, 23, 42, 0.08);
+      --text: #111827;
+      --muted: #667085;
+      --accent: #F29725;
+      --accent-strong: #F29725;
+      --accent-soft: rgba(242, 151, 37, 0.12);
+      --danger: #ef4444;
+      --success: #16a34a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Sora", "Inter", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(242, 151, 37, 0.15), transparent 38%),
+        radial-gradient(circle at bottom right, rgba(242, 151, 37, 0.14), transparent 34%),
+        var(--bg);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 18px;
+    }
+
+    .shell {
+      width: min(1120px, 100%);
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(360px, 440px);
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .hero,
+    .panel {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 28px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(18px);
+    }
+
+    .hero {
+      padding: 40px;
+      background:
+        linear-gradient(160deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)),
+        rgba(9, 9, 11, 0.72);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 720px;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: auto -120px -120px auto;
+      width: 260px;
+      height: 260px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(242, 151, 37, 0.32), transparent 70%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      width: fit-content;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      color: #F29725;
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      box-shadow: 0 0 0 8px rgba(242, 151, 37, 0.14);
+    }
+
+    .hero-copy {
+      max-width: 520px;
+      margin-top: 34px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(2.4rem, 5vw, 4.4rem);
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+    }
+
+    .hero p {
+      margin: 20px 0 0;
+      max-width: 500px;
+      font-size: 1rem;
+      line-height: 1.7;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .hero-flow {
+      display: grid;
+      gap: 10px;
+      margin-top: 40px;
+    }
+
+    .flow-item {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 14px;
+      align-items: flex-start;
+      padding: 15px 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .flow-step {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #fff;
+      font-size: 0.94rem;
+      font-weight: 800;
+      box-shadow: 0 14px 30px rgba(242, 151, 37, 0.24);
+    }
+
+    .flow-item strong {
+      display: block;
+      font-size: 0.95rem;
+      color: #fff;
+    }
+
+    .flow-item span {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.67);
+    }
+
+    .panel {
+      background: var(--card);
+      color: var(--text);
+      padding: 28px;
+      min-height: 720px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .brand-badge {
+      width: 64px;
+      height: 64px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #050505;
+      box-shadow: 0 16px 32px rgba(242, 151, 37, 0.12);
+      overflow: hidden;
+    }
+
+    .brand-badge img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+      padding: 6px;
+    }
+
+    .brand-copy strong {
+      display: block;
+      font-size: 1.2rem;
+      letter-spacing: -0.03em;
+    }
+
+    .brand-copy span {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .session-pill {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .session-pill.show { display: inline-flex; }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 6px;
+      border-radius: 18px;
+      background: #f8fafc;
+      margin-bottom: 26px;
+    }
+
+    .tab-button {
+      border: none;
+      border-radius: 14px;
+      background: transparent;
+      color: #64748b;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 700;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    }
+
+    .tab-button.active {
+      background: #fff;
+      color: var(--accent-strong);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 1.62rem;
+      letter-spacing: -0.05em;
+    }
+
+    .panel-intro {
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.7;
+    }
+
+    .field-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .register-bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .field.two-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    input,
+    select {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 15px 16px;
+      font: inherit;
+      font-size: 0.94rem;
+      color: var(--text);
+      background: #f8fafc;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+
+    input:focus,
+    select:focus {
+      border-color: var(--accent);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(242, 151, 37, 0.12);
+    }
+
+    .document-row {
+      display: grid;
+      grid-template-columns: 116px minmax(0, 1fr);
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .document-row select {
+      padding-right: 40px;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .document-row input {
+      min-width: 0;
+    }
+
+    .hint {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      line-height: 1.5;
+    }
+
+    .submit-button,
+    .secondary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      border: none;
+      border-radius: 18px;
+      padding: 15px 18px;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.16s, box-shadow 0.2s, opacity 0.2s;
+    }
+
+    .submit-button {
+      margin-top: 22px;
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      box-shadow: 0 18px 30px rgba(242, 151, 37, 0.24);
+    }
+
+    .secondary-button {
+      color: #334155;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .submit-button:hover,
+    .secondary-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .message {
+      display: none;
+      margin-bottom: 18px;
+      padding: 14px 15px;
+      border-radius: 16px;
+      font-size: 0.86rem;
+      line-height: 1.6;
+    }
+
+    .message.show { display: block; }
+    .message.error {
+      background: rgba(239, 68, 68, 0.08);
+      color: #b91c1c;
+      border: 1px solid rgba(239, 68, 68, 0.12);
+    }
+
+    .message.success {
+      background: rgba(34, 197, 94, 0.08);
+      color: var(--success);
+      border: 1px solid rgba(34, 197, 94, 0.12);
+    }
+
+    .waiting {
+      display: none;
+      flex: 1;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 12px 4px 20px;
+    }
+
+    .waiting.show { display: flex; }
+
+    .waiting-card {
+      width: 100%;
+      padding: 34px 24px;
+      border-radius: 28px;
+      background:
+        linear-gradient(180deg, rgba(242, 151, 37, 0.08), rgba(255, 255, 255, 0.92)),
+        #fff;
+      border: 1px solid rgba(242, 151, 37, 0.12);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+
+    .waiting-clock {
+      width: 98px;
+      height: 98px;
+      margin: 0 auto 22px;
+      border-radius: 50%;
+      background: #fff;
+      border: 10px solid rgba(242, 151, 37, 0.16);
+      position: relative;
+      box-shadow: 0 24px 50px rgba(242, 151, 37, 0.14);
+    }
+
+    .waiting-clock::before,
+    .waiting-clock::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform-origin: bottom center;
+      background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+      border-radius: 999px;
+    }
+
+    .waiting-clock::before {
+      width: 5px;
+      height: 24px;
+      transform: translate(-50%, -100%) rotate(18deg);
+    }
+
+    .waiting-clock::after {
+      width: 5px;
+      height: 30px;
+      transform: translate(-50%, -100%) rotate(122deg);
+    }
+
+    .waiting-center {
+      position: absolute;
+      inset: 0;
+      margin: auto;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent-strong);
+      box-shadow: 0 0 0 6px rgba(242, 151, 37, 0.14);
+    }
+
+    .waiting h3 {
+      margin: 0;
+      font-size: 1.55rem;
+      letter-spacing: -0.05em;
+      color: var(--text);
+    }
+
+    .waiting p {
+      margin: 14px auto 0;
+      max-width: 320px;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 0.92rem;
+    }
+
+    .waiting-footer {
+      display: grid;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .waiting-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: fit-content;
+      margin: 0 auto;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #F29725;
+      border: 1px solid rgba(242, 151, 37, 0.28);
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .waiting-link {
+      width: auto;
+      padding-inline: 18px;
+      justify-self: center;
+    }
+
+    .small-note {
+      margin-top: 18px;
+      color: #94a3b8;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 980px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .hero,
+      .panel {
+        min-height: auto;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      .hero, .panel { border-radius: 24px; }
+      .hero { padding: 24px; }
+      .panel { padding: 20px; }
+      .field.two-col { grid-template-columns: 1fr; }
+      .document-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">
+          <span class="eyebrow-dot"></span>
+          Bem-vindo
+        </div>
+        <div class="hero-copy">
+          <h1>Acesse seus serviços especializados</h1>
+        </div>
+      </div>
+
+      <div class="hero-flow">
+        <div class="flow-item">
+          <div class="flow-step">1</div>
+          <div>
+            <strong>Cadastro com nome, email e documento</strong>
+            <span>O email e o CPF/CNPJ precisam ser os mesmos cadastrados internamente.</span>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-step">2</div>
+          <div>
+            <strong>Aguarde alguns minutos</strong>
+            <span>A equipe é responsável por aprovar sua entrada no sistema.</span>
+          </div>
+        </div>
+        <div class="flow-item">
+          <div class="flow-step">3</div>
+          <div>
+            <strong>Aprovado!</strong>
+            <span>Só entrar com seu login e senha.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="brand">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div class="brand-badge">
+            <img src="./group.webp" alt="Grupo Participa" />
+          </div>
+          <div class="brand-copy">
+            <strong>Grupo Participa</strong>
+          </div>
+        </div>
+        <div class="session-pill" id="sessionPill">sessão salva</div>
+      </div>
+
+      <div id="authViews">
+        <div class="view active" id="authView">
+          <div class="tabs">
+            <button type="button" class="tab-button active" data-tab="login">Entrar</button>
+            <button type="button" class="tab-button" data-tab="register">Cadastrar</button>
+          </div>
+
+          <div class="message" id="authMessage"></div>
+
+          <div class="view active" id="loginView">
+            <h2>Entrar no portal</h2>
+
+            <form id="loginForm">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="loginIdentifier">Email</label>
+                  <input id="loginIdentifier" type="text" placeholder="seuemail@dominio.com" autocomplete="username" />
+                </div>
+                <div class="field">
+                  <label for="loginPassword">Senha</label>
+                  <input id="loginPassword" type="password" placeholder="Digite sua senha" autocomplete="current-password" />
+                </div>
+              </div>
+              <button class="submit-button" type="submit">Entrar no ambiente</button>
+            </form>
+          </div>
+
+          <div class="view" id="registerView">
+            <h2>Solicitar acesso</h2>
+            <p class="panel-intro">Preencha seus dados para entrar na fila de validação. A aprovação acontece no ambiente administrativo.</p>
+
+            <form id="registerForm">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="registerName">Nome completo</label>
+                  <input id="registerName" type="text" placeholder="Seu nome completo" autocomplete="name" />
+                </div>
+                <div class="field">
+                  <label for="registerEmail">Email</label>
+                  <input id="registerEmail" type="email" placeholder="seuemail@dominio.com" autocomplete="email" />
+                </div>
+                <div class="register-bottom-grid">
+                  <div class="field">
+                    <label for="registerPassword">Senha</label>
+                    <input id="registerPassword" type="password" placeholder="Mínimo de 8 caracteres" autocomplete="new-password" />
+                  </div>
+                  <div class="field">
+                    <label for="registerDocumentValue">Documento</label>
+                    <div class="document-row">
+                      <select id="registerDocumentType">
+                        <option value="cpf">CPF</option>
+                        <option value="cnpj">CNPJ</option>
+                      </select>
+                      <input id="registerDocumentValue" type="text" inputmode="numeric" placeholder="000.000.000-00" maxlength="14" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button class="submit-button" type="submit">Enviar para validação</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="waiting" id="waitingView">
+          <div class="waiting-card">
+            <div class="waiting-clock">
+              <div class="waiting-center"></div>
+            </div>
+            <div class="waiting-chip">Aguardando validação</div>
+            <h3>Estamos validando sua entrada</h3>
+            <p id="waitingText">Seu cadastro foi recebido e está em análise. Assim que o admin liberar o acesso, esse mesmo email será usado para te direcionar ao ambiente correto.</p>
+            <div class="waiting-footer">
+              <button type="button" class="secondary-button waiting-link" id="waitingBackButton">Voltar para login</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="./portal-auth.js"></script>
+  <script>
+    (async function () {
+      const auth = window.PortalAuth;
+      const authView = document.getElementById("authView");
+      const waitingView = document.getElementById("waitingView");
+      const authMessage = document.getElementById("authMessage");
+      const waitingText = document.getElementById("waitingText");
+      const sessionPill = document.getElementById("sessionPill");
+      const registerDocumentType = document.getElementById("registerDocumentType");
+      const registerDocumentValue = document.getElementById("registerDocumentValue");
+
+      function syncRegisterDocumentField() {
+        const type = registerDocumentType.value === "cnpj" ? "cnpj" : "cpf";
+        registerDocumentValue.maxLength = type === "cnpj" ? 18 : 14;
+        registerDocumentValue.placeholder = type === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00";
+        registerDocumentValue.value = auth.formatDocument(registerDocumentValue.value, type);
+      }
+
+      function setMessage(text, type) {
+        if (!text) {
+          authMessage.className = "message";
+          authMessage.textContent = "";
+          return;
+        }
+        authMessage.className = `message show ${type || "error"}`;
+        authMessage.textContent = text;
+      }
+
+      function setActiveTab(tab) {
+        document.querySelectorAll("[data-tab]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.tab === tab);
+        });
+        document.getElementById("loginView").classList.toggle("active", tab === "login");
+        document.getElementById("registerView").classList.toggle("active", tab === "register");
+        setMessage("", "");
+      }
+
+      function showAuth() {
+        authView.classList.add("active");
+        waitingView.classList.remove("show");
+      }
+
+      function showWaiting(user, mode) {
+        authView.classList.remove("active");
+        waitingView.classList.add("show");
+        sessionPill.classList.add("show");
+        sessionPill.textContent = user ? `${user.email}` : "sessão salva";
+
+        if (mode === "rejected") {
+          waitingText.textContent = "Seu acesso ainda não foi liberado. Fale com a equipe ou aguarde um novo ajuste no cadastro.";
+          return;
+        }
+
+        waitingText.textContent = `${user.name || "Seu cadastro"} foi recebido e está em análise. Assim que o admin aprovar seu acesso, você será enviado automaticamente para o ambiente certo com o email ${user.email}.`;
+      }
+
+      function redirectIfApproved() {
+        const sessionUser = auth.getSessionUser();
+        if (!sessionUser) return;
+
+        sessionPill.classList.add("show");
+        sessionPill.textContent = sessionUser.email;
+
+        if (sessionUser.role === "admin") {
+          window.location.replace(auth.toAppUrl("admin/index.html"));
+          return;
+        }
+
+        if (sessionUser.status === "approved" && sessionUser.clientSlug) {
+          window.location.replace(auth.getClientUrl(sessionUser.clientSlug));
+          return;
+        }
+
+        showWaiting(sessionUser, sessionUser.status);
+      }
+
+      document.querySelectorAll("[data-tab]").forEach((button) => {
+        button.addEventListener("click", () => {
+          showAuth();
+          sessionPill.classList.remove("show");
+          setActiveTab(button.dataset.tab);
+        });
+      });
+
+      document.getElementById("loginForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+          const result = await auth.login(
+            document.getElementById("loginIdentifier").value,
+            document.getElementById("loginPassword").value
+          );
+          setMessage("", "");
+          if (result.redirect) {
+            window.location.replace(result.redirect);
+            return;
+          }
+          showWaiting(result.user, result.status);
+        } catch (error) {
+          setMessage(error.message || "Não foi possível entrar.", "error");
+        }
+      });
+
+      document.getElementById("registerForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        try {
+          const user = await auth.createPendingUser({
+            name: document.getElementById("registerName").value,
+            email: document.getElementById("registerEmail").value,
+            password: document.getElementById("registerPassword").value,
+            documentType: registerDocumentType.value,
+            documentValue: registerDocumentValue.value
+          });
+
+          document.getElementById("registerForm").reset();
+          registerDocumentType.value = "cpf";
+          registerDocumentValue.value = "";
+          syncRegisterDocumentField();
+          setMessage("", "");
+          showWaiting(user, "pending");
+        } catch (error) {
+          setMessage(error.message || "Não foi possível cadastrar.", "error");
+        }
+      });
+
+      document.getElementById("waitingBackButton").addEventListener("click", async () => {
+        await auth.clearSession();
+        sessionPill.classList.remove("show");
+        showAuth();
+        setActiveTab("login");
+      });
+
+      registerDocumentType.addEventListener("change", syncRegisterDocumentField);
+      registerDocumentValue.addEventListener("input", syncRegisterDocumentField);
+
+      showAuth();
+      setActiveTab("login");
+      syncRegisterDocumentField();
+
+      try {
+        await auth.init();
+      } catch (error) {
+        setMessage("Não foi possível conectar com o ambiente publicado.", "error");
+      }
+
+      redirectIfApproved();
+    })();
+  </script>
+</body>
+</html>

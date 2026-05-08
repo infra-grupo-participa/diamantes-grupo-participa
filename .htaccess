@@ -1,0 +1,43 @@
+# Configuração Apache/LiteSpeed para diamantes.grupoparticipa.app.br
+# Resolve:
+#  - 403 ao acessar a raiz (servidor não enxergava index.html como índice)
+#  - protege arquivos sensíveis de leitura direta
+
+Options -Indexes
+
+DirectoryIndex index.html index.php
+
+# Página de login fica na raiz; se vier "/" ou variantes vazias, garante index.html
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Acesso direto à raiz -> serve index.html
+    RewriteRule ^$ index.html [L]
+</IfModule>
+
+# Bloqueia acesso a configs locais e arquivos sensíveis
+<FilesMatch "^(\.htaccess|\.htpasswd|\.DS_Store|php\.ini|php-local\.ini|.*\.example|.*\.md|HOSTINGER-DEPLOY\.md|GOOGLE-SHEETS-SYNC\.md)$">
+    Require all denied
+</FilesMatch>
+
+# Bloqueia execução de scripts dentro de uploads/storage caso PHP escape para lá
+<FilesMatch "\.(env|log|sqlite3?|jsonl)$">
+    Require all denied
+</FilesMatch>
+
+# Cache estático — assets carregam mais rápido
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/webp "access plus 7 days"
+    ExpiresByType image/jpeg "access plus 7 days"
+    ExpiresByType image/png "access plus 7 days"
+    ExpiresByType text/css "access plus 1 day"
+    ExpiresByType application/javascript "access plus 1 day"
+</IfModule>
+
+# Headers de segurança básicos
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

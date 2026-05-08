@@ -1,0 +1,2959 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Portal de Acesso</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --surface: rgba(255, 255, 255, 0.08);
+      --panel: #ffffff;
+      --line: rgba(15, 23, 42, 0.08);
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #F29725;
+      --accent-strong: #F29725;
+      --accent-soft: rgba(242, 151, 37, 0.12);
+      --success: #16a34a;
+      --warning: #F29725;
+      --danger: #dc2626;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Sora", "Inter", "Segoe UI", sans-serif;
+      color: #fff;
+      background:
+        radial-gradient(circle at top left, rgba(242, 151, 37, 0.18), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(242, 151, 37, 0.14), transparent 28%),
+        var(--bg);
+      padding: 20px;
+    }
+
+    .admin-shell {
+      width: min(1280px, 100%);
+      margin: 0 auto;
+      display: grid;
+      gap: 28px;
+    }
+
+    .board,
+    .modal-card {
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 28px 80px rgba(0,0,0,0.26);
+      overflow: hidden;
+    }
+
+    .action-button,
+    .ghost-button,
+    .approve-button,
+    .danger-button,
+    .link-button {
+      border: none;
+      border-radius: 16px;
+      font: inherit;
+      font-size: 0.84rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.16s, opacity 0.2s, box-shadow 0.2s;
+    }
+
+    .action-button,
+    .approve-button {
+      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      box-shadow: 0 16px 26px rgba(242, 151, 37, 0.24);
+    }
+
+    .action-button,
+    .ghost-button {
+      padding: 13px 16px;
+    }
+
+    .ghost-button {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .board-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    .board {
+      background: var(--panel);
+      color: var(--text);
+    }
+
+    .board {
+      padding: 24px;
+    }
+
+    .board-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .board-title-wrap {
+      display: grid;
+      gap: 10px;
+    }
+
+    .board-pill {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .board-title {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+      color: var(--text);
+    }
+
+    .board-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .stat-card {
+      padding: 18px;
+      border-radius: 22px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .stat-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-card strong {
+      display: block;
+      margin-top: 10px;
+      font-size: 2rem;
+      letter-spacing: -0.06em;
+    }
+
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .search-input,
+    .row-select,
+    .modal-card input,
+    .modal-card select {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px 15px;
+      font: inherit;
+      font-size: 0.92rem;
+      color: var(--text);
+      background: #f8fafc;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+
+    .search-input:focus,
+    .row-select:focus,
+    .modal-card input:focus,
+    .modal-card select:focus {
+      border-color: var(--accent);
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(242, 151, 37, 0.12);
+    }
+
+    .filter-chip {
+      padding: 11px 14px;
+      border-radius: 999px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+    }
+
+    .filter-chip.active {
+      background: #ffffff;
+      border-color: #F29725;
+      color: #F29725;
+    }
+
+    .list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .user-card {
+      display: grid;
+      gap: 16px;
+      padding: 18px;
+      border-radius: 24px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 18px 34px rgba(15, 23, 42, 0.05);
+    }
+
+    .user-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .user-head strong {
+      display: block;
+      font-size: 1.02rem;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      text-wrap: pretty;
+    }
+
+    .user-meta {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meta-chip,
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .meta-chip {
+      background: #f8fafc;
+      color: #475569;
+    }
+
+    .status-chip.pending {
+      background: #ffffff;
+      color: var(--warning);
+      box-shadow: inset 0 0 0 1px rgba(242, 151, 37, 0.28);
+    }
+
+    .status-chip.approved {
+      background: rgba(22, 163, 74, 0.12);
+      color: var(--success);
+    }
+
+    .status-chip.rejected {
+      background: rgba(220, 38, 38, 0.12);
+      color: var(--danger);
+    }
+
+    .status-chip.admin {
+      background: rgba(242, 151, 37, 0.14);
+      color: #c55a09;
+      box-shadow: inset 0 0 0 1px rgba(242, 151, 37, 0.22);
+    }
+
+    .user-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 210px 210px;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .row-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .row-field label {
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+    }
+
+    .row-readonly {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px 15px;
+      font-size: 0.92rem;
+      color: var(--muted);
+      background: #f8fafc;
+    }
+
+    .user-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .approve-button,
+    .danger-button,
+    .link-button {
+      padding: 12px 14px;
+    }
+
+    .danger-button {
+      color: var(--danger);
+      background: rgba(220, 38, 38, 0.08);
+    }
+
+    .link-button {
+      color: #334155;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+      border: 1px dashed #cbd5e1;
+      border-radius: 24px;
+      color: #94a3b8;
+      background: #f8fafc;
+      line-height: 1.7;
+    }
+
+    .insights-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .insights-board {
+      position: relative;
+    }
+
+    .insights-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .insights-head h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: 1.6rem;
+      letter-spacing: -0.05em;
+    }
+
+    .insights-head p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.7;
+      max-width: 720px;
+    }
+
+    .insights-tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .insights-tools {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .insights-tab {
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #475569;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 800;
+      padding: 11px 15px;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .insights-tab.active {
+      background: #ffffff;
+      border-color: #F29725;
+      color: #F29725;
+    }
+
+    .export-button {
+      border: 1px solid #F29725;
+      border-radius: 999px;
+      background: #ffffff;
+      color: #c55a09;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 800;
+      padding: 11px 16px;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+
+    .export-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(242, 151, 37, 0.12);
+    }
+
+    .insights-view { display: none; }
+    .insights-view.active { display: block; }
+
+    .insights-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    .insight-card {
+      min-width: 0;
+      padding: 18px;
+      border-radius: 24px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .insight-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .insight-card strong {
+      display: block;
+      margin-top: 10px;
+      color: var(--text);
+      font-size: clamp(1.05rem, 1.45vw, 1.45rem);
+      letter-spacing: -0.04em;
+      line-height: 1.14;
+      text-wrap: pretty;
+      overflow-wrap: anywhere;
+    }
+
+    .insight-card small {
+      display: block;
+      margin-top: 8px;
+      color: #64748b;
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    .insights-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.9fr) minmax(420px, 1.1fr);
+      gap: 16px;
+      margin-top: 16px;
+      align-items: start;
+    }
+
+    .insight-panel {
+      padding: 18px;
+      border-radius: 24px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      box-shadow: 0 18px 34px rgba(15, 23, 42, 0.04);
+    }
+
+    .insight-panel h3 {
+      margin: 0;
+      font-size: 1rem;
+      color: var(--text);
+      letter-spacing: -0.03em;
+    }
+
+    .insight-panel p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.65;
+    }
+
+    .table-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .table-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+    }
+
+    .table-row strong {
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+
+    .table-row span,
+    .table-row small {
+      color: #64748b;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .diamond-grid,
+    .employee-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .diamond-focus-grid {
+      display: grid;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .diamond-selector-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .diamond-selector-field {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 320px;
+    }
+
+    .diamond-selector-field label {
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+    }
+
+    .diamond-overview {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .diamond-overview-card {
+      min-width: 0;
+      padding: 18px 20px;
+      border-radius: 20px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      min-height: 128px;
+    }
+
+    .diamond-overview-card.primary {
+      grid-column: 1 / -1;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border-color: rgba(242, 151, 37, 0.28);
+      min-height: 164px;
+    }
+
+    .diamond-overview-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .diamond-overview-card strong {
+      display: block;
+      color: var(--text);
+      font-size: clamp(1.22rem, 1.8vw, 1.55rem);
+      letter-spacing: -0.05em;
+      line-height: 1.02;
+      text-wrap: pretty;
+      word-break: normal;
+      overflow-wrap: normal;
+      hyphens: none;
+    }
+
+    .diamond-overview-card.primary strong {
+      max-width: 10ch;
+      font-size: clamp(2rem, 3vw, 2.8rem);
+    }
+
+    .diamond-service-stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .diamond-service-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .diamond-service-meta {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+      flex: 1 1 280px;
+    }
+
+    .diamond-service-meta strong {
+      color: var(--text);
+      font-size: 0.92rem;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      text-wrap: pretty;
+    }
+
+    .diamond-service-meta span {
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.5;
+    }
+
+    .diamond-service-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .diamond-service-empty {
+      padding: 28px 18px;
+      border-radius: 22px;
+      border: 1px dashed #cbd5e1;
+      background: #f8fafc;
+      color: #94a3b8;
+      text-align: center;
+      line-height: 1.7;
+    }
+
+    .client-profile-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.88fr) minmax(0, 1.12fr);
+      gap: 20px;
+      margin-top: 16px;
+      align-items: start;
+    }
+
+    .client-profile-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .client-profile-selector {
+      display: grid;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .client-profile-selector label,
+    .client-profile-section-title,
+    .client-contract-grid label {
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+    }
+
+    .client-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .client-kpi-card {
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      display: grid;
+      gap: 8px;
+    }
+
+    .client-kpi-card.primary {
+      grid-column: 1 / -1;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+      border-color: rgba(242, 151, 37, 0.28);
+    }
+
+    .client-kpi-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .client-kpi-card strong {
+      display: block;
+      color: var(--text);
+      font-size: clamp(1rem, 1.35vw, 1.28rem);
+      line-height: 1.14;
+      letter-spacing: -0.05em;
+      text-wrap: pretty;
+      overflow-wrap: anywhere;
+    }
+
+    .client-kpi-card.primary strong {
+      font-size: clamp(1.5rem, 2vw, 2rem);
+      line-height: 1.02;
+    }
+
+    .client-kpi-card small {
+      display: block;
+      color: #64748b;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    .client-profile-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .client-profile-status.current {
+      background: #ecfdf5;
+      color: #047857;
+    }
+
+    .client-profile-status.late {
+      background: #fff7ed;
+      color: #c2410c;
+    }
+
+    .client-profile-status.canceled {
+      background: #f8fafc;
+      color: #64748b;
+    }
+
+    .client-profile-status.pending {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+
+    .client-monthly-banner {
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #475569;
+      line-height: 1.6;
+      font-size: 0.9rem;
+    }
+
+    .client-monthly-banner.pending {
+      border-color: rgba(242, 151, 37, 0.28);
+      background: rgba(242, 151, 37, 0.12);
+      color: #9a3412;
+    }
+
+    .client-profile-form {
+      display: grid;
+      gap: 18px;
+      margin-top: 16px;
+    }
+
+    .client-contract-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(220px, 1fr) minmax(220px, 1fr);
+      gap: 14px;
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      align-items: start;
+    }
+
+    .client-contract-grid .row-select,
+    .client-contract-grid input,
+    .client-profile-field input {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 13px 14px;
+      font: inherit;
+      font-size: 0.92rem;
+      background: #ffffff;
+      color: var(--text);
+    }
+
+    .billing-status-group {
+      position: relative;
+      display: grid;
+      gap: 10px;
+    }
+
+    .billing-toggle-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .billing-toggle {
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      padding: 10px 14px;
+      background: #ffffff;
+      color: #475569;
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 800;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .billing-toggle.current.active {
+      border-color: #86efac;
+      background: #ecfdf5;
+      color: #047857;
+      box-shadow: 0 10px 20px rgba(4, 120, 87, 0.08);
+    }
+
+    .billing-toggle.late.active {
+      border-color: rgba(242, 151, 37, 0.45);
+      background: #fff7ed;
+      color: #c2410c;
+      box-shadow: 0 10px 20px rgba(242, 151, 37, 0.12);
+    }
+
+    .billing-toggle.canceled.active {
+      border-color: #cbd5e1;
+      background: #f1f5f9;
+      color: #475569;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    .billing-status-help {
+      color: #64748b;
+      font-size: 0.82rem;
+      line-height: 1.6;
+    }
+
+    .billing-status-native {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      border: 0;
+      opacity: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .client-profile-section {
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      display: grid;
+      gap: 14px;
+    }
+
+    .client-profile-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .client-profile-field {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .client-profile-field.toggle,
+    .client-profile-field.multi {
+      grid-column: 1 / -1;
+    }
+
+    .client-toggle-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .client-toggle-card small {
+      display: block;
+      margin-top: 4px;
+      color: #64748b;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+
+    .client-check-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .client-check-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 0.86rem;
+      font-weight: 700;
+    }
+
+    .client-profile-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .client-profile-actions small {
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    .diamond-card,
+    .employee-card {
+      min-width: 0;
+      padding: 18px;
+      border-radius: 24px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      box-shadow: 0 18px 34px rgba(15, 23, 42, 0.04);
+      display: grid;
+      gap: 14px;
+    }
+
+    .diamond-head,
+    .employee-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .diamond-head strong,
+    .employee-head strong {
+      display: block;
+      color: var(--text);
+      font-size: 1rem;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      text-wrap: pretty;
+    }
+
+    .diamond-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .diamond-sub,
+    .employee-sub {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    .chip-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .contract-button,
+    .metric-chip {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 3px;
+      border-radius: 16px;
+      padding: 10px 12px;
+      font: inherit;
+      text-align: left;
+    }
+
+    .contract-button {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #334155;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.16s, background 0.2s;
+      max-width: 220px;
+      align-items: flex-start;
+    }
+
+    .contract-button:hover {
+      transform: translateY(-1px);
+      border-color: #F29725;
+    }
+
+    .contract-button.canceled {
+      background: rgba(220, 38, 38, 0.06);
+      border-color: rgba(220, 38, 38, 0.14);
+      color: #991b1b;
+    }
+
+    .contract-button small,
+    .metric-chip small {
+      font-size: 0.72rem;
+      color: #64748b;
+      font-weight: 700;
+    }
+
+    .contract-button span {
+      font-size: 0.9rem;
+      font-weight: 800;
+      line-height: 1.12;
+    }
+
+    .contract-button.canceled small {
+      color: #b91c1c;
+    }
+
+    .mini-action-button {
+      border: 1px solid rgba(242, 151, 37, 0.35);
+      border-radius: 999px;
+      background: #ffffff;
+      color: #F29725;
+      font: inherit;
+      font-size: 0.76rem;
+      font-weight: 800;
+      padding: 9px 12px;
+      cursor: pointer;
+      transition: transform 0.16s, border-color 0.2s, background 0.2s;
+    }
+
+    .mini-action-button:hover {
+      transform: translateY(-1px);
+      border-color: #F29725;
+      background: #ffffff;
+    }
+
+    .metric-chip {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: var(--text);
+    }
+
+    .score-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: #eefbf1;
+      color: var(--success);
+      font-size: 0.82rem;
+      font-weight: 800;
+    }
+
+    .score-pill.empty {
+      background: #f8fafc;
+      color: #64748b;
+    }
+
+    .stack-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .stack-row {
+      display: grid;
+      gap: 8px;
+    }
+
+    .stack-row-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .stack-row strong {
+      color: var(--text);
+      font-size: 0.9rem;
+      line-height: 1.25;
+      text-wrap: pretty;
+    }
+
+    .stack-row span {
+      color: #64748b;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(8px);
+      z-index: 2000;
+    }
+
+    .modal.show { display: flex; }
+
+    .modal-card {
+      width: min(560px, 100%);
+      padding: 26px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    .modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      font-size: 1.34rem;
+      letter-spacing: -0.05em;
+    }
+
+    .modal-close {
+      width: 42px;
+      height: 42px;
+      border: none;
+      border-radius: 14px;
+      background: #f8fafc;
+      color: #475569;
+      font: inherit;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .modal-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .modal-grid.two-col {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .modal-card label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .toast {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: #111827;
+      color: #fff;
+      box-shadow: 0 18px 36px rgba(15, 23, 42, 0.24);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.24s, transform 0.24s;
+      pointer-events: none;
+      z-index: 2200;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .toast.error {
+      background: #991b1b;
+    }
+
+    @media (max-width: 1240px) {
+      .client-profile-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .client-contract-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .client-contract-grid .row-field:first-child {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .board-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .insights-cards,
+      .diamond-grid,
+      .employee-grid,
+      .insights-grid,
+      .client-profile-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .diamond-overview {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .client-contract-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .user-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .diamond-service-row {
+        grid-template-columns: 1fr;
+      }
+
+      .diamond-service-actions {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .board, .modal-card { border-radius: 24px; }
+      .board { padding: 18px; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .table-row { grid-template-columns: 1fr; }
+      .modal-grid.two-col { grid-template-columns: 1fr; }
+      .diamond-overview { grid-template-columns: 1fr; }
+      .diamond-overview-card.primary strong { max-width: none; }
+      .client-kpi-grid,
+      .client-profile-fields { grid-template-columns: 1fr; }
+      .contract-button { max-width: 100%; width: 100%; }
+    }
+  </style>
+</head>
+  <body>
+  <div class="admin-shell">
+    <div class="board-grid">
+      <section class="board">
+        <div class="board-topbar">
+          <div class="board-title-wrap">
+            <div class="board-pill">Geral</div>
+            <h1 class="board-title">Central de Acessos</h1>
+          </div>
+          <div class="board-actions">
+            <button type="button" class="ghost-button" id="backToLoginButton">Portal</button>
+            <button type="button" class="ghost-button" id="newUserButton">Criar acesso manual</button>
+            <button type="button" class="action-button" id="logoutButton">Sair do admin</button>
+          </div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span>Pendentes</span>
+            <strong id="statPending">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Aprovados</span>
+            <strong id="statApproved">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Rejeitados</span>
+            <strong id="statRejected">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Com destino</span>
+            <strong id="statAssigned">0</strong>
+          </div>
+        </div>
+
+        <div class="filters">
+          <input class="search-input" id="searchInput" type="text" placeholder="Buscar por nome, email, CPF ou CNPJ" />
+          <button type="button" class="filter-chip" data-filter="all">Todos</button>
+          <button type="button" class="filter-chip active" data-filter="pending">Pendentes</button>
+          <button type="button" class="filter-chip" data-filter="approved">Aprovados</button>
+          <button type="button" class="filter-chip" data-filter="rejected">Rejeitados</button>
+        </div>
+
+        <div class="list" id="usersList"></div>
+      </section>
+
+      <section class="board insights-board">
+        <section class="insights-shell">
+          <div class="insights-head">
+            <div>
+              <h2>Leitura interna da operação.</h2>
+            </div>
+            <div class="insights-tools">
+              <div class="insights-tabs">
+                <button type="button" class="insights-tab active" data-insight-tab="diamonds">Diamantes</button>
+                <button type="button" class="insights-tab" data-insight-tab="clients">Clientes</button>
+                <button type="button" class="insights-tab" data-insight-tab="employees">Funcionários</button>
+                <button type="button" class="insights-tab" data-insight-tab="satisfaction">Satisfação</button>
+              </div>
+              <button type="button" class="export-button" id="exportSpreadsheetButton">Exportar planilha</button>
+            </div>
+          </div>
+
+          <div class="insights-view active" data-insight-view="diamonds">
+            <div id="diamondsDashboard"></div>
+          </div>
+          <div class="insights-view" data-insight-view="clients">
+            <div id="clientsDashboard"></div>
+          </div>
+          <div class="insights-view" data-insight-view="employees">
+            <div id="employeesDashboard"></div>
+          </div>
+          <div class="insights-view" data-insight-view="satisfaction">
+            <div id="satisfactionDashboard"></div>
+          </div>
+        </section>
+      </section>
+    </div>
+  </div>
+
+  <div class="modal" id="userModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3 id="modalTitle">Editar usuário</h3>
+        </div>
+        <button type="button" class="modal-close" id="closeModalButton">×</button>
+      </div>
+
+      <form id="userForm">
+        <div class="modal-grid">
+          <div>
+            <label for="formName">Nome</label>
+            <input id="formName" type="text" />
+          </div>
+          <div>
+            <label for="formEmail">Email</label>
+            <input id="formEmail" type="text" />
+          </div>
+        </div>
+
+        <div class="modal-grid two-col" style="margin-top:14px;">
+          <div>
+            <label for="formPassword">Senha</label>
+            <input id="formPassword" type="text" />
+          </div>
+          <div>
+            <label for="formDocumentType">Tipo de documento</label>
+            <select id="formDocumentType">
+              <option value="cpf">CPF</option>
+              <option value="cnpj">CNPJ</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-grid two-col" style="margin-top:14px;">
+          <div>
+            <label for="formDocumentValue">Documento</label>
+            <input id="formDocumentValue" type="text" maxlength="18" />
+          </div>
+          <div>
+            <label for="formClientSlug">Destino do portal</label>
+            <select id="formClientSlug"></select>
+          </div>
+        </div>
+
+        <div class="modal-grid" style="margin-top:14px;">
+          <div>
+            <label for="formStatus">Status</label>
+            <select id="formStatus">
+              <option value="pending">Pendente</option>
+              <option value="approved">Aprovado</option>
+              <option value="rejected">Rejeitado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-grid" style="margin-top:14px;">
+          <div>
+            <label for="formRole">Permissão</label>
+            <select id="formRole">
+              <option value="client">Cliente</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="link-button" id="cancelModalButton">Cancelar</button>
+          <button type="submit" class="action-button">Salvar usuário</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="serviceModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h3>Adicionar serviço ao cliente</h3>
+        </div>
+        <button type="button" class="modal-close" id="closeServiceModalButton">×</button>
+      </div>
+
+      <form id="serviceForm">
+        <div class="modal-grid">
+          <div>
+            <label for="serviceClientSlug">Cliente</label>
+            <select id="serviceClientSlug"></select>
+          </div>
+          <div>
+            <label for="serviceStatus">Status inicial</label>
+            <select id="serviceStatus">
+              <option value="active">Ativo</option>
+              <option value="canceled">Cancelado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-grid two-col" style="margin-top:14px;">
+          <div>
+            <label for="serviceType">Serviço</label>
+            <select id="serviceType"></select>
+          </div>
+          <div>
+            <label for="serviceEmployee">Prestador</label>
+            <select id="serviceEmployee"></select>
+          </div>
+        </div>
+
+        <div class="modal-grid two-col" style="margin-top:14px;">
+          <div>
+            <label for="serviceStartedAt">Início do contrato</label>
+            <input id="serviceStartedAt" type="date" />
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="link-button" id="cancelServiceModalButton">Cancelar</button>
+          <button type="submit" class="action-button">Adicionar serviço</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="../portal-auth.js"></script>
+  <script src="../portal-contracts.js"></script>
+  <script src="../portal-insights.js"></script>
+  <script>
+    (async function () {
+    const auth = window.PortalAuth;
+    const exportApiUrl = auth.toAppUrl("api/export.php?action=sync_spreadsheet");
+    try {
+      await auth.init({ includeUsers: true });
+      await window.PortalInsights.init({ force: true });
+    } catch (error) {
+      window.location.replace(auth.toAppUrl("index.html"));
+      return;
+    }
+
+    const sessionUser = auth.getSessionUser();
+    if (!sessionUser || sessionUser.role !== "admin") {
+      window.location.replace(auth.toAppUrl("index.html"));
+      return;
+    }
+
+    const usersList = document.getElementById("usersList");
+    const searchInput = document.getElementById("searchInput");
+    const toast = document.getElementById("toast");
+    const userModal = document.getElementById("userModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const userForm = document.getElementById("userForm");
+    const formName = document.getElementById("formName");
+    const formEmail = document.getElementById("formEmail");
+    const formPassword = document.getElementById("formPassword");
+    const formDocumentType = document.getElementById("formDocumentType");
+    const formDocumentValue = document.getElementById("formDocumentValue");
+    const formClientSlug = document.getElementById("formClientSlug");
+    const formStatus = document.getElementById("formStatus");
+    const formRole = document.getElementById("formRole");
+    const diamondsDashboard = document.getElementById("diamondsDashboard");
+    const clientsDashboard = document.getElementById("clientsDashboard");
+    const employeesDashboard = document.getElementById("employeesDashboard");
+    const satisfactionDashboard = document.getElementById("satisfactionDashboard");
+    const exportSpreadsheetButton = document.getElementById("exportSpreadsheetButton");
+    const serviceModal = document.getElementById("serviceModal");
+    const serviceForm = document.getElementById("serviceForm");
+    const serviceClientSlug = document.getElementById("serviceClientSlug");
+    const serviceStatus = document.getElementById("serviceStatus");
+    const serviceType = document.getElementById("serviceType");
+    const serviceEmployee = document.getElementById("serviceEmployee");
+    const serviceStartedAt = document.getElementById("serviceStartedAt");
+
+    let activeFilter = "pending";
+    let activeInsightTab = "diamonds";
+    let activeDiamondClientSlug = "";
+    let activeClientProfileSlug = "";
+    let editingUserId = null;
+    let adminRefreshBusy = false;
+    let adminRefreshTimer = null;
+
+    function getDocumentLabel(type) {
+      return type === "cnpj" ? "CNPJ" : "CPF";
+    }
+
+    function syncDocumentField() {
+      const type = formDocumentType.value === "cnpj" ? "cnpj" : "cpf";
+      formDocumentValue.maxLength = type === "cnpj" ? 18 : 14;
+      formDocumentValue.placeholder = type === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00";
+      formDocumentValue.value = auth.formatDocument(formDocumentValue.value, type);
+    }
+
+    function syncRoleField() {
+      const isAdmin = formRole.value === "admin";
+      formStatus.disabled = isAdmin;
+      formClientSlug.disabled = isAdmin;
+
+      if (isAdmin) {
+        formStatus.value = "approved";
+        formClientSlug.value = "";
+      }
+    }
+
+    function getUserStatusMeta(user) {
+      if (user.role === "admin") {
+        return { label: "admin", className: "admin" };
+      }
+      if (user.status === "approved") {
+        return { label: "aprovado", className: "approved" };
+      }
+      if (user.status === "rejected") {
+        return { label: "rejeitado", className: "rejected" };
+      }
+      return { label: "pendente", className: "pending" };
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function showToast(text, isError) {
+      toast.textContent = text;
+      toast.className = `toast show${isError ? " error" : ""}`;
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => {
+        toast.className = "toast";
+      }, 2600);
+    }
+
+    function getClientOptionsMarkup(selectedSlug, emptyLabel = "Selecione o destino") {
+      const options = [`<option value="">${emptyLabel}</option>`];
+      auth.getClientRoutes().forEach((route) => {
+        const selected = route.slug === selectedSlug ? " selected" : "";
+        options.push(`<option value="${route.slug}"${selected}>${route.label}</option>`);
+      });
+      return options.join("");
+    }
+
+    function getServiceOptionsMarkup(selectedService) {
+      const options = ['<option value="">Selecione o serviço</option>'];
+      PortalInsights.getServiceCatalog().forEach((entry) => {
+        const selected = entry.service === selectedService ? " selected" : "";
+        options.push(`<option value="${entry.service}"${selected}>${escapeHtml(PortalInsights.formatServiceName(entry.service))}</option>`);
+      });
+      return options.join("");
+    }
+
+    function getEmployeeOptionsMarkup(service, selectedEmployee) {
+      const options = ['<option value="">Selecione o prestador</option>'];
+      PortalInsights.getEmployeesForService(service).forEach((employee) => {
+        const selected = employee === selectedEmployee ? " selected" : "";
+        options.push(`<option value="${employee}"${selected}>${escapeHtml(PortalInsights.formatEmployeeName(employee))}</option>`);
+      });
+      return options.join("");
+    }
+
+    function getDiamondClientOptionsMarkup(clients, selectedSlug) {
+      return clients.map((client) => {
+        const selected = client.slug === selectedSlug ? " selected" : "";
+        return `<option value="${client.slug}"${selected}>${escapeHtml(PortalInsights.formatClientName(client.name))}</option>`;
+      }).join("");
+    }
+
+    function sortUsers(users) {
+      const priority = { pending: 0, approved: 1, rejected: 2 };
+      return [...users].sort((a, b) => {
+        const byStatus = (priority[a.status] ?? 9) - (priority[b.status] ?? 9);
+        if (byStatus !== 0) return byStatus;
+        return (a.name || "").localeCompare(b.name || "", "pt-BR");
+      });
+    }
+
+    function getFilteredUsers() {
+      const query = searchInput.value.trim().toLowerCase();
+      return sortUsers(auth.getUsers()).filter((user) => {
+        const matchesFilter = activeFilter === "all"
+          || (activeFilter === "approved" && (user.role === "admin" || user.status === "approved"))
+          || (activeFilter === "pending" && user.role !== "admin" && user.status === "pending")
+          || (activeFilter === "rejected" && user.role !== "admin" && user.status === "rejected");
+        if (!matchesFilter) return false;
+        if (!query) return true;
+        const document = auth.getUserDocument(user);
+        return [user.name, user.email, document.value, auth.formatDocument(document.value, document.type), getDocumentLabel(document.type)].some((value) =>
+          String(value || "").toLowerCase().includes(query)
+        );
+      });
+    }
+
+    function renderStats() {
+      const users = auth.getUsers().filter((user) => user.role !== "admin");
+      document.getElementById("statPending").textContent = users.filter((user) => user.status === "pending").length;
+      document.getElementById("statApproved").textContent = users.filter((user) => user.status === "approved").length;
+      document.getElementById("statRejected").textContent = users.filter((user) => user.status === "rejected").length;
+      document.getElementById("statAssigned").textContent = users.filter((user) => !!user.clientSlug).length;
+    }
+
+    function formatScore(score) {
+      return score == null ? "—" : `${Number(score).toFixed(1)}`;
+    }
+
+    function formatExportTimestamp(date) {
+      return new Intl.DateTimeFormat("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(date);
+    }
+
+    function getTodayIso() {
+      const now = new Date();
+      const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 10);
+    }
+
+    function getBillingStatusHelp(status) {
+      if (status === "late") {
+        return "A assinatura continua vinculada ao cliente, mas fica marcada como pendente para acompanhamento financeiro.";
+      }
+      if (status === "canceled") {
+        return "O contrato fica encerrado e a data de fim passa a registrar o cancelamento do cliente.";
+      }
+      return "Cliente liberado para operar normalmente, com assinatura ativa e contrato vigente.";
+    }
+
+    function syncClientBillingForm(root) {
+      if (!root) return;
+      const select = root.querySelector('[name="clientBillingStatus"]');
+      const endedAtInput = root.querySelector('[name="clientContractEndedAt"]');
+      const help = root.querySelector("[data-billing-help]");
+      const buttons = root.querySelectorAll("[data-billing-value]");
+      if (!select) return;
+
+      buttons.forEach((button) => {
+        const isActive = button.dataset.billingValue === select.value;
+        button.classList.toggle("active", isActive);
+        button.setAttribute("aria-pressed", isActive ? "true" : "false");
+      });
+
+      if (help) {
+        help.textContent = getBillingStatusHelp(select.value);
+      }
+
+      if (!endedAtInput) return;
+      const isCanceled = select.value === "canceled";
+      endedAtInput.disabled = !isCanceled;
+
+      if (isCanceled && !endedAtInput.value) {
+        endedAtInput.value = getTodayIso();
+      }
+
+      if (!isCanceled) {
+        endedAtInput.value = "";
+      }
+    }
+
+    function getServiceStatusLabel(status) {
+      return status === "canceled" ? "Cancelado" : "Ativo";
+    }
+
+    function buildAreaSnapshot() {
+      return PortalInsights.getServiceCatalog().map((entry) => ({
+        area: PortalInsights.formatServiceName(entry.service),
+        totalEmployees: entry.employees.length,
+        employees: entry.employees.map((employee) => PortalInsights.formatEmployeeName(employee))
+      }));
+    }
+
+    function buildSpreadsheetPayload(snapshot) {
+      return {
+        summary: {
+          exportedAt: formatExportTimestamp(new Date()),
+          employeeCount: snapshot.employees.length,
+          diamondCount: snapshot.diamonds.totalClients,
+          activeServiceCount: snapshot.diamonds.totalActiveServices,
+          canceledServiceCount: snapshot.diamonds.totalCanceledServices
+        },
+        employees: snapshot.employees
+          .slice()
+          .sort((a, b) => PortalInsights.formatEmployeeName(a.employee).localeCompare(PortalInsights.formatEmployeeName(b.employee), "pt-BR"))
+          .map((employee) => ({
+            name: PortalInsights.formatEmployeeName(employee.employee),
+            activeDiamonds: employee.activeDiamonds,
+            canceledServices: employee.canceledServices,
+            averageRating: employee.averageRating,
+            totalRatings: employee.totalRatings
+          })),
+        areas: buildAreaSnapshot(),
+        diamonds: snapshot.diamonds.clients
+          .slice()
+          .sort((a, b) => PortalInsights.formatClientName(a.name).localeCompare(PortalInsights.formatClientName(b.name), "pt-BR"))
+          .map((client) => ({
+            name: PortalInsights.formatClientName(client.name),
+            slug: client.slug,
+            activeServices: client.activeServices,
+            canceledServices: client.canceledServices,
+            averageRating: client.averageRating,
+            totalRatings: client.totalRatings,
+            services: client.services
+              .slice()
+              .sort((a, b) => PortalInsights.formatServiceName(a.service).localeCompare(PortalInsights.formatServiceName(b.service), "pt-BR"))
+              .map((service) => ({
+                service: PortalInsights.formatServiceName(service.service),
+                employee: PortalInsights.formatEmployeeName(service.employee),
+                status: getServiceStatusLabel(service.status)
+              }))
+          }))
+      };
+    }
+
+    async function exportSpreadsheet() {
+      const snapshot = PortalInsights.getDashboardSnapshot();
+      const sheetWindow = window.open("", "_blank");
+      const originalLabel = exportSpreadsheetButton.textContent;
+
+      exportSpreadsheetButton.disabled = true;
+      exportSpreadsheetButton.textContent = "Atualizando...";
+
+      try {
+        const response = await fetch(exportApiUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(buildSpreadsheetPayload(snapshot))
+        });
+
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.ok === false) {
+          throw new Error(data && data.error ? data.error : `Erro ${response.status}`);
+        }
+
+        if (sheetWindow && data.spreadsheetUrl) {
+          sheetWindow.location.replace(data.spreadsheetUrl);
+        } else if (sheetWindow) {
+          sheetWindow.close();
+        }
+
+        showToast(data.message || "Planilha atualizada com sucesso.");
+      } catch (error) {
+        if (sheetWindow) {
+          sheetWindow.close();
+        }
+        showToast(error.message || "Não foi possível atualizar a planilha.", true);
+      } finally {
+        exportSpreadsheetButton.disabled = false;
+        exportSpreadsheetButton.textContent = originalLabel;
+      }
+    }
+
+    function renderBars(items, formatter) {
+      if (!items.length) {
+        return `<div class="empty-state">Ainda não existe dado suficiente para mostrar essa leitura.</div>`;
+      }
+      const maxValue = Math.max(...items.map((item) => formatter(item).value), 1);
+      return `
+        <div class="stack-list">
+          ${items.map((item) => {
+            const metric = formatter(item);
+            const width = Math.max((metric.value / maxValue) * 100, metric.value > 0 ? 8 : 0);
+            return `
+              <div class="stack-row">
+                <div class="stack-row-head">
+                  <strong>${escapeHtml(metric.label)}</strong>
+                  <span>${escapeHtml(metric.meta)}</span>
+                </div>
+                <div class="progress-track">
+                  <div class="progress-fill" style="width:${width}%"></div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+
+    function renderInsightError(target, title, error) {
+      if (!target) return;
+      const message = error && error.message ? error.message : "Não foi possível montar essa leitura agora.";
+      target.innerHTML = `
+        <div class="empty-state">
+          <strong>${escapeHtml(title)}</strong><br />
+          ${escapeHtml(message)}
+        </div>
+      `;
+      console.error(`[admin] ${title}`, error);
+    }
+
+    function getSnapshotClientProfile(snapshot, client) {
+      const slug = client && client.slug ? client.slug : "";
+      const fromClient = client && client.profile && typeof client.profile === "object" ? client.profile : null;
+      const fromSnapshot = snapshot && snapshot.clientProfiles && slug && typeof snapshot.clientProfiles[slug] === "object"
+        ? snapshot.clientProfiles[slug]
+        : null;
+
+      return fromClient || fromSnapshot || {
+        slug,
+        seminar: {},
+        billingStatus: "current",
+        contractStartedAt: "",
+        contractEndedAt: "",
+        updatedAt: ""
+      };
+    }
+
+    function syncInsightTabs() {
+      document.querySelectorAll("[data-insight-tab]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.insightTab === activeInsightTab);
+      });
+      document.querySelectorAll("[data-insight-view]").forEach((panel) => {
+        panel.classList.toggle("active", panel.dataset.insightView === activeInsightTab);
+      });
+    }
+
+    function getProfileFieldValue(profile, key) {
+      const seminar = profile && profile.seminar && typeof profile.seminar === "object" ? profile.seminar : {};
+      return seminar[key];
+    }
+
+    function renderClientProfileField(field, profile, prefix) {
+      const inputId = `${prefix}_${field.key}`;
+      const value = getProfileFieldValue(profile, field.key);
+
+      if (field.type === "toggle") {
+        return `
+          <div class="client-profile-field toggle">
+            <label class="client-toggle-card" for="${inputId}">
+              <input type="checkbox" id="${inputId}" data-client-profile-key="${field.key}" ${value ? "checked" : ""} />
+              <span>
+                ${escapeHtml(field.label)}
+                <small>Marque quando isso já estiver ativo para esse cliente.</small>
+              </span>
+            </label>
+          </div>
+        `;
+      }
+
+      if (field.type === "multicheck") {
+        const values = Array.isArray(value) ? value : [];
+        return `
+          <div class="client-profile-field multi">
+            <label>${escapeHtml(field.label)}</label>
+            <div class="client-check-grid">
+              ${field.options.map((option) => `
+                <label class="client-check-chip" for="${inputId}_${option.value}">
+                  <input
+                    type="checkbox"
+                    id="${inputId}_${option.value}"
+                    data-client-profile-key="${field.key}"
+                    value="${escapeHtml(option.value)}"
+                    ${values.includes(option.value) ? "checked" : ""}
+                  />
+                  <span>${escapeHtml(option.label)}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="client-profile-field">
+          <label for="${inputId}">${escapeHtml(field.label)}</label>
+          <input
+            id="${inputId}"
+            type="${field.type === "date" ? "date" : field.type === "url" ? "url" : "text"}"
+            data-client-profile-key="${field.key}"
+            placeholder="${escapeHtml(field.placeholder || "")}"
+            value="${escapeHtml(value || "")}"
+          />
+        </div>
+      `;
+    }
+
+    function renderClientProfileSections(profile) {
+      const schema = PortalInsights.getClientProfileSchema();
+      return schema.map((section) => `
+        <section class="client-profile-section">
+          <div class="client-profile-section-title">${escapeHtml(section.title)}</div>
+          <div class="client-profile-fields">
+            ${section.fields.map((field) => renderClientProfileField(field, profile, "clientProfile")).join("")}
+          </div>
+        </section>
+      `).join("");
+    }
+
+    function collectClientProfilePayload(form) {
+      const schema = PortalInsights.getClientProfileSchema();
+      const seminar = {};
+
+      schema.forEach((section) => {
+        section.fields.forEach((field) => {
+          if (field.type === "multicheck") {
+            seminar[field.key] = field.options
+              .filter((option) => {
+                const input = form.querySelector(`#clientProfile_${field.key}_${option.value}`);
+                return input && input.checked;
+              })
+              .map((option) => option.value);
+            return;
+          }
+
+          const input = form.querySelector(`#clientProfile_${field.key}`);
+          if (!input) return;
+          seminar[field.key] = field.type === "toggle"
+            ? Boolean(input.checked)
+            : String(input.value || "").trim();
+        });
+      });
+
+      return {
+        billingStatus: form.querySelector('[name="clientBillingStatus"]')?.value || "current",
+        contractStartedAt: form.querySelector('[name="clientContractStartedAt"]')?.value || "",
+        contractEndedAt: form.querySelector('[name="clientContractEndedAt"]')?.value || "",
+        seminar,
+      };
+    }
+
+    function renderClientsDashboard(snapshot) {
+      const clients = snapshot.diamonds.clients || [];
+      if (!activeClientProfileSlug || !clients.some((client) => client.slug === activeClientProfileSlug)) {
+        activeClientProfileSlug = clients[0]?.slug || "";
+      }
+
+      const selectedClient = clients.find((client) => client.slug === activeClientProfileSlug) || null;
+      if (!selectedClient) {
+        clientsDashboard.innerHTML = `<div class="empty-state">Nenhum cliente disponível para preencher ou revisar o perfil mensal.</div>`;
+        return;
+      }
+
+      const profile = getSnapshotClientProfile(snapshot, selectedClient);
+      const billingMeta = PortalInsights.getBillingStatusMeta(profile.billingStatus);
+      const monthlyMeta = PortalInsights.getMonthlyProfileMeta(profile);
+      const route = auth.getClientRouteBySlug(selectedClient.slug);
+      const latestMonthlyUpdate = monthlyMeta.answered ? PortalInsights.formatProfileDateTime(profile.updatedAt) : "Aguardando resposta";
+      const latestMonthlyCopy = monthlyMeta.answered
+        ? "Momento mais recente em que o formulário mensal foi salvo."
+        : "Esse cliente ainda não respondeu o formulário mensal.";
+
+      clientsDashboard.innerHTML = `
+        <div class="insights-cards">
+          <article class="insight-card">
+            <span>Clientes com perfil</span>
+            <strong>${snapshot.diamonds.totalClients}</strong>
+            <small>Base de diamantes com perfil mensal individual.</small>
+          </article>
+          <article class="insight-card">
+            <span>Pendentes no mês</span>
+            <strong>${snapshot.diamonds.monthlyProfilePending}</strong>
+            <small>Clientes que ainda precisam atualizar o próximo seminário.</small>
+          </article>
+          <article class="insight-card">
+            <span>Assinatura atrasada</span>
+            <strong>${snapshot.diamonds.lateBillingClients}</strong>
+            <small>Diamantes marcados com cobrança atrasada.</small>
+          </article>
+          <article class="insight-card">
+            <span>Última atualização</span>
+            <strong>${escapeHtml(latestMonthlyUpdate)}</strong>
+            <small>${escapeHtml(latestMonthlyCopy)}</small>
+          </article>
+          <article class="insight-card">
+            <span>Revisões do cliente</span>
+            <strong>${selectedClient.totalReviews}</strong>
+            <small>${selectedClient.changesRequested} entrega(s) voltaram com ajuste solicitado.</small>
+          </article>
+        </div>
+
+        <div class="client-profile-grid">
+          <section class="insight-panel client-profile-stack">
+            <div>
+              <h3>Clientes</h3>
+              <p>Escolha o diamante para ver o que ele respondeu, ajustar contrato, cobrança e manter o histórico mensal organizado.</p>
+            </div>
+            <div class="client-profile-selector">
+              <label for="clientProfileSelector">Selecionar cliente</label>
+              <select class="row-select" id="clientProfileSelector" data-client-profile-selector>
+                ${getDiamondClientOptionsMarkup(clients, activeClientProfileSlug)}
+              </select>
+            </div>
+            <div class="client-kpi-grid">
+              <article class="client-kpi-card primary">
+                <span>Cliente</span>
+                <strong>${escapeHtml(PortalInsights.formatClientName(selectedClient.name))}</strong>
+                <small>${route ? `Portal vinculado em ${escapeHtml(route.path)}` : "Esse cliente ainda não tem rota pública vinculada."}</small>
+              </article>
+              <article class="client-kpi-card">
+                <span>Status mensal</span>
+                <strong><span class="client-profile-status ${monthlyMeta.className}">${escapeHtml(monthlyMeta.label)}</span></strong>
+                <small>${escapeHtml(monthlyMeta.description)}</small>
+              </article>
+              <article class="client-kpi-card">
+                <span>Assinatura</span>
+                <strong><span class="client-profile-status ${billingMeta.className}">${escapeHtml(billingMeta.label)}</span></strong>
+                <small>${escapeHtml(billingMeta.description)}</small>
+              </article>
+              <article class="client-kpi-card">
+                <span>Carteira ativa</span>
+                <strong>${selectedClient.activeServices}</strong>
+                <small>${selectedClient.canceledServices} serviços cancelados no histórico.</small>
+              </article>
+              <article class="client-kpi-card">
+                <span>Satisfação</span>
+                <strong>${selectedClient.averageRating == null ? "Sem nota" : `${formatScore(selectedClient.averageRating)} / 10`}</strong>
+                <small>${selectedClient.totalRatings} avaliações registradas.</small>
+              </article>
+              <article class="client-kpi-card">
+                <span>Revisões</span>
+                <strong>${selectedClient.totalReviews}</strong>
+                <small>${selectedClient.approvedReviews} aprovadas • ${selectedClient.changesRequested} com ajuste.</small>
+              </article>
+            </div>
+            <div class="client-monthly-banner ${monthlyMeta.due ? "pending" : ""}">
+              ${escapeHtml(!monthlyMeta.answered
+                ? "Esse cliente ainda não respondeu o formulário mensal. O ideal é incentivar a primeira resposta para alinhar a operação."
+                : monthlyMeta.due
+                  ? "A resposta mensal desse cliente precisa ser atualizada para este mês, mas o portal segue liberado para novos chamados."
+                  : "Esse cliente está com o formulário mensal atualizado e já pode seguir usando o portal normalmente."
+              )}
+            </div>
+          </section>
+
+          <section class="insight-panel">
+            <h3>Perfil mensal do seminário</h3>
+            <p>Essa ficha é a mesma visão do portal do cliente. Aqui o admin consegue revisar, ajustar e manter as informações alinhadas com a operação.</p>
+            <form class="client-profile-form" data-client-profile-form data-client-slug="${escapeHtml(selectedClient.slug)}">
+              <div class="client-contract-grid">
+                <div class="row-field">
+                  <label for="clientBillingStatus">Status da assinatura</label>
+                  <div class="billing-status-group">
+                    <div class="billing-toggle-row" role="group" aria-label="Controle da assinatura">
+                      <button type="button" class="billing-toggle current ${profile.billingStatus === "current" ? "active" : ""}" data-billing-value="current" aria-pressed="${profile.billingStatus === "current" ? "true" : "false"}">Ativa</button>
+                      <button type="button" class="billing-toggle late ${profile.billingStatus === "late" ? "active" : ""}" data-billing-value="late" aria-pressed="${profile.billingStatus === "late" ? "true" : "false"}">Atrasada</button>
+                      <button type="button" class="billing-toggle canceled ${profile.billingStatus === "canceled" ? "active" : ""}" data-billing-value="canceled" aria-pressed="${profile.billingStatus === "canceled" ? "true" : "false"}">Encerrada</button>
+                    </div>
+                    <select class="row-select billing-status-native" id="clientBillingStatus" name="clientBillingStatus">
+                      <option value="current" ${profile.billingStatus === "current" ? "selected" : ""}>Ativa</option>
+                      <option value="late" ${profile.billingStatus === "late" ? "selected" : ""}>Atrasada</option>
+                      <option value="canceled" ${profile.billingStatus === "canceled" ? "selected" : ""}>Encerrada</option>
+                    </select>
+                    <small class="billing-status-help" data-billing-help>${escapeHtml(getBillingStatusHelp(profile.billingStatus))}</small>
+                  </div>
+                </div>
+                <div class="row-field">
+                  <label for="clientContractStartedAt">Início do contrato</label>
+                  <input id="clientContractStartedAt" name="clientContractStartedAt" type="date" value="${escapeHtml(profile.contractStartedAt || "")}" />
+                </div>
+                <div class="row-field">
+                  <label for="clientContractEndedAt">Fim do contrato</label>
+                  <input id="clientContractEndedAt" name="clientContractEndedAt" type="date" value="${escapeHtml(profile.billingStatus === "canceled" ? (profile.contractEndedAt || "") : "")}" ${profile.billingStatus === "canceled" ? "" : "disabled"} />
+                </div>
+              </div>
+
+              ${renderClientProfileSections(profile)}
+
+              <div class="client-profile-actions">
+                <small>Quando o cliente salva pelo portal, esses dados também são enviados ao ClickUp. Aqui o admin centraliza e corrige a ficha quando necessário.</small>
+                <div class="board-actions">
+                  ${route ? `<button type="button" class="ghost-button" data-open-client-portal="${escapeHtml(selectedClient.slug)}">Abrir portal do cliente</button>` : ""}
+                  <button type="submit" class="action-button">Salvar perfil do cliente</button>
+                </div>
+              </div>
+            </form>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderDiamondsDashboard(snapshot) {
+      const topService = snapshot.diamonds.mostContractedServices[0] || null;
+      const clients = snapshot.diamonds.clients || [];
+      if (!activeDiamondClientSlug || !clients.some((client) => client.slug === activeDiamondClientSlug)) {
+        activeDiamondClientSlug = clients[0]?.slug || "";
+      }
+      const selectedClient = clients.find((client) => client.slug === activeDiamondClientSlug) || null;
+      const selectedProfile = selectedClient ? getSnapshotClientProfile(snapshot, selectedClient) : null;
+      const billingMeta = selectedProfile ? PortalInsights.getBillingStatusMeta(selectedProfile.billingStatus) : null;
+      const monthlyMeta = selectedProfile ? PortalInsights.getMonthlyProfileMeta(selectedProfile) : null;
+
+      diamondsDashboard.innerHTML = `
+        <div class="insights-cards">
+          <article class="insight-card">
+            <span>Diamantes</span>
+            <strong>${snapshot.diamonds.totalClients}</strong>
+            <small>Total de clientes mapeados nesse ambiente.</small>
+          </article>
+          <article class="insight-card">
+            <span>Serviços ativos</span>
+            <strong>${snapshot.diamonds.totalActiveServices}</strong>
+            <small>Contratos ativos hoje na operação.</small>
+          </article>
+          <article class="insight-card">
+            <span>Perfis pendentes</span>
+            <strong>${snapshot.diamonds.monthlyProfilePending}</strong>
+            <small>Clientes que ainda precisam atualizar o perfil deste mês.</small>
+          </article>
+          <article class="insight-card">
+            <span>Assinaturas atrasadas</span>
+            <strong>${snapshot.diamonds.lateBillingClients}</strong>
+            <small>Diamantes marcados com cobrança em atraso.</small>
+          </article>
+          <article class="insight-card">
+            <span>Mais contratado</span>
+            <strong>${topService ? escapeHtml(PortalInsights.formatServiceName(topService.service)) : "—"}</strong>
+            <small>${topService ? `${topService.activeCount} ativos` : "Sem volume registrado ainda."}</small>
+          </article>
+          <article class="insight-card">
+            <span>Ajustes pedidos</span>
+            <strong>${snapshot.reviewFlow.changesRequested}</strong>
+            <small>Revisões do solicitante que pediram nova rodada antes da avaliação.</small>
+          </article>
+        </div>
+
+        <div class="insights-grid">
+          <section class="insight-panel">
+            <h3>Serviços mais contratados</h3>
+            <p>Leitura consolidada do que mais aparece entre os 25 diamantes.</p>
+            <div class="table-list">
+              ${snapshot.diamonds.services.slice(0, 8).map((service) => `
+                <div class="table-row">
+                  <strong>${escapeHtml(PortalInsights.formatServiceName(service.service))}</strong>
+                  <span>${service.activeCount} ativos</span>
+                  <small>${service.canceledCount} cancelados</small>
+                </div>
+              `).join("")}
+            </div>
+          </section>
+          <section class="insight-panel">
+            <h3>Clientes</h3>
+            <p>Selecione um diamante para ver a carteira dele, adicionar serviços e alternar entre ativo e cancelado sem uma lista gigante.</p>
+            <div class="diamond-selector-row">
+              <div class="diamond-selector-field">
+                <label for="diamondClientSelector">Selecionar cliente</label>
+                <select class="row-select" id="diamondClientSelector" data-diamond-client-selector>
+                  ${getDiamondClientOptionsMarkup(clients, activeDiamondClientSlug)}
+                </select>
+              </div>
+              ${selectedClient ? `<button type="button" class="mini-action-button" data-action="add-service" data-client-slug="${escapeHtml(selectedClient.slug)}">+ Adicionar serviço</button>` : ""}
+            </div>
+            ${selectedClient ? `
+              <div class="diamond-focus-grid">
+                <div class="diamond-overview">
+                  <div class="diamond-overview-card primary">
+                    <span>Cliente</span>
+                    <strong>${escapeHtml(PortalInsights.formatClientName(selectedClient.name))}</strong>
+                  </div>
+                  <div class="diamond-overview-card">
+                    <span>Carteira ativa</span>
+                    <strong>${selectedClient.activeServices}</strong>
+                  </div>
+                  <div class="diamond-overview-card">
+                    <span>Satisfação</span>
+                    <strong>${selectedClient.averageRating == null ? "Sem nota" : `${formatScore(selectedClient.averageRating)} / 10`}</strong>
+                  </div>
+                  <div class="diamond-overview-card">
+                    <span>Assinatura</span>
+                    <strong>${billingMeta ? escapeHtml(billingMeta.label) : "—"}</strong>
+                  </div>
+                  <div class="diamond-overview-card">
+                    <span>Perfil mensal</span>
+                    <strong>${monthlyMeta ? escapeHtml(monthlyMeta.label) : "—"}</strong>
+                  </div>
+                  <div class="diamond-overview-card">
+                    <span>Revisões</span>
+                    <strong>${selectedClient.totalReviews}</strong>
+                  </div>
+                </div>
+                <div class="diamond-service-stack">
+                  ${selectedClient.services.length ? selectedClient.services.map((service) => `
+                    <div class="diamond-service-row">
+                      <div class="diamond-service-meta">
+                        <strong>${escapeHtml(PortalInsights.formatServiceName(service.service))}</strong>
+                        <span>
+                          ${escapeHtml(PortalInsights.formatEmployeeName(service.employee))} • ${service.status === "canceled" ? "cancelado" : "ativo"}
+                          ${service.startedAt ? ` • início ${escapeHtml(PortalInsights.formatProfileDate(service.startedAt))}` : ""}
+                          ${service.endedAt ? ` • fim ${escapeHtml(PortalInsights.formatProfileDate(service.endedAt))}` : ""}
+                        </span>
+                      </div>
+                      <div class="diamond-service-actions">
+                        <button
+                          type="button"
+                          class="contract-button ${service.status === "canceled" ? "canceled" : ""}"
+                          data-contract-client="${escapeHtml(selectedClient.slug)}"
+                          data-contract-service="${escapeHtml(service.service)}"
+                          data-contract-employee="${escapeHtml(service.employee)}"
+                        >
+                          <span>${service.status === "canceled" ? "Reativar serviço" : "Cancelar serviço"}</span>
+                          <small>${service.status === "canceled" ? "Volta a liberar no portal" : "Remove do portal do cliente"}</small>
+                        </button>
+                      </div>
+                    </div>
+                  `).join("") : `<div class="diamond-service-empty">Esse cliente ainda não tem nenhum serviço cadastrado.</div>`}
+                </div>
+              </div>
+            ` : `<div class="empty-state">Nenhum cliente disponível para essa leitura.</div>`}
+          </section>
+        </div>
+      `;
+    }
+
+    function renderEmployeesDashboard(snapshot) {
+      const contracts = snapshot.contracts;
+      const employeeServices = new Map();
+      contracts.forEach((client) => {
+        client.services.forEach((service) => {
+          if (!employeeServices.has(service.employee)) employeeServices.set(service.employee, new Set());
+          employeeServices.get(service.employee).add(service.service);
+        });
+      });
+
+      const topEmployee = snapshot.employees[0] || null;
+      employeesDashboard.innerHTML = `
+        <div class="insights-cards">
+          <article class="insight-card">
+            <span>Funcionários</span>
+            <strong>${snapshot.employees.length}</strong>
+            <small>Profissionais vinculados aos contratos atuais.</small>
+          </article>
+          <article class="insight-card">
+            <span>Maior carteira</span>
+            <strong>${topEmployee ? escapeHtml(PortalInsights.formatEmployeeName(topEmployee.employee)) : "—"}</strong>
+            <small>${topEmployee ? `${topEmployee.activeDiamonds} diamantes ativos` : "Sem contratos."}</small>
+          </article>
+          <article class="insight-card">
+            <span>Média da equipe</span>
+            <strong>${formatScore(snapshot.satisfaction.overallAverage)}</strong>
+            <small>Avaliação média geral puxada das notas dos clientes.</small>
+          </article>
+          <article class="insight-card">
+            <span>Cancelamentos</span>
+            <strong>${snapshot.employees.reduce((sum, item) => sum + item.canceledServices, 0)}</strong>
+            <small>Total de serviços cancelados atribuídos à equipe.</small>
+          </article>
+          <article class="insight-card">
+            <span>Ajustes solicitados</span>
+            <strong>${snapshot.reviewFlow.changesRequested}</strong>
+            <small>Entregas que voltaram para a equipe depois da revisão do cliente.</small>
+          </article>
+        </div>
+
+        <div class="employee-grid">
+          ${snapshot.employees.map((employee) => `
+            <article class="employee-card">
+              <div class="employee-head">
+                <div>
+                  <strong>${escapeHtml(PortalInsights.formatEmployeeName(employee.employee))}</strong>
+                  <span class="employee-sub">Diamantes: ${employee.activeDiamonds} • Cancelados: ${employee.canceledServices} • Avaliações: ${employee.totalRatings}</span>
+                </div>
+                <span class="score-pill ${employee.averageRating == null ? "empty" : ""}">${employee.averageRating == null ? "Sem nota" : `${formatScore(employee.averageRating)} / 10`}</span>
+              </div>
+              <div class="chip-row">
+                <div class="metric-chip">
+                  <strong>${employee.activeDiamonds}</strong>
+                  <small>Diamantes</small>
+                </div>
+                <div class="metric-chip">
+                  <strong>${employee.canceledServices}</strong>
+                  <small>Cancelados</small>
+                </div>
+                <div class="metric-chip">
+                  <strong>${employee.totalRatings}</strong>
+                  <small>Avaliações</small>
+                </div>
+                <div class="metric-chip">
+                  <strong>${employee.totalReviews}</strong>
+                  <small>Revisões</small>
+                </div>
+              </div>
+              <div class="chip-row">
+                ${Array.from(employeeServices.get(employee.employee) || []).map((service) => `
+                  <span class="metric-chip">
+                    <strong>${escapeHtml(PortalInsights.formatServiceName(service))}</strong>
+                    <small>Área</small>
+                  </span>
+                `).join("")}
+              </div>
+            </article>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function renderSatisfactionDashboard(snapshot) {
+      satisfactionDashboard.innerHTML = `
+        <div class="insights-cards">
+          <article class="insight-card">
+            <span>Média geral</span>
+            <strong>${formatScore(snapshot.satisfaction.overallAverage)}</strong>
+            <small>Média consolidada de todas as avaliações registradas.</small>
+          </article>
+          <article class="insight-card">
+            <span>Total de notas</span>
+            <strong>${snapshot.satisfaction.totalRatings}</strong>
+            <small>Quantidade de avaliações vindas das tasks resolvidas.</small>
+          </article>
+          <article class="insight-card">
+            <span>Melhor área</span>
+            <strong>${snapshot.satisfaction.byService[0] ? escapeHtml(PortalInsights.formatServiceName(snapshot.satisfaction.byService[0].service)) : "—"}</strong>
+            <small>${snapshot.satisfaction.byService[0] ? `${formatScore(snapshot.satisfaction.byService[0].averageRating)} / 10` : "Sem notas ainda."}</small>
+          </article>
+          <article class="insight-card">
+            <span>Melhor cliente</span>
+            <strong>${snapshot.satisfaction.byClient[0] ? escapeHtml(PortalInsights.formatClientName(snapshot.satisfaction.byClient[0].name)) : "—"}</strong>
+            <small>${snapshot.satisfaction.byClient[0] ? `${formatScore(snapshot.satisfaction.byClient[0].averageRating)} / 10` : "Sem notas ainda."}</small>
+          </article>
+          <article class="insight-card">
+            <span>Revisões aprovadas</span>
+            <strong>${snapshot.reviewFlow.approved}</strong>
+            <small>${snapshot.reviewFlow.changesRequested} revisões pediram ajuste antes da nota.</small>
+          </article>
+        </div>
+
+        <div class="insights-grid">
+          <section class="insight-panel">
+            <h3>Satisfação por área</h3>
+            <p>Média das notas separada por serviço contratado.</p>
+            ${renderBars(snapshot.satisfaction.byService, (item) => ({
+              label: PortalInsights.formatServiceName(item.service),
+              value: item.averageRating || 0,
+              meta: `${formatScore(item.averageRating)} / 10 • ${item.totalReviews} revisões • ${item.changesRequested} ajustes`
+            }))}
+          </section>
+          <section class="insight-panel">
+            <h3>Satisfação por funcionário</h3>
+            <p>Leitura média por profissional com base nas tarefas avaliadas.</p>
+            ${renderBars(snapshot.satisfaction.byEmployee, (item) => ({
+              label: PortalInsights.formatEmployeeName(item.employee),
+              value: item.averageRating || 0,
+              meta: `${formatScore(item.averageRating)} / 10 • ${item.totalReviews} revisões • ${item.changesRequested} ajustes`
+            }))}
+          </section>
+        </div>
+
+        <div class="insight-panel" style="margin-top:16px;">
+          <h3>Satisfação por cliente</h3>
+          <p>Média geral de avaliação de cada diamante com nota registrada.</p>
+          ${renderBars(snapshot.satisfaction.byClient, (item) => ({
+            label: PortalInsights.formatClientName(item.name),
+            value: item.averageRating || 0,
+            meta: `${formatScore(item.averageRating)} / 10 • ${item.totalReviews} revisões • ${item.changesRequested} ajustes`
+          }))}
+        </div>
+      `;
+    }
+
+    function renderAnalytics() {
+      const snapshot = PortalInsights.getDashboardSnapshot();
+      try {
+        renderDiamondsDashboard(snapshot);
+      } catch (error) {
+        renderInsightError(diamondsDashboard, "Erro ao carregar diamantes.", error);
+      }
+      try {
+        renderClientsDashboard(snapshot);
+      } catch (error) {
+        renderInsightError(clientsDashboard, "Erro ao carregar clientes.", error);
+      }
+      try {
+        renderEmployeesDashboard(snapshot);
+      } catch (error) {
+        renderInsightError(employeesDashboard, "Erro ao carregar funcionários.", error);
+      }
+      try {
+        renderSatisfactionDashboard(snapshot);
+      } catch (error) {
+        renderInsightError(satisfactionDashboard, "Erro ao carregar satisfação.", error);
+      }
+      syncInsightTabs();
+    }
+
+    function renderUsers() {
+      renderStats();
+      const users = getFilteredUsers();
+
+      if (!users.length) {
+        usersList.innerHTML = `<div class="empty-state">Nenhum usuário encontrado com esse filtro.</div>`;
+        return;
+      }
+
+      usersList.innerHTML = users.map((user) => {
+        const route = auth.getClientRouteBySlug(user.clientSlug);
+        const document = auth.getUserDocument(user);
+        const statusMeta = getUserStatusMeta(user);
+        const decisionButtons = user.status === "pending"
+          ? `
+              <button type="button" class="approve-button" data-action="approve" data-user-id="${user.id}">Aprovar</button>
+              <button type="button" class="danger-button" data-action="reject" data-user-id="${user.id}">Rejeitar</button>
+            `
+          : "";
+        const openButton = user.role !== "admin" && user.status === "approved" && route
+          ? `<button type="button" class="link-button" data-action="open" data-user-id="${user.id}">Abrir portal</button>`
+          : "";
+        const roleButton = user.id !== "seed-admin"
+          ? user.role === "admin"
+            ? `<button type="button" class="link-button" data-action="revoke-admin" data-user-id="${user.id}">Remover admin</button>`
+            : `<button type="button" class="link-button" data-action="grant-admin" data-user-id="${user.id}">Tornar admin</button>`
+          : "";
+        const destinationMarkup = user.role === "admin"
+          ? `<div class="row-readonly">Acesso total ao painel admin</div>`
+          : `
+              <select class="row-select" data-client-select="${user.id}">
+                ${getClientOptionsMarkup(user.clientSlug)}
+              </select>
+            `;
+
+        return `
+          <article class="user-card" data-user-id="${user.id}">
+            <div class="user-head">
+              <div>
+                <strong>${escapeHtml(user.name)}</strong>
+                <div class="user-meta">
+                  <span class="meta-chip">${escapeHtml(user.email)}</span>
+                  <span class="meta-chip">${getDocumentLabel(document.type)} ${escapeHtml(auth.formatDocument(document.value, document.type))}</span>
+                  <span class="status-chip ${statusMeta.className}">${statusMeta.label}</span>
+                </div>
+              </div>
+              <div class="meta-chip">${user.role === "admin" ? "acesso total" : route ? route.label : "sem destino"}</div>
+            </div>
+            <div class="user-grid">
+              <div class="row-field">
+                <label>${user.role === "admin" ? "Acesso do usuário" : "Destino do usuário"}</label>
+                ${destinationMarkup}
+              </div>
+              <div class="user-actions">${decisionButtons}</div>
+              <div class="user-actions">
+                ${roleButton}
+                <button type="button" class="link-button" data-action="edit" data-user-id="${user.id}">Editar</button>
+                ${openButton}
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    async function refreshAdminDataInBackground() {
+      if (adminRefreshBusy) {
+        return;
+      }
+
+      adminRefreshBusy = true;
+      try {
+        await auth.init({ includeUsers: true, force: true });
+        await window.PortalInsights.init({ force: true, silent: true });
+        renderUsers();
+        renderAnalytics();
+      } catch (error) {
+        // Keep the current screen visible even if a background refresh fails.
+      } finally {
+        adminRefreshBusy = false;
+      }
+    }
+
+    function startAdminLiveRefresh() {
+      if (adminRefreshTimer) {
+        return;
+      }
+
+      adminRefreshTimer = window.setInterval(() => {
+        if (!document.hidden) {
+          refreshAdminDataInBackground();
+        }
+      }, 30000);
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          refreshAdminDataInBackground();
+        }
+      });
+
+      window.addEventListener("focus", () => {
+        refreshAdminDataInBackground();
+      });
+    }
+
+    function openModal(user) {
+      editingUserId = user ? user.id : null;
+      modalTitle.textContent = user ? "Editar usuário" : "Criar usuário manual";
+      const document = auth.getUserDocument(user || {});
+      formName.value = user ? user.name : "";
+      formEmail.value = user ? user.email : "";
+      formPassword.value = user ? user.password : "";
+      formDocumentType.value = document.type;
+      formDocumentValue.value = document.value;
+      syncDocumentField();
+      formClientSlug.innerHTML = getClientOptionsMarkup(user ? user.clientSlug : "");
+      formStatus.value = user ? user.status : "pending";
+      formRole.value = user ? (user.role || "client") : "client";
+      formRole.disabled = !!(user && user.id === "seed-admin");
+      syncRoleField();
+      userModal.classList.add("show");
+    }
+
+    function closeModal() {
+      editingUserId = null;
+      userForm.reset();
+      formDocumentType.value = "cpf";
+      formDocumentValue.value = "";
+      formRole.value = "client";
+      formRole.disabled = false;
+      syncDocumentField();
+      syncRoleField();
+      userModal.classList.remove("show");
+    }
+
+    function syncServiceEmployeeOptions(selectedEmployee) {
+      serviceEmployee.innerHTML = getEmployeeOptionsMarkup(serviceType.value, selectedEmployee || "");
+    }
+
+    function openServiceModal(clientSlug) {
+      serviceClientSlug.innerHTML = getClientOptionsMarkup(clientSlug || "", "Selecione o cliente");
+      serviceType.innerHTML = getServiceOptionsMarkup("");
+      serviceStatus.value = "active";
+      serviceStartedAt.value = new Date().toISOString().slice(0, 10);
+      syncServiceEmployeeOptions("");
+      serviceModal.classList.add("show");
+    }
+
+    function closeServiceModal() {
+      serviceForm.reset();
+      serviceClientSlug.innerHTML = getClientOptionsMarkup("", "Selecione o cliente");
+      serviceType.innerHTML = getServiceOptionsMarkup("");
+      serviceStartedAt.value = "";
+      syncServiceEmployeeOptions("");
+      serviceModal.classList.remove("show");
+    }
+
+    async function approveUser(userId) {
+      const select = document.querySelector(`[data-client-select="${userId}"]`);
+      const clientSlug = select ? select.value : "";
+      if (!clientSlug) {
+        showToast("Escolha o destino antes de aprovar.", true);
+        return;
+      }
+      try {
+        await auth.updateUser(userId, { status: "approved", clientSlug });
+        renderUsers();
+        renderAnalytics();
+        showToast("Usuário aprovado com sucesso.");
+      } catch (error) {
+        showToast(error.message || "Não foi possível aprovar.", true);
+      }
+    }
+
+    async function rejectUser(userId) {
+      try {
+        await auth.updateUser(userId, { status: "rejected" });
+        renderUsers();
+        renderAnalytics();
+        showToast("Usuário movido para rejeitado.");
+      } catch (error) {
+        showToast(error.message || "Não foi possível rejeitar.", true);
+      }
+    }
+
+    async function toggleAdminAccess(user, shouldGrantAdmin) {
+      if (!user || user.id === "seed-admin") {
+        showToast("Esse admin principal não pode ser alterado por aqui.", true);
+        return;
+      }
+
+      if (!shouldGrantAdmin && user.id === sessionUser.id) {
+        showToast("Você não pode remover o próprio acesso de admin.", true);
+        return;
+      }
+
+      try {
+        await auth.updateUser(user.id, shouldGrantAdmin
+          ? { role: "admin", status: "approved", clientSlug: "" }
+          : { role: "client", status: "pending", clientSlug: "" }
+        );
+        renderUsers();
+        renderAnalytics();
+        showToast(shouldGrantAdmin ? "Acesso de admin liberado com sucesso." : "Acesso de admin removido. O usuário voltou para pendente.");
+      } catch (error) {
+        showToast(error.message || "Não foi possível atualizar a permissão.", true);
+      }
+    }
+
+    usersList.addEventListener("click", async (event) => {
+      const button = event.target.closest("[data-action]");
+      if (!button) return;
+      const { action, userId } = button.dataset;
+      const user = auth.getUserById(userId);
+      if (!user) return;
+
+      if (action === "approve") {
+        await approveUser(userId);
+        return;
+      }
+
+      if (action === "reject") {
+        await rejectUser(userId);
+        return;
+      }
+
+      if (action === "edit") {
+        openModal(user);
+        return;
+      }
+
+      if (action === "grant-admin") {
+        await toggleAdminAccess(user, true);
+        return;
+      }
+
+      if (action === "revoke-admin") {
+        await toggleAdminAccess(user, false);
+        return;
+      }
+
+      if (action === "open" && user.clientSlug) {
+        window.open(auth.getClientUrl(user.clientSlug), "_blank");
+      }
+    });
+
+    userForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        const payload = {
+          name: formName.value,
+          email: formEmail.value,
+          password: formPassword.value,
+          documentType: formDocumentType.value,
+          documentValue: formDocumentValue.value,
+          clientSlug: formRole.value === "admin" ? "" : formClientSlug.value,
+          status: formRole.value === "admin" ? "approved" : formStatus.value,
+          role: formRole.value
+        };
+
+        if (editingUserId) {
+          await auth.updateUser(editingUserId, payload);
+        } else {
+          const created = await auth.createPendingUser(payload, { setSession: false });
+          await auth.updateUser(created.id, payload);
+        }
+
+        closeModal();
+        renderUsers();
+        renderAnalytics();
+        showToast("Usuário salvo com sucesso.");
+      } catch (error) {
+        showToast(error.message || "Não foi possível salvar.", true);
+      }
+    });
+
+    formDocumentType.addEventListener("change", syncDocumentField);
+    formDocumentValue.addEventListener("input", syncDocumentField);
+    formRole.addEventListener("change", syncRoleField);
+
+    document.querySelectorAll("[data-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        activeFilter = button.dataset.filter;
+        document.querySelectorAll("[data-filter]").forEach((chip) => {
+          chip.classList.toggle("active", chip.dataset.filter === activeFilter);
+        });
+        renderUsers();
+      });
+    });
+
+    searchInput.addEventListener("input", renderUsers);
+
+    document.getElementById("newUserButton").addEventListener("click", () => openModal(null));
+    document.getElementById("closeModalButton").addEventListener("click", closeModal);
+    document.getElementById("cancelModalButton").addEventListener("click", closeModal);
+    document.getElementById("logoutButton").addEventListener("click", () => {
+      auth.logout();
+    });
+    document.getElementById("backToLoginButton").addEventListener("click", () => {
+      window.location.href = auth.toAppUrl("index.html");
+    });
+
+    userModal.addEventListener("click", (event) => {
+      if (event.target === userModal) closeModal();
+    });
+
+    document.querySelectorAll("[data-insight-tab]").forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        activeInsightTab = button.dataset.insightTab || "diamonds";
+        syncInsightTabs();
+      });
+    });
+
+    exportSpreadsheetButton.addEventListener("click", exportSpreadsheet);
+
+    diamondsDashboard.addEventListener("click", async (event) => {
+      const addButton = event.target.closest('[data-action="add-service"]');
+      if (addButton) {
+        openServiceModal(addButton.dataset.clientSlug || "");
+        return;
+      }
+
+      const button = event.target.closest("[data-contract-client]");
+      if (!button) return;
+      await PortalInsights.toggleContractStatus(
+        button.dataset.contractClient,
+        button.dataset.contractService,
+        button.dataset.contractEmployee
+      );
+      renderAnalytics();
+      showToast("Status do serviço atualizado.");
+    });
+
+    diamondsDashboard.addEventListener("change", (event) => {
+      const selector = event.target.closest("[data-diamond-client-selector]");
+      if (!selector) return;
+      activeDiamondClientSlug = selector.value || "";
+      renderAnalytics();
+    });
+
+    clientsDashboard.addEventListener("click", (event) => {
+      const billingButton = event.target.closest("[data-billing-value]");
+      if (billingButton) {
+        const form = billingButton.closest("[data-client-profile-form]");
+        const select = form ? form.querySelector('[name="clientBillingStatus"]') : null;
+        if (select) {
+          select.value = billingButton.dataset.billingValue || "current";
+          syncClientBillingForm(form);
+        }
+        return;
+      }
+
+      const portalButton = event.target.closest("[data-open-client-portal]");
+      if (!portalButton) return;
+      window.open(auth.getClientUrl(portalButton.dataset.openClientPortal), "_blank");
+    });
+
+    clientsDashboard.addEventListener("change", (event) => {
+      const selector = event.target.closest("[data-client-profile-selector]");
+      if (selector) {
+        activeClientProfileSlug = selector.value || "";
+        renderAnalytics();
+        return;
+      }
+
+      const billingSelect = event.target.closest('[name="clientBillingStatus"]');
+      if (billingSelect) {
+        syncClientBillingForm(billingSelect.closest("[data-client-profile-form]"));
+      }
+    });
+
+    clientsDashboard.addEventListener("submit", async (event) => {
+      const form = event.target.closest("[data-client-profile-form]");
+      if (!form) return;
+      event.preventDefault();
+
+      const clientSlug = form.dataset.clientSlug || "";
+      if (!clientSlug) {
+        showToast("Cliente não identificado para salvar o perfil.", true);
+        return;
+      }
+
+      const submitButton = form.querySelector('button[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+
+      try {
+        await PortalInsights.saveClientProfile(clientSlug, collectClientProfilePayload(form));
+        renderAnalytics();
+        showToast("Perfil do cliente salvo com sucesso.");
+      } catch (error) {
+        showToast(error.message || "Não foi possível salvar o perfil do cliente.", true);
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+
+    serviceType.addEventListener("change", () => {
+      syncServiceEmployeeOptions("");
+    });
+
+    serviceForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      try {
+        if (!serviceClientSlug.value) {
+          throw new Error("Escolha o cliente.");
+        }
+
+        if (!serviceType.value) {
+          throw new Error("Escolha o serviço.");
+        }
+
+        if (!serviceEmployee.value) {
+          throw new Error("Escolha o prestador.");
+        }
+
+        await PortalInsights.upsertContract(
+          serviceClientSlug.value,
+          serviceType.value,
+          serviceEmployee.value,
+          { status: serviceStatus.value, startedAt: serviceStartedAt.value }
+        );
+
+        closeServiceModal();
+        renderAnalytics();
+        showToast("Serviço adicionado ao cliente.");
+      } catch (error) {
+        showToast(error.message || "Não foi possível adicionar o serviço.", true);
+      }
+    });
+
+    document.getElementById("closeServiceModalButton").addEventListener("click", closeServiceModal);
+    document.getElementById("cancelServiceModalButton").addEventListener("click", closeServiceModal);
+
+    serviceModal.addEventListener("click", (event) => {
+      if (event.target === serviceModal) closeServiceModal();
+    });
+
+    syncDocumentField();
+    renderUsers();
+    renderAnalytics();
+    startAdminLiveRefresh();
+    })();
+  </script>
+</body>
+</html>

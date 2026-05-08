@@ -1,0 +1,36 @@
+# --- segredos / credenciais (NUNCA versionar) ---
+api/data/clickup-api-key.txt
+api/data/*.key
+api/data/*.secret
+.env
+.env.*
+*.pem
+
+# --- dados de produção / runtime ---
+api/storage/app-state.json
+api/storage/notification-log.jsonl
+api/storage/notification-markers/
+api/storage/*.bak
+backend/clients.json
+backend/runtime/
+backup-storage-before-merge-*/
+
+# --- arquivos locais de desenvolvimento ---
+php.ini
+php-local.ini
+.php-local.ini
+_diag.php
+_apply_proxy_patch.py
+
+# --- artefatos do SO / IDE ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- empacotamentos ---
+*.zip
+!api/data/*.example
