@@ -11,20 +11,24 @@ import { saveTaskReview } from "./insights-reviews.js";
 import { openRatingModal } from "./insights-rating-modal.js";
 
 async function postPortalTaskComment(taskId, message) {
-  const response = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/comment`, {
-    method:  "POST",
-    headers: {
-      Authorization:  typeof CU_API_KEY !== "undefined" ? CU_API_KEY : "",
-      "Content-Type": "application/json"
-    },
+  // FIX (pentest HIGH): rota via proxy server-side em vez de chamar api.clickup.com direto.
+  const clientSlug = typeof CLIENTE_SLUG !== "undefined" ? CLIENTE_SLUG : "";
+  const prefix = typeof CLIENT_COMMENT_PREFIX !== "undefined" ? CLIENT_COMMENT_PREFIX : "";
+  const response = await fetch("/api/clickup.php", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      comment_text: `${typeof CLIENT_COMMENT_PREFIX !== "undefined" ? CLIENT_COMMENT_PREFIX : ""}${String(message || "").trim()}`,
-    })
+      method: "POST",
+      path: `task/${taskId}/comment`,
+      clientSlug,
+      body: { comment_text: `${prefix}${String(message || "").trim()}` },
+    }),
   });
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(payload && payload.err ? payload.err : `Erro ${response.status} ao enviar comentário.`);
+    throw new Error(payload?.err || payload?.error || `Erro ${response.status} ao enviar comentário.`);
   }
   return payload;
 }

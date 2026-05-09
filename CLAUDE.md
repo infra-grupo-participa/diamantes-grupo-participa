@@ -18,7 +18,7 @@
 feat/* → PR → CI verde (6 checks) → aprovação → squash merge → deploy automático via main → smoke test → done
 ```
 
-**Nunca commite direto em `main` ou `homologacao`.** Veja `CONTRIBUTING.md` para detalhes.
+**Nunca commite direto em `main`.** Veja `CONTRIBUTING.md` para detalhes. Homolog foi descontinuado — todas as alterações vão direto pra prod via `main`.
 
 ## Quality Gate
 

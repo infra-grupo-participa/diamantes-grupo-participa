@@ -218,19 +218,24 @@ export function updatePortalUploadPreview() {
 
 export async function syncProfileAttachments(context, files) {
   if (typeof CLIENTE_TASK_ID === "undefined" || !CLIENTE_TASK_ID || !files.length) return;
+  // FIX (pentest HIGH): rota via proxy server-side. CSRF token + auth são tratados pelo PHP.
+  const clientSlug = typeof CLIENTE_SLUG !== "undefined" ? CLIENTE_SLUG : "";
   for (const file of files) {
     const formData = new FormData();
+    formData.append("clientSlug", clientSlug);
+    formData.append("method", "POST");
+    formData.append("path", `task/${CLIENTE_TASK_ID}/attachment`);
     formData.append("attachment", file, file.name);
 
-    const response = await fetch(`https://api.clickup.com/api/v2/task/${CLIENTE_TASK_ID}/attachment`, {
-      method:  "POST",
-      headers: { Authorization: typeof CU_API_KEY !== "undefined" ? CU_API_KEY : "" },
-      body:    formData,
+    const response = await fetch("/api/clickup.php", {
+      method: "POST",
+      credentials: "same-origin",
+      body: formData,
     });
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(payload?.err || `Erro ${response.status} ao enviar foto do formulário.`);
+      throw new Error(payload?.err || payload?.error || `Erro ${response.status} ao enviar foto do formulário.`);
     }
   }
 }

@@ -1,0 +1,8 @@
+# admin/.htaccess — força index.php (server-side guard) ao acessar /admin/
+# Sem isso, Apache serviria index.html diretamente sem passar pelo PHP guard.
+DirectoryIndex index.php index.html
+
+# Bloqueia acesso direto ao HTML estático — só via index.php
+<Files "index.html">
+    Require all denied
+</Files>

@@ -525,9 +525,14 @@ export async function hydratePortalTipoOptions() {
   const fieldId = typeof CF_TIPO_ID  !== "undefined" ? String(CF_TIPO_ID  || "").trim() : "";
   if (!listId || !fieldId) { state.tipoOptionsHydrated = true; return Promise.resolve(); }
 
-  state.tipoOptionsPromise = fetch(`https://api.clickup.com/api/v2/list/${listId}/field`, {
-    method:  "GET",
-    headers: { Authorization: typeof CU_API_KEY !== "undefined" ? CU_API_KEY : "" },
+  // FIX (pentest HIGH): rota via proxy server-side em vez de chamar api.clickup.com direto
+  // (que exporia GP_CLICKUP_API_KEY no browser). Backend autentica e repassa.
+  const clientSlug = typeof CLIENTE_SLUG !== "undefined" ? CLIENTE_SLUG : "";
+  state.tipoOptionsPromise = fetch("/api/clickup.php", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ method: "GET", path: `list/${listId}/field`, clientSlug, body: null }),
   })
     .then((response) => response.json().catch(() => null).then((payload) => ({ response, payload })))
     .then(({ response, payload }) => {
