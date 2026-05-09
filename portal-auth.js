@@ -253,6 +253,10 @@
   }
 
   function getClientUrl(slug) {
+    // Fase 3: redirect to unified portal endpoint instead of legacy static paths.
+    if (slug) {
+      return new URL("portal/?slug=" + encodeURIComponent(slug), appRootUrl).href;
+    }
     const route = getClientRouteBySlug(slug);
     return route ? toAppUrl(route.path) : toAppUrl("index.html");
   }

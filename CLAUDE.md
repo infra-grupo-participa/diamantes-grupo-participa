@@ -66,32 +66,71 @@ npm run test:e2e:headed
 ```
 .
 ├── api/
-│   ├── bootstrap.php      ← 1400+ linhas; core do sistema (Fase 2: extrair classes)
+│   ├── bootstrap.php      ← core do sistema; wrappers para classes PSR-4 em src/
 │   ├── auth.php           ← autenticação
 │   ├── users.php          ← gestão de usuários
 │   ├── clickup.php        ← integração ClickUp
 │   ├── clickup-webhook.php← webhook ClickUp
 │   ├── insights.php       ← relatórios
-│   └── export.php         ← exportação de dados
+│   ├── export.php         ← exportação de dados
+│   ├── data/
+│   │   └── portals.json   ← config dos 27 portais (cf_tipos, assignee_ids, auto_map)
+│   └── scripts/
+│       ├── setup-admin.php         ← cria/atualiza admin (suporta GP_BOOTSTRAP_USER_CLIENT_SLUG)
+│       └── seed-client-slugs.php   ← idempotente: atribui clientSlug a users existentes
+├── portal/
+│   ├── index.php          ← endpoint único: auth guard + render por slug
+│   └── template.html      ← template com {{PLACEHOLDERS}} extraído do portal canônico
+├── src/                   ← classes PSR-4 (Fase 2)
+│   └── Users/UserService.php  ← normalize() já inclui clientSlug
 ├── admin/index.html       ← painel administrativo
-├── {slug}/index.html      ← 27 portais individuais de clientes
+├── {slug}/index.html      ← 27 portais legados (coexistem até PR 3b removê-los)
 ├── index.html             ← tela de login
-├── portal-auth.js         ← lógica de auth no cliente
+├── portal-auth.js         ← lógica de auth; getClientUrl() aponta para /portal/?slug=
 ├── portal-contracts.js    ← listagem de contratos
 ├── portal-insights.js     ← insights no cliente
 ├── auth-guard.js          ← guard de rota client-side
 ├── backend/server.py      ← listener Python ClickUp
 ├── chatbot/               ← bot Python WhatsApp
 ├── tests/
-│   ├── Smoke/SanityTest.php  ← PHPUnit smoke
-│   ├── unit/sanity.test.js   ← Vitest smoke
-│   └── e2e/login.spec.js     ← Playwright smoke
+│   ├── Smoke/SanityTest.php              ← PHPUnit smoke
+│   ├── Unit/Portal/AuthorizationTest.php ← PHPUnit: auth guard do portal
+│   ├── unit/sanity.test.js               ← Vitest smoke
+│   ├── e2e/login.spec.js                 ← Playwright smoke
+│   └── e2e/portal-unification.spec.js    ← Playwright: snapshot 27 slugs + IDOR
+├── .htaccess              ← redirects legados /{slug}/ → /portal/?slug=
 ├── .github/workflows/
 │   ├── ci.yml             ← lint + testes + gitleaks + dependency review
 │   ├── security.yml       ← varredura semanal
 │   └── pr-quality.yml     ← comentário com métricas no PR
 └── docs/quality-gate.md   ← como configurar o gate no GitHub
 ```
+
+## Fluxo de request — Portal (Fase 3)
+
+```
+Cliente → GET /portal/?slug=X
+       → portal/index.php
+         - gp_get_session_user() → 401 se sem sessão
+         - Valida slug (regex /^[a-z][a-z0-9-]+$/) → 400 se inválido
+         - Admin: acessa qualquer slug
+         - Client: só seu próprio clientSlug → 403 se diferente
+         - Lê api/data/portals.json → 404 se slug não existe
+         - Renderiza portal/template.html via strtr() com dados do portal
+       → HTML idêntico ao legado /{slug}/index.html
+```
+
+### Variáveis de configuração por portal (portals.json)
+
+| Campo | Descrição |
+|-------|-----------|
+| `slug` | Identificador único (ex: `joao-eduardo-zanela`) |
+| `display_name` | Nome exibido no title e h1 |
+| `cliente_name_var` | Nome em maiúsculas para JS |
+| `cliente_task_id` | ID da task no ClickUp |
+| `cf_tipos` | Lista de tipos de serviço disponíveis |
+| `assignee_ids` | Mapa nome → ID no ClickUp |
+| `auto_map` | Mapa tipo → nome do prestador padrão |
 
 ## Variáveis de ambiente
 
@@ -115,7 +154,7 @@ Legado: `api/data/clickup-api-key.txt` ainda é lido como fallback (remover na F
 | 0 | Quality Gate + Harness de Testes | Concluída |
 | 1 | Segurança crítica: bcrypt, CSRF, rate-limit, CSP | Pendente |
 | 2 | Quebrar `api/bootstrap.php` em classes PSR-4 (`src/`) | Pendente |
-| 3 | Unificar 27 portais de clientes em portal único CRUD | Pendente |
+| 3 | Unificar 27 portais de clientes em portal único CRUD | PR 3a concluído — portais legados coexistindo |
 | 4 | Modularizar `portal-insights.js` + extrair CSS inline | Pendente |
 | 5 | Migrar armazenamento JSON → Supabase Postgres | Pendente |
 | 6 | Deploy automatizado GitHub Actions → Hostinger | Pendente |

@@ -474,11 +474,43 @@ function gp_find_client_route(string $clientSlug): ?array
 
 function gp_get_client_portal_url(string $clientSlug): string
 {
-    $route = gp_find_client_route($clientSlug);
-    if ($route && !empty($route['path'])) {
-        return gp_get_app_base_url() . '/' . ltrim((string)$route['path'], '/');
+    // Fase 3: unified portal endpoint.
+    if ($clientSlug !== '') {
+        return gp_get_app_base_url() . '/portal/?slug=' . urlencode($clientSlug);
     }
     return gp_get_app_base_url();
+}
+
+/**
+ * Build a JS object literal in the multi-line format used by legacy portals.
+ *
+ * Output format:
+ *   {
+ *     "KEY": value,
+ *     ...
+ *   }
+ *
+ * Uses CRLF line endings and 4-space key indent to match the legacy portal files.
+ * Values are null-literal or json_encode'd strings.
+ *
+ * @param array<string, mixed> $keys
+ */
+function gp_portal_object_literal(array $keys, string $indent = '    '): string
+{
+    if (empty($keys)) {
+        return '{}';
+    }
+    $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT;
+    $lines = ['{'];
+    foreach ($keys as $key => $val) {
+        $jsonKey = json_encode((string)$key, $jsonFlags);
+        $jsonVal = $val === null
+            ? 'null'
+            : json_encode($val, $jsonFlags);
+        $lines[] = $indent . $jsonKey . ': ' . $jsonVal . ',';
+    }
+    $lines[] = '  }';
+    return implode("\r\n", $lines);
 }
 
 function gp_default_admin(): array
