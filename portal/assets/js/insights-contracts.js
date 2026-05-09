@@ -15,8 +15,7 @@ import {
   normalizeEntityName,
   normalizeServiceName,
   humanizeText,
-  uniqueValues,
-  SERVICE_LABELS as _labels  // local alias
+  uniqueValues
 } from "./insights-utils.js";
 import { SERVICE_LABELS, CLIENT_PROFILE_SCHEMA } from "./insights-state.js";
 
