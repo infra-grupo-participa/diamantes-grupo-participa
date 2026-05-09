@@ -74,7 +74,8 @@ function normalizeForDiff(html) {
     .replace(/\r\n/g, '\n');
 }
 
-function saveDiff(slug, portalHtml, legacyHtml) {
+// kept for diagnostic use during future refactors
+function saveDiff(slug, portalHtml, legacyHtml) { // eslint-disable-line no-unused-vars
   try {
     mkdirSync('test-results', { recursive: true });
     const diffPath = join('test-results', `snapshot-diff-${slug}.html`);
@@ -131,45 +132,21 @@ test.describe('Admin portal access', () => {
   }
 });
 
-// ── Tests: snapshot equivalence (admin vs legacy) ────────────────────────────
+// ── Tests: legacy redirect (após remoção das 27 pastas) ──────────────────────
 
-test.describe('Snapshot equivalence: /portal/ vs legacy static HTML', () => {
+test.describe('Legacy /{slug}/ URLs redirect to /portal/?slug=', () => {
   test.skip(!HAS_ADMIN, 'Skipped: admin credentials not set');
 
   test.beforeEach(async ({ page }) => {
     await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   });
 
-  for (const slug of ALL_SLUGS) {
-    test(`/portal/?slug=${slug} matches /${slug}/index.html`, async ({ page }) => {
-      // Fetch portal endpoint.
-      const portalResponse = await page.goto(`/portal/?slug=${slug}`);
-      expect(portalResponse?.status()).toBe(200);
-      const portalHtml = normalizeForDiff(await page.content());
-
-      // Fetch legacy static file.
-      const legacyResponse = await page.goto(`/${slug}/index.html`);
-      const legacyStatus = legacyResponse?.status() ?? 0;
-
-      if (legacyStatus === 404 || legacyStatus === 302 || legacyStatus === 301) {
-        // Legacy file already removed or redirected — skip byte comparison.
-        test.info().annotations.push({
-          type: 'note',
-          description: `Legacy /${slug}/index.html returned ${legacyStatus} — skipping byte comparison`,
-        });
-        return;
-      }
-
-      const legacyHtml = normalizeForDiff(await page.content());
-
-      if (portalHtml !== legacyHtml) {
-        saveDiff(slug, portalHtml, legacyHtml);
-      }
-
-      expect(
-        portalHtml,
-        `HTML mismatch for ${slug} — diff saved to test-results/snapshot-diff-${slug}.html`
-      ).toBe(legacyHtml);
+  // Sample 3 slugs to validate the .htaccess RewriteRule.
+  for (const slug of ['alessandro-lima', 'joao-eduardo-zanela', 'willian-loro']) {
+    test(`/${slug}/ → 302 → /portal/?slug=${slug}`, async ({ page }) => {
+      const response = await page.goto(`/${slug}/`, { waitUntil: 'load' });
+      expect(response?.status()).toBe(200); // após redirect
+      expect(page.url()).toContain(`/portal/?slug=${slug}`);
     });
   }
 });

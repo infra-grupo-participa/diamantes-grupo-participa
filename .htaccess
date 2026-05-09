@@ -14,12 +14,11 @@ DirectoryIndex index.html index.php
     # Acesso direto à raiz -> serve index.html
     RewriteRule ^$ index.html [L]
 
-    # Fase 3: redireciona URLs legadas /{slug}/ para /portal/?slug={slug}
-    # Lista explícita dos 27 slugs válidos — evita interferência com /api/, /admin/, etc.
-    # Para reverter: comentar o RewriteRule abaixo.
-    # No QSA — legacy URLs never carried query strings; forwarding them would risk
-    # injection of duplicate ?slug= parameters.
-    RewriteRule ^(alessandro-lima|anthony-sodre|bartira-paes|bernadete|bruno-couto|claudia-kellner|deyse-engel|fabiana-parro|felipe-schroeder|fernanda-lessa|isabela-teixeira|joao-carlos-lima|joao-eduardo-zanela|katia-paixao|luciano-simionato|luis-rocha|matheus-borges|nairio|osvaldo-catena|paulo-guaraciaba|pedro-nery|priscila-ziliani|rafael-molino|roberto-gaspar|suely-resende|vitor-negrao|willian-loro)/?$ /portal/?slug=$1 [L,R=302]
+    # Backward-compat: URLs legadas /{slug}/ continuam funcionando via redirect 302.
+    # Aceita qualquer slug kebab-case; portal/index.php valida em api/data/portals.json
+    # (slugs inválidos retornam 404). Exclui rotas internas com RewriteCond acima.
+    RewriteCond %{REQUEST_URI} !^/(api|admin|assets|portal|chatbot|backend|src|vendor|node_modules|tests|docs|tmp|infra|tools|\.github)(/|$)
+    RewriteRule ^([a-z][a-z0-9-]+)/?$ /portal/?slug=$1 [L,R=302]
 </IfModule>
 
 # Bloqueia acesso a configs locais e arquivos sensíveis
