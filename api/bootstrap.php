@@ -983,13 +983,19 @@ function gp_has_client_profile_response(array $profile): bool
 {
     $seminar = is_array($profile['seminar'] ?? null) ? $profile['seminar'] : [];
     foreach ($seminar as $value) {
-        if (is_array($value) && !empty($value)) {
-            return true;
+        if (is_array($value)) {
+            if (!empty($value)) {
+                return true;
+            }
+            continue;
         }
-        if (is_bool($value) && $value === true) {
-            return true;
+        if (is_bool($value)) {
+            if ($value === true) {
+                return true;
+            }
+            continue;
         }
-        if (trim((string)$value) !== '') {
+        if (is_scalar($value) && trim((string)$value) !== '') {
             return true;
         }
     }
