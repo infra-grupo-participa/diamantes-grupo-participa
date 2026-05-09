@@ -199,7 +199,9 @@ jobs:
               api/storage/rate-limits.json|api/data/clickup-api-key.txt) SKIPPED=$((SKIPPED+1)); continue ;;
             esac
 
-            target="ftp://${FTP_HOST}${FTP_PATH}${rel}"
+            # URL-encode espaços e caracteres especiais no path remoto
+            rel_enc=$(printf '%s' "$rel" | sed 's/ /%20/g')
+            target="ftp://${FTP_HOST}${FTP_PATH}${rel_enc}"
             code=$(curl -sS --ftp-create-dirs --user "$CREDS" -T "$f" "$target" -w "%{http_code}" -o /dev/null --max-time 60 || echo "ERR")
             if [ "$code" = "226" ] || [ "$code" = "0" ] || [ "$code" = "" ]; then
               UPLOADED=$((UPLOADED+1))
