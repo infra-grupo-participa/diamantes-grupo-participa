@@ -617,6 +617,44 @@
                 </div>
               </div>
               <button class="submit-button" type="submit">Entrar no ambiente</button>
+              <div style="margin-top:12px;text-align:right;">
+                <a href="#" id="forgotLink" style="color:#F29725;text-decoration:none;font-size:0.85rem;">Esqueci minha senha</a>
+              </div>
+            </form>
+          </div>
+
+          <div class="view" id="forgotView">
+            <h2>Recuperar senha</h2>
+            <p class="panel-intro">Informe o email do seu cadastro. Vamos enviar um link para você definir uma nova senha.</p>
+            <form id="forgotForm">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="forgotEmail">Email</label>
+                  <input id="forgotEmail" type="email" placeholder="seuemail@dominio.com" autocomplete="email" />
+                </div>
+              </div>
+              <button class="submit-button" type="submit">Enviar link de recuperação</button>
+              <div style="margin-top:12px;text-align:right;">
+                <a href="#" id="forgotBackLink" style="color:rgba(255,255,255,0.6);text-decoration:none;font-size:0.85rem;">Voltar para login</a>
+              </div>
+            </form>
+          </div>
+
+          <div class="view" id="resetView">
+            <h2>Definir nova senha</h2>
+            <p class="panel-intro">Crie uma nova senha para sua conta. Use no mínimo 8 caracteres.</p>
+            <form id="resetForm">
+              <div class="field-grid">
+                <div class="field">
+                  <label for="resetPassword">Nova senha</label>
+                  <input id="resetPassword" type="password" placeholder="Mínimo de 8 caracteres" autocomplete="new-password" />
+                </div>
+                <div class="field">
+                  <label for="resetPasswordConfirm">Confirmar senha</label>
+                  <input id="resetPasswordConfirm" type="password" placeholder="Repita a nova senha" autocomplete="new-password" />
+                </div>
+              </div>
+              <button class="submit-button" type="submit">Salvar nova senha</button>
             </form>
           </div>
 
@@ -739,6 +777,16 @@
         });
         document.getElementById("loginView").classList.toggle("active", tab === "login");
         document.getElementById("registerView").classList.toggle("active", tab === "register");
+        document.getElementById("forgotView").classList.remove("active");
+        document.getElementById("resetView").classList.remove("active");
+        setMessage("", "");
+      }
+
+      function showView(viewId) {
+        ["loginView", "registerView", "forgotView", "resetView"].forEach((id) => {
+          document.getElementById(id).classList.toggle("active", id === viewId);
+        });
+        document.querySelectorAll("[data-tab]").forEach((b) => b.classList.remove("active"));
         setMessage("", "");
       }
 
@@ -761,7 +809,12 @@
         waitingText.textContent = `${user.name || "Seu cadastro"} foi recebido e está em análise. Assim que o admin aprovar seu acesso, você será enviado automaticamente para o ambiente certo com o email ${user.email}.`;
       }
 
+      function isRecoveryFlow() {
+        return (window.location.hash || "").includes("type=recovery");
+      }
+
       function redirectIfApproved() {
+        if (isRecoveryFlow()) return;
         const sessionUser = auth.getSessionUser();
         if (!sessionUser) return;
 
@@ -853,6 +906,85 @@
           if (btn) btn.disabled = false;
         }
       });
+
+      // Forgot password flow
+      document.getElementById("forgotLink").addEventListener("click", (event) => {
+        event.preventDefault();
+        showView("forgotView");
+        const loginEmail = document.getElementById("loginIdentifier").value.trim();
+        if (loginEmail && loginEmail.includes("@")) {
+          document.getElementById("forgotEmail").value = loginEmail;
+        }
+      });
+
+      document.getElementById("forgotBackLink").addEventListener("click", (event) => {
+        event.preventDefault();
+        showView("loginView");
+      });
+
+      document.getElementById("forgotForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setMessage("", "");
+        const btn = event.target.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        try {
+          const supabase = window.getSupabaseClient();
+          const email = document.getElementById("forgotEmail").value.trim().toLowerCase();
+          if (!email || !email.includes("@")) throw new Error("Informe um email válido.");
+          const redirectTo = window.location.origin + window.location.pathname;
+          const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+          if (error) throw new Error(error.message);
+          setMessage("Pronto! Se o email existir, você vai receber um link em instantes. Confira sua caixa de entrada e o spam.", "success");
+        } catch (error) {
+          setMessage(error.message || "Não foi possível enviar o link.", "error");
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      });
+
+      // Reset password (após clicar no link do email)
+      document.getElementById("resetForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setMessage("", "");
+        const btn = event.target.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
+        try {
+          const supabase = window.getSupabaseClient();
+          const newPassword = document.getElementById("resetPassword").value;
+          const confirm = document.getElementById("resetPasswordConfirm").value;
+          if (newPassword.length < 8) throw new Error("A senha precisa ter no mínimo 8 caracteres.");
+          if (newPassword !== confirm) throw new Error("As senhas não coincidem.");
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          if (error) throw new Error(error.message);
+          setMessage("Senha atualizada! Redirecionando...", "success");
+          await auth.logout();
+          setTimeout(() => {
+            window.location.replace(window.location.origin + window.location.pathname);
+          }, 1500);
+        } catch (error) {
+          setMessage(error.message || "Não foi possível atualizar a senha.", "error");
+        } finally {
+          if (btn) btn.disabled = false;
+        }
+      });
+
+      // Detecta link de recovery do Supabase: hash contém type=recovery
+      (function detectRecoveryLink() {
+        const hash = window.location.hash || "";
+        if (hash.includes("type=recovery")) {
+          showView("resetView");
+        }
+      })();
+
+      // Listener pra evento PASSWORD_RECOVERY (quando supabase processa o hash)
+      try {
+        const supabase = window.getSupabaseClient();
+        supabase.auth.onAuthStateChange((event) => {
+          if (event === "PASSWORD_RECOVERY") {
+            showView("resetView");
+          }
+        });
+      } catch (_) { /* ignore */ }
 
       document.getElementById("waitingBackButton").addEventListener("click", async () => {
         await auth.clearSession();
