@@ -11,6 +11,9 @@ api/data/*.secret
 api/storage/app-state.json
 api/storage/notification-log.jsonl
 api/storage/notification-markers/
+api/storage/audit-log.jsonl
+api/storage/rate-limits.json
+api/storage/logs/
 api/storage/*.bak
 backend/clients.json
 backend/runtime/
@@ -51,3 +54,6 @@ test-results/
 
 # --- arquivos locais de env e config ---
 *.local
+
+# --- squad scratchpad (descartável, não vai pro repo) ---
+tmp/

@@ -55,6 +55,7 @@ try {
     if ($action === 'upsert_contract') {
         gp_require_method('POST');
         gp_require_admin();
+        gp_require_csrf_header();
         $payload = gp_request_payload();
         $clientSlug = trim((string)($payload['clientSlug'] ?? ''));
         $service = gp_service_label_alias((string)($payload['service'] ?? ''));
@@ -159,6 +160,7 @@ try {
     if ($action === 'remove_contract') {
         gp_require_method('POST');
         gp_require_admin();
+        gp_require_csrf_header();
         $payload = gp_request_payload();
         $clientSlug = trim((string)($payload['clientSlug'] ?? ''));
         $service = gp_service_label_alias((string)($payload['service'] ?? ''));
@@ -203,6 +205,7 @@ try {
     if ($action === 'set_contract_status') {
         gp_require_method('POST');
         gp_require_admin();
+        gp_require_csrf_header();
         $payload = gp_request_payload();
         $clientSlug = trim((string)($payload['clientSlug'] ?? ''));
         $service = gp_service_label_alias((string)($payload['service'] ?? ''));
@@ -262,6 +265,7 @@ try {
 
     if ($action === 'save_client_profile') {
         gp_require_method('POST');
+        gp_require_csrf_header();
         $payload = gp_request_payload();
         $clientSlug = trim((string)($payload['clientSlug'] ?? ''));
         if ($clientSlug === '') {
@@ -361,6 +365,7 @@ try {
 
     if ($action === 'save_rating') {
         gp_require_method('POST');
+        gp_require_csrf_header();
         $payload = gp_request_payload();
         $clientSlug = trim((string)($payload['clientSlug'] ?? ''));
         gp_require_client_access($clientSlug);
@@ -441,6 +446,7 @@ try {
 
     if ($action === 'save_task_review') {
         gp_require_method('POST');
+        gp_require_csrf_header();
         $payload = gp_request_payload();
         $clientSlug = trim((string)($payload['clientSlug'] ?? ''));
         gp_require_client_access($clientSlug);

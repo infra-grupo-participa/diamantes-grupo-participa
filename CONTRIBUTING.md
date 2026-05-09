@@ -100,6 +100,39 @@ npm run test:e2e
 npm run test:e2e:headed
 ```
 
+## Primeiro deploy — configuração obrigatória de segurança
+
+Após clonar e configurar o `.env`, execute estes dois passos **antes** de expor a aplicação:
+
+### 1. Configurar credenciais do admin
+
+O seed-admin é criado com senha vazia (não é possível fazer login sem este passo):
+
+```bash
+GP_BOOTSTRAP_ADMIN_EMAIL=seu-email@empresa.com \
+GP_BOOTSTRAP_ADMIN_PASSWORD=senha-forte-aqui \
+php api/scripts/setup-admin.php
+```
+
+### 2. Migrar senhas existentes para bcrypt (se houver dados legados)
+
+Se o `app-state.json` já existir com senhas em plaintext (instalação anterior à Fase 1):
+
+```bash
+php api/scripts/migrate-passwords-to-bcrypt.php
+```
+
+O script é idempotente — pode ser executado múltiplas vezes sem risco.
+
+### Variáveis de ambiente de segurança
+
+| Variável | Default | Descrição |
+|----------|---------|-----------|
+| `GP_COOKIE_SECURE` | `true` | `false` apenas em dev HTTP local |
+| `GP_CLICKUP_WEBHOOK_SECRET` | — | **Obrigatório** — sem ele, o webhook rejeita todas as chamadas (fail-closed) |
+
+Veja `.env.example` para a lista completa.
+
 ## Hooks locais (opt-in)
 
 O projeto inclui `lefthook.yml` com hooks de conveniência (php lint + gitleaks no pre-commit, Conventional Commits no commit-msg). São opcionais — o gate real é o CI.

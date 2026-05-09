@@ -6,8 +6,9 @@ require_once __DIR__ . '/bootstrap.php';
 function gp_clickup_webhook_signature_valid(string $rawBody, string $signature): bool
 {
     $secret = gp_get_clickup_webhook_secret();
+    // HIGH-4: fail-closed — if the secret is not configured, reject all requests.
     if ($secret === '') {
-        return true;
+        return false;
     }
     if ($signature === '') {
         return false;
@@ -23,6 +24,11 @@ $rawBody = file_get_contents('php://input') ?: '';
 $signature = (string)($_SERVER['HTTP_X_SIGNATURE'] ?? '');
 
 if (!gp_clickup_webhook_signature_valid($rawBody, $signature)) {
+    $secret = gp_get_clickup_webhook_secret();
+    if ($secret === '') {
+        // Return 503 to signal misconfiguration, not a fake auth failure.
+        gp_json_response(['ok' => false, 'error' => 'Webhook não configurado no servidor.'], 503);
+    }
     gp_json_response(['ok' => false, 'error' => 'Assinatura inválida.'], 401);
 }
 

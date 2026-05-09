@@ -8,11 +8,16 @@ $admin = gp_require_admin();
 
 try {
     if ($action === 'list') {
-        gp_json_response(['ok' => true, 'users' => gp_read_state()['users'], 'sessionUser' => $admin]);
+        gp_json_response([
+            'ok' => true,
+            'users' => array_map('gp_public_user', gp_read_state()['users']),
+            'sessionUser' => gp_public_user($admin),
+        ]);
     }
 
     if ($action === 'update') {
         gp_require_method('POST');
+        gp_require_csrf_header();
         $payload = gp_request_payload();
         $userId = (string)($payload['userId'] ?? '');
         $patch = is_array($payload['patch'] ?? null) ? $payload['patch'] : [];
@@ -62,7 +67,7 @@ try {
             );
         }
 
-        gp_json_response(['ok' => true, 'user' => $updatedUser]);
+        gp_json_response(['ok' => true, 'user' => gp_public_user($updatedUser)]);
     }
 
     gp_json_response(['ok' => false, 'error' => 'Ação inválida.'], 404);

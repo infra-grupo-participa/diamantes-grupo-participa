@@ -12,6 +12,14 @@ const GP_CLICKUP_CLIENT_RELATION_FIELD_ID = 'b25022f9-f6a7-44be-8b86-7454fe9fa77
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_name('gp_portal_session');
+    $gpCookieSecure = filter_var(getenv('GP_COOKIE_SECURE') ?: 'true', FILTER_VALIDATE_BOOLEAN);
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $gpCookieSecure,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_start();
 }
 
@@ -24,6 +32,8 @@ function gp_json_response(array $payload, int $status = 200): never
 {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -32,6 +42,8 @@ function gp_raw_response(string $body, int $status = 200, string $contentType = 
 {
     http_response_code($status);
     header('Content-Type: ' . $contentType);
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
     echo $body;
     exit;
 }
@@ -117,6 +129,179 @@ function gp_append_log_line(string $path, array $value): void
     @file_put_contents($path, $payload . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
+// ── Security helpers ──────────────────────────────────────────────────────────
+
+const GP_AUDIT_LOG_FILE = GP_STORAGE_DIR . '/audit-log.jsonl';
+const GP_RATE_LIMIT_FILE = GP_STORAGE_DIR . '/rate-limits.json';
+const GP_RATE_LIMIT_MAX_FAILURES = 5;
+const GP_RATE_LIMIT_WINDOW_SECONDS = 900; // 15 minutes
+
+function gp_client_ip(): string
+{
+    foreach (['HTTP_X_FORWARDED_FOR', 'HTTP_X_REAL_IP', 'REMOTE_ADDR'] as $key) {
+        $raw = (string)($_SERVER[$key] ?? '');
+        if ($raw !== '') {
+            // Take the first IP in a comma-separated list (X-Forwarded-For).
+            $ip = trim(explode(',', $raw)[0]);
+            if (filter_var($ip, FILTER_VALIDATE_IP) !== false) {
+                return $ip;
+            }
+        }
+    }
+    return 'unknown';
+}
+
+function gp_append_audit_log(string $event, array $context = []): void
+{
+    gp_ensure_storage();
+    $logsDir = GP_STORAGE_DIR . '/logs';
+    if (!is_dir($logsDir) && !mkdir($logsDir, 0775, true) && !is_dir($logsDir)) {
+        return; // Best-effort; never fail the request because of audit log.
+    }
+    gp_append_log_line(GP_AUDIT_LOG_FILE, array_merge([
+        'time' => gp_now_iso(),
+        'event' => $event,
+    ], $context));
+}
+
+function gp_verify_password(string $input, string $stored): bool
+{
+    if ($stored === '' || $input === '') {
+        return false;
+    }
+    if (str_starts_with($stored, '$2')) {
+        return password_verify($input, $stored);
+    }
+    // Legacy plaintext comparison — only reached during transparent migration.
+    return hash_equals($stored, $input);
+}
+
+// ── Rate limiting (sliding window, file-backed) ───────────────────────────────
+
+function gp_rate_limit_read(): array
+{
+    if (!is_file(GP_RATE_LIMIT_FILE)) {
+        return [];
+    }
+    $data = @file_get_contents(GP_RATE_LIMIT_FILE);
+    if ($data === false || $data === '') {
+        return [];
+    }
+    $decoded = json_decode($data, true);
+    return is_array($decoded) ? $decoded : [];
+}
+
+function gp_rate_limit_write(array $data): void
+{
+    gp_ensure_storage();
+    $payload = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($payload === false) {
+        return;
+    }
+    @file_put_contents(GP_RATE_LIMIT_FILE, $payload, LOCK_EX);
+}
+
+function gp_rate_limit_key(string $identifier): string
+{
+    $ip = gp_client_ip();
+    return 'ip:' . sha1($ip) . '|id:' . sha1($identifier);
+}
+
+function gp_check_rate_limit(string $identifier): void
+{
+    $now = time();
+    $data = gp_rate_limit_read();
+
+    // Check by IP.
+    $ipKey = 'ip:' . sha1(gp_client_ip());
+    $ipEntry = $data[$ipKey] ?? ['failures' => [], 'until' => 0];
+    if ($now < (int)($ipEntry['until'] ?? 0)) {
+        $retryAfter = (int)$ipEntry['until'] - $now;
+        http_response_code(429);
+        header('Retry-After: ' . $retryAfter);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => 'Muitas tentativas. Tente novamente mais tarde.']);
+        exit;
+    }
+
+    // Check by identifier.
+    $idKey = 'id:' . sha1($identifier);
+    $idEntry = $data[$idKey] ?? ['failures' => [], 'until' => 0];
+    if ($now < (int)($idEntry['until'] ?? 0)) {
+        $retryAfter = (int)$idEntry['until'] - $now;
+        http_response_code(429);
+        header('Retry-After: ' . $retryAfter);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => 'Muitas tentativas. Tente novamente mais tarde.']);
+        exit;
+    }
+}
+
+function gp_record_rate_limit_failure(string $identifier): void
+{
+    $now = time();
+    $data = gp_rate_limit_read();
+    $windowStart = $now - GP_RATE_LIMIT_WINDOW_SECONDS;
+
+    foreach (['ip:' . sha1(gp_client_ip()), 'id:' . sha1($identifier)] as $key) {
+        $entry = $data[$key] ?? ['failures' => [], 'until' => 0];
+        $failures = array_filter((array)$entry['failures'], fn($ts) => $ts > $windowStart);
+        $failures[] = $now;
+        $failures = array_values($failures);
+        $entry['failures'] = $failures;
+        if (count($failures) >= GP_RATE_LIMIT_MAX_FAILURES) {
+            $entry['until'] = $now + GP_RATE_LIMIT_WINDOW_SECONDS;
+        }
+        $data[$key] = $entry;
+    }
+
+    gp_rate_limit_write($data);
+}
+
+function gp_clear_rate_limit(string $identifier): void
+{
+    $data = gp_rate_limit_read();
+    $ipKey = 'ip:' . sha1(gp_client_ip());
+    $idKey = 'id:' . sha1($identifier);
+    unset($data[$ipKey], $data[$idKey]);
+    gp_rate_limit_write($data);
+}
+
+// ── CSRF ──────────────────────────────────────────────────────────────────────
+
+function gp_get_csrf_token(): string
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        return '';
+    }
+    if (empty($_SESSION['gp_csrf_token'])) {
+        $_SESSION['gp_csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return (string)$_SESSION['gp_csrf_token'];
+}
+
+function gp_require_csrf_header(): void
+{
+    $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+    // Only enforce on state-changing methods.
+    if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        return;
+    }
+    $token = (string)($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+    $stored = (string)($_SESSION['gp_csrf_token'] ?? '');
+    if ($stored === '' || $token === '' || !hash_equals($stored, $token)) {
+        gp_json_response(['ok' => false, 'error' => 'Token CSRF inválido ou ausente.'], 403);
+    }
+}
+
+// ── Cache-Control for authenticated API responses ─────────────────────────────
+
+function gp_no_cache_headers(): void
+{
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+}
+
 function gp_client_routes(): array
 {
     return [
@@ -152,11 +337,14 @@ function gp_client_routes(): array
 
 function gp_default_admin(): array
 {
+    // Sentinel password: empty string signals "account not bootstrapped".
+    // gp_verify_password() will reject empty stored hashes, so login is
+    // impossible until setup-admin.php is run with real credentials.
     return [
         'id' => 'seed-admin',
         'name' => 'Administrador',
         'email' => 'admin',
-        'password' => '12345678',
+        'password' => '',
         'documentType' => 'cpf',
         'documentValue' => '00000000000',
         'cpf' => '00000000000',
@@ -403,6 +591,16 @@ function gp_normalize_user(array $user): array
     return $normalized;
 }
 
+/**
+ * Strip sensitive fields (password hash) before sending a user record to the client.
+ * Apply to every user or user array returned in an API response.
+ */
+function gp_public_user(array $user): array
+{
+    unset($user['password']);
+    return $user;
+}
+
 function gp_normalize_state(array $state): array
 {
     $defaults = gp_default_state();
@@ -427,6 +625,7 @@ function gp_normalize_state(array $state): array
     $hasSeedAdmin = false;
     foreach ($normalized['users'] as &$user) {
         if (gp_is_seed_admin_record($user)) {
+            // User record wins over defaults — specifically preserves the stored password.
             $user = gp_normalize_user(array_merge($admin, $user));
             $hasSeedAdmin = true;
             break;
@@ -435,6 +634,7 @@ function gp_normalize_state(array $state): array
     unset($user);
 
     if (!$hasSeedAdmin) {
+        // No existing seed-admin: insert sentinel (login blocked until setup-admin.php runs).
         $normalized['users'][] = $admin;
     }
 
@@ -569,7 +769,20 @@ function gp_clear_session(): void
 {
     $_SESSION = [];
     if (session_status() === PHP_SESSION_ACTIVE) {
-        session_regenerate_id(true);
+        // Destroy the session server-side and expire the cookie immediately.
+        $gpCookieSecure = filter_var(getenv('GP_COOKIE_SECURE') ?: 'true', FILTER_VALIDATE_BOOLEAN);
+        setcookie(
+            session_name(),
+            '',
+            [
+                'expires' => time() - 3600,
+                'path' => '/',
+                'secure' => $gpCookieSecure,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]
+        );
+        session_destroy();
     }
 }
 
@@ -698,10 +911,11 @@ function gp_update_user_record(array $state, string $userId, array $patch): arra
     }
 
     if (array_key_exists('password', $patch)) {
-        $next['password'] = (string)$patch['password'];
-        if (mb_strlen($next['password'], 'UTF-8') < 8) {
+        $rawPassword = (string)$patch['password'];
+        if (mb_strlen($rawPassword, 'UTF-8') < 8) {
             throw new RuntimeException('A senha precisa ter no mínimo 8 caracteres.');
         }
+        $next['password'] = password_hash($rawPassword, PASSWORD_BCRYPT, ['cost' => 12]);
     }
 
     if (array_key_exists('documentType', $patch) || array_key_exists('documentValue', $patch) || array_key_exists('cpf', $patch)) {
@@ -1388,6 +1602,9 @@ function gp_http_request(string $method, string $url, $body = null, array $heade
         CURLOPT_HEADER => true,
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT => 45,
+        // CRITICAL-1: restrict protocols to HTTPS only — prevents SSRF to http/ftp/file/etc.
+        CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+        CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
     ]);
 
     if (!empty($files)) {
@@ -1437,9 +1654,16 @@ function gp_http_request(string $method, string $url, $body = null, array $heade
 
 function gp_clickup_request(string $method, string $path, $body = null, array $extraHeaders = [], array $files = []): array
 {
-    $url = str_starts_with($path, 'http')
-        ? $path
-        : rtrim(GP_CLICKUP_BASE_URL, '/') . '/' . ltrim($path, '/');
+    if (str_starts_with($path, 'http')) {
+        // Internal server-to-server absolute URL — validate host is api.clickup.com.
+        $parsedHost = parse_url($path, PHP_URL_HOST);
+        if ($parsedHost !== 'api.clickup.com') {
+            gp_json_response(['ok' => false, 'error' => 'Host não permitido para requisição ClickUp.'], 422);
+        }
+        $url = $path;
+    } else {
+        $url = rtrim(GP_CLICKUP_BASE_URL, '/') . '/' . ltrim($path, '/');
+    }
 
     $token = gp_get_clickup_api_key();
     if ($token === '') {

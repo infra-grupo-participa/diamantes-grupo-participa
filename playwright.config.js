@@ -11,10 +11,15 @@ export default defineConfig({
   // Sobe o PHP built-in server antes de rodar os testes.
   // php deve estar disponível no PATH do runner (GitHub Actions instala na etapa de setup).
   webServer: {
+    // GP_COOKIE_SECURE=false: PHP dev server runs over HTTP. Secure cookie flag must
+    // be disabled so session cookies are sent/received correctly in tests.
     command: 'php -S 127.0.0.1:8765 -t .',
     url: 'http://127.0.0.1:8765',
     timeout: 15_000,
     reuseExistingServer: !process.env.CI,
+    env: {
+      GP_COOKIE_SECURE: 'false',
+    },
   },
 
   use: {

@@ -45,6 +45,7 @@
     clientRoutes: clone(clientRoutes),
     initPromise: null,
     initialized: false,
+    csrfToken: "",
   };
 
   function clone(value) {
@@ -130,11 +131,37 @@
     };
   }
 
+  async function fetchCsrfToken() {
+    try {
+      const response = await window.fetch(new URL("api/csrf.php", appRootUrl).href, {
+        method: "GET",
+        credentials: "same-origin",
+      });
+      const data = await response.json().catch(() => null);
+      if (data && data.csrfToken) {
+        state.csrfToken = String(data.csrfToken);
+      }
+    } catch (_) {
+      // Best-effort — server will reject mutating requests if token is missing.
+    }
+  }
+
+  function getCsrfToken() {
+    return state.csrfToken;
+  }
+
   async function apiRequest(url, options) {
     const settings = options || {};
     const headers = new Headers(settings.headers || {});
+    const method = (settings.method || "GET").toUpperCase();
+
+    // Attach CSRF token for state-changing requests.
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method) && state.csrfToken) {
+      headers.set("X-CSRF-Token", state.csrfToken);
+    }
+
     const init = {
-      method: settings.method || "GET",
+      method,
       credentials: "same-origin",
       headers,
     };
@@ -148,6 +175,11 @@
 
     const response = await window.fetch(url, init);
     const data = await response.json().catch(() => null);
+
+    // Capture updated csrfToken from any response.
+    if (data && data.csrfToken) {
+      state.csrfToken = String(data.csrfToken);
+    }
 
     if (!response.ok || !data || data.ok === false) {
       throw new Error(data && data.error ? data.error : `Erro ${response.status}`);
@@ -190,7 +222,7 @@
     state.initPromise = apiRequest(
       `${authApiUrl}?action=bootstrap${includeUsers ? "&includeUsers=1" : ""}`,
       { method: "GET" }
-    ).then((payload) => {
+    ).then(async (payload) => {
       state.sessionUser = payload.sessionUser ? clone(payload.sessionUser) : null;
       if (Array.isArray(payload.clientRoutes) && payload.clientRoutes.length) {
         state.clientRoutes = clone(payload.clientRoutes);
@@ -200,6 +232,10 @@
         state.usersLoaded = true;
       }
       state.initialized = true;
+      // Fetch CSRF token whenever we have an active session.
+      if (state.sessionUser && !state.csrfToken) {
+        await fetchCsrfToken();
+      }
       return payload;
     }).finally(() => {
       state.initPromise = null;
@@ -507,6 +543,13 @@
   }
 
   async function login(identifier, password) {
+    // Fetch a CSRF token before login (session may not exist yet).
+    // The login endpoint accepts the token from the bootstrap session if any,
+    // or the server issues a new one and returns it in the response.
+    if (!state.csrfToken) {
+      await fetchCsrfToken().catch(() => null);
+    }
+
     const payload = await apiRequest(`${authApiUrl}?action=login`, {
       method: "POST",
       body: {
@@ -514,6 +557,10 @@
         password: String(password || ""),
       }
     });
+
+    if (payload.csrfToken) {
+      state.csrfToken = String(payload.csrfToken);
+    }
 
     const user = payload.user ? clone(payload.user) : null;
     state.sessionUser = user;
@@ -548,6 +595,7 @@
     }
 
     state.sessionUser = null;
+    state.csrfToken = "";
     state.users = [];
     state.usersLoaded = false;
     state.initialized = false;
@@ -767,6 +815,8 @@
     getClientRoutes,
     getClientRouteBySlug,
     getClientUrl,
-    toAppUrl
+    toAppUrl,
+    getCsrfToken,
+    fetchCsrfToken,
   };
 })();

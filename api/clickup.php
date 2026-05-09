@@ -18,10 +18,17 @@ if ($clientSlug !== '') {
     }
 }
 
+gp_require_csrf_header();
+
 $method = strtoupper((string)($payload['method'] ?? 'GET'));
 $path = (string)($payload['path'] ?? '');
 if ($path === '') {
     gp_json_response(['ok' => false, 'error' => 'Path do ClickUp é obrigatório.'], 422);
+}
+
+// CRITICAL-1: Reject absolute URLs from the client — only relative ClickUp paths allowed.
+if (preg_match('#^https?://#i', $path)) {
+    gp_json_response(['ok' => false, 'error' => 'Path absoluto não é permitido. Use apenas caminhos relativos ao ClickUp.'], 422);
 }
 
 $body = $payload['body'] ?? null;

@@ -12,6 +12,7 @@ try {
 
     gp_require_method('POST');
     gp_require_admin();
+    gp_require_csrf_header();
 
     $syncUrl = gp_get_sheets_sync_url();
     if ($syncUrl === '') {
