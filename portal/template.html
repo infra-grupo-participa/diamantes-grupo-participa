@@ -991,6 +991,10 @@
       .attachments-grid { grid-template-columns: 1fr; }
     }
   </style>
+  <!-- Fase 4: extracted CSS from portal-insights.js -->
+  <link rel="stylesheet" href="assets/css/portal-base.css">
+  <link rel="stylesheet" href="assets/css/insights-modals.css">
+  <link rel="stylesheet" href="assets/css/insights-task-cards.css">
 </head>
 <body>
 
@@ -2230,6 +2234,7 @@
   }
 </script>
   <script src="../portal-contracts.js"></script>
-  <script src="../portal-insights.js"></script>
+  <!-- Fase 4: ESM modules — replaces the monolithic portal-insights.js IIFE -->
+  <script type="module" src="assets/js/insights-bootstrap.js"></script>
 </body>
 </html>

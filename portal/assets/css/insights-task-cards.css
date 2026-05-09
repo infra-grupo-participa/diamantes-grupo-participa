@@ -1,0 +1,99 @@
+/* insights-task-cards.css — Task card enhancement styles */
+
+.gp-area-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 0;
+}
+
+.gp-filter-caption {
+  color: #94a3b8;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gp-progress-track {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.gp-task-review-box {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.gp-task-review-box.pending {
+  border-color: rgba(242, 151, 37, 0.28);
+  background: rgba(242, 151, 37, 0.08);
+}
+
+.gp-task-review-box.warning {
+  border-color: rgba(251, 146, 60, 0.28);
+  background: #fff7ed;
+}
+
+.gp-task-review-box.approved {
+  border-color: rgba(22, 163, 74, 0.18);
+  background: #ecfdf5;
+}
+
+.gp-task-review-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.gp-task-review-copy strong {
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.gp-task-review-copy span {
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.gp-task-review-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gp-task-review-button {
+  border: none;
+  border-radius: 14px;
+  padding: 11px 13px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.gp-task-review-button.primary {
+  background: linear-gradient(135deg, #F29725 0%, #F29725 100%);
+  color: #ffffff;
+  box-shadow: 0 14px 22px rgba(242, 151, 37, 0.18);
+}
+
+@media (max-width: 860px) {
+  .gp-task-review-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
