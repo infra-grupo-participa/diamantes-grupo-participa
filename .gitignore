@@ -57,3 +57,7 @@ test-results/
 
 # --- squad scratchpad (descartável, não vai pro repo) ---
 tmp/
+
+# Composer tools (local only)
+tools/
+

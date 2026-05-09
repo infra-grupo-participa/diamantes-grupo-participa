@@ -12,14 +12,18 @@ Hooks locais (Lefthook/Husky) são opt-in para conveniência do desenvolvedor e 
 
 Estes são os checks que devem estar marcados como **required** em Branch Protection:
 
-| Check | Workflow | Job |
-|-------|----------|-----|
-| PHP Lint (8.2) | `ci.yml` | `php-lint` |
-| PHPUnit | `ci.yml` | `phpunit` |
-| Vitest | `ci.yml` | `vitest` |
-| Playwright E2E | `ci.yml` | `playwright` |
-| Gitleaks | `ci.yml` | `gitleaks` |
-| Dependency Review | `ci.yml` | `dependency-review` |
+| Check | Workflow | Job | Bloqueante |
+|-------|----------|-----|-----------|
+| PHP Lint (8.2) | `ci.yml` | `php-lint` | sim |
+| PHPUnit | `ci.yml` | `phpunit` | sim |
+| Vitest | `ci.yml` | `vitest` | sim |
+| Playwright E2E | `ci.yml` | `playwright` | sim |
+| Gitleaks | `ci.yml` | `gitleaks` | sim |
+| Dependency Review | `ci.yml` | `dependency-review` | sim |
+| **PHP lint + smoke** | `php-smoke.yml` | `smoke` | **sim — replica o padrão sip-system** |
+| Post quality metrics comment | `pr-quality.yml` | `quality-comment` | informativo |
+
+O `php-smoke.yml` sobe um `php -S` local e valida endpoint-por-endpoint do projeto (login page, `/api/health.php`, `/api/csrf.php`, `/api/auth.php`, `/api/users.php`, `/api/clickup.php`, `/api/clickup-webhook.php`, `/portal/?slug=`). Replicado do `sistema-grupo-participa` (sip-system).
 
 ---
 

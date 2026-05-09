@@ -23,7 +23,8 @@ concurrency:
 env:
   PHP_VERSION: '8.2'
   NODE_VERSION: '20'
-  TARGET_URL: 'https://homolog.diamantes.grupoparticipa.app.br/api/csrf.php'
+  TARGET_URL: 'https://homolog.diamantes.grupoparticipa.app.br/api/health.php'
+  BASE_URL: 'https://homolog.diamantes.grupoparticipa.app.br'
 
 jobs:
   # ──────────────────────────────────────────────
@@ -161,20 +162,39 @@ jobs:
         env:
           GP_DEPLOY_PAUSED: ${{ secrets.GP_DEPLOY_PAUSED }}
 
-      - name: FTP Deploy
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.HOSTINGER_HOMOLOG_FTP_HOST }}
-          username: ${{ secrets.HOSTINGER_HOMOLOG_FTP_USER }}
-          password: ${{ secrets.HOSTINGER_HOMOLOG_FTP_PASSWORD }}
-          server-dir: ${{ secrets.HOSTINGER_HOMOLOG_FTP_PATH }}
-          local-dir: deploy-artifact/
-          dangerous-clean-slate: false
-          log-level: standard
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Deploy via lftp (preserve runtime files)
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_HOMOLOG_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_HOMOLOG_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_HOMOLOG_FTP_PASSWORD }}
+          FTP_PATH: ${{ secrets.HOSTINGER_HOMOLOG_FTP_PATH }}
+        run: |
+          lftp -c "
+            set net:timeout 60;
+            set net:max-retries 5;
+            set net:reconnect-interval-base 10;
+            set ftp:ssl-allow no;
+            set ftp:passive-mode yes;
+            open -u '$FTP_USER','$FTP_PASS' ftp://$FTP_HOST;
+            mirror -R --only-newer --verbose --parallel=3 \
+              --exclude-glob '.git*' \
+              --exclude-glob 'node_modules/' \
+              --exclude-glob 'tests/' \
+              --exclude-glob 'docs/' \
+              --exclude-glob 'tmp/' \
+              --exclude-glob '.github/' \
+              --exclude-glob 'api/storage/app-state.json' \
+              --exclude-glob 'api/storage/audit-log.jsonl' \
+              --exclude-glob 'api/storage/notification-log.jsonl' \
+              --exclude-glob 'api/storage/notification-markers/' \
+              --exclude-glob 'api/storage/rate-limits.json' \
+              --exclude-glob 'api/data/clickup-api-key.txt' \
+              ./deploy-artifact/ '$FTP_PATH';
+            bye
+          "
 
   # ──────────────────────────────────────────────
   # 3. Smoke test — valida que o servidor respondeu
@@ -187,16 +207,28 @@ jobs:
       - name: Wait for server to settle
         run: sleep 10
 
-      - name: GET ${{ env.TARGET_URL }}
+      - name: Smoke — health endpoint
         run: |
-          HTTP_STATUS=$(curl -f -s -o /dev/null -w "%{http_code}" "${{ env.TARGET_URL }}")
+          set -euo pipefail
+          HTTP_STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" "${{ env.TARGET_URL }}")
           echo "HTTP status: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Smoke test falhou. Esperado 200, recebeu $HTTP_STATUS"
-            echo "Verifique os logs do servidor ou acesse ${{ env.TARGET_URL }} manualmente."
+          cat /tmp/health.json
+          echo ""
+          if [ "$HTTP_STATUS" != "200" ] && [ "$HTTP_STATUS" != "503" ]; then
+            echo "::error::Health endpoint retornou $HTTP_STATUS"
             exit 1
           fi
-          echo "Smoke test passed: $HTTP_STATUS"
+
+      - name: Smoke — login + CSRF
+        run: |
+          set -euo pipefail
+          for path in "/" "/api/csrf.php"; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ env.BASE_URL }}${path}")
+            if [ "$STATUS" != "200" ]; then
+              echo "::error::${path} retornou $STATUS"; exit 1
+            fi
+            echo "OK: ${path} -> $STATUS"
+          done
 
       - name: Notify success
         if: success()

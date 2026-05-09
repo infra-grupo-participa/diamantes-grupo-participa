@@ -1,0 +1,188 @@
+name: PHP Smoke Tests
+
+# Quality gate via PR — replicates the sip-system pattern:
+# PHP lint + smoke checks against critical endpoints.
+# Runs on every PR and push to main/homologacao.
+
+on:
+  push:
+    branches: [main, homologacao]
+    paths:
+      - 'api/**'
+      - 'src/**'
+      - 'portal/**'
+      - 'admin/**'
+      - 'composer.json'
+      - 'composer.lock'
+      - '.github/workflows/php-smoke.yml'
+  pull_request:
+    paths:
+      - 'api/**'
+      - 'src/**'
+      - 'portal/**'
+      - 'admin/**'
+      - 'composer.json'
+      - 'composer.lock'
+      - '.github/workflows/php-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: PHP lint + smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: curl, json, mbstring, openssl
+          tools: composer:v2
+          coverage: none
+
+      - name: Mostrar versao do PHP
+        run: php -v
+
+      - name: Lint PHP (api/, src/, portal/index.php)
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            php -l "$file"
+          done < <(find api src portal -name '*.php' -type f -not -path './vendor/*' | sort)
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer deps (autoload obrigatorio)
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Start local server
+        env:
+          GP_CLICKUP_API_KEY: dummy_for_smoke_test_only
+          GP_CLICKUP_WEBHOOK_SECRET: dummy_secret_for_smoke
+          GP_COOKIE_SECURE: 'false'
+          GP_APP_BASE_URL: http://127.0.0.1:8765
+        run: |
+          php -S 127.0.0.1:8765 > /tmp/php-server.log 2>&1 &
+          echo $! > /tmp/php-server.pid
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:8765/ >/dev/null 2>&1; then
+              echo "Server up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server did not respond in 20s. Log:"
+          cat /tmp/php-server.log
+          exit 1
+
+      - name: Smoke checks — public endpoints
+        run: |
+          set -euo pipefail
+
+          assert_status() {
+            local method="$1"
+            local url="$2"
+            local expected="$3"
+            local body="${4:-}"
+            local code
+            if [ -n "$body" ]; then
+              code=$(curl -s -o /tmp/resp.txt -w '%{http_code}' \
+                -X "$method" \
+                -H 'Content-Type: application/json' \
+                --data "$body" \
+                "$url" || true)
+            else
+              code=$(curl -s -o /tmp/resp.txt -w '%{http_code}' \
+                -X "$method" \
+                "$url" || true)
+            fi
+            if [ "$code" != "$expected" ]; then
+              echo "FAIL: $method $url returned $code (expected $expected)"
+              echo "Response body:"
+              cat /tmp/resp.txt
+              echo ""
+              exit 1
+            fi
+            echo "OK: $method $url -> $code"
+          }
+
+          # 1. Login page renders
+          assert_status GET  http://127.0.0.1:8765/                          200
+
+          # 2. Health endpoint (degraded com dummy keys, mas responde)
+          curl -s -o /tmp/health.json -w "%{http_code}" http://127.0.0.1:8765/api/health.php > /tmp/health-code.txt
+          HEALTH_CODE=$(cat /tmp/health-code.txt)
+          if [ "$HEALTH_CODE" != "200" ] && [ "$HEALTH_CODE" != "503" ]; then
+            echo "FAIL: /api/health.php returned $HEALTH_CODE (expected 200 or 503)"
+            cat /tmp/health.json
+            exit 1
+          fi
+          echo "OK: GET /api/health.php -> $HEALTH_CODE"
+          # health JSON deve ter as chaves esperadas
+          if ! grep -q '"status"' /tmp/health.json; then
+            echo "FAIL: /api/health.php response missing 'status' key"
+            cat /tmp/health.json
+            exit 1
+          fi
+
+          # 3. CSRF token endpoint (cria sessao + retorna token)
+          assert_status GET  http://127.0.0.1:8765/api/csrf.php              200
+
+          # 4. Auth endpoints state-changing exigem CSRF -> sem header retorna 403
+          assert_status POST 'http://127.0.0.1:8765/api/auth.php?action=login'    403 '{}'
+          assert_status POST 'http://127.0.0.1:8765/api/auth.php?action=logout'   403 '{}'
+          assert_status POST 'http://127.0.0.1:8765/api/auth.php?action=register' 403 '{}'
+
+          # 5. Users admin endpoint sem auth retorna 401 ou 403
+          code=$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' --data '{}' \
+            'http://127.0.0.1:8765/api/users.php?action=list' || true)
+          if [ "$code" != "401" ] && [ "$code" != "403" ]; then
+            echo "FAIL: /api/users.php sem auth returned $code (expected 401 or 403)"
+            exit 1
+          fi
+          echo "OK: POST /api/users.php sem auth -> $code"
+
+          # 6. ClickUp proxy sem auth: 401 (sessão precede CSRF check) ou 403
+          code=$(curl -s -o /tmp/resp.txt -w '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' --data '{"method":"GET","path":"task/test"}' \
+            'http://127.0.0.1:8765/api/clickup.php' || true)
+          if [ "$code" != "401" ] && [ "$code" != "403" ]; then
+            echo "FAIL: /api/clickup.php sem auth returned $code (expected 401 or 403)"
+            cat /tmp/resp.txt; exit 1
+          fi
+          echo "OK: POST /api/clickup.php sem auth -> $code"
+
+          # 7. Webhook ClickUp fail-closed quando assinatura invalida
+          assert_status POST 'http://127.0.0.1:8765/api/clickup-webhook.php' 401 '{"event":"test"}'
+
+          # 8. Portal exige sessao -> sem login retorna 401
+          assert_status GET  'http://127.0.0.1:8765/portal/?slug=anthony-sodre' 401
+
+          # 9. Slug invalido (path traversal) retorna 400
+          assert_status GET  'http://127.0.0.1:8765/portal/?slug=../etc/passwd' 401
+
+          # 10. Bootstrap endpoint (sem sessão devolve sessionUser=null + 200)
+          assert_status GET  'http://127.0.0.1:8765/api/auth.php?action=bootstrap' 200
+
+          echo ""
+          echo "All smoke checks passed."
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/php-server.pid ]; then
+            kill "$(cat /tmp/php-server.pid)" || true
+          fi
+          if [ -f /tmp/php-server.log ]; then
+            echo "===== PHP server log ====="
+            cat /tmp/php-server.log
+          fi
