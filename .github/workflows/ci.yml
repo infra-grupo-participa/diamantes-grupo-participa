@@ -36,41 +36,8 @@ jobs:
           echo "PHP lint passed."
 
   # ──────────────────────────────────────────────
-  # 2. PHPUnit — suite de testes PHP
+  # 2. (PHPUnit removido — backend reduzido a 2 endpoints PHP, sem composer/PSR-4)
   # ──────────────────────────────────────────────
-  phpunit:
-    name: PHPUnit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          tools: composer:v2
-          coverage: xdebug
-
-      - name: Cache Composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
-
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Run tests
-        run: vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: phpunit-coverage
-          path: build/coverage/
-          retention-days: 7
 
   # ──────────────────────────────────────────────
   # 3. Vitest — testes unitários JS
@@ -116,22 +83,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Setup PHP (para webServer do Playwright)
+      - name: Setup PHP (para webServer do Playwright; só pra clickup.php + clickup-webhook.php)
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          tools: composer:v2
+          tools: none
           coverage: none
-
-      - name: Cache Composer
-        uses: actions/cache@v4
-        with:
-          path: vendor
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
-
-      - name: Install Composer deps (autoload required by api/bootstrap.php)
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Install npm deps
         run: npm ci

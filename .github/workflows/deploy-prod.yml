@@ -23,7 +23,7 @@ concurrency:
 env:
   PHP_VERSION: '8.2'
   NODE_VERSION: '20'
-  TARGET_URL: 'https://diamantes.grupoparticipa.app.br/servico/api/health.php'
+  TARGET_URL: 'https://diamantes.grupoparticipa.app.br/servico/'
 
 jobs:
   # ──────────────────────────────────────────────
@@ -45,7 +45,8 @@ jobs:
             GP_CLICKUP_API_KEY \
             GP_CLICKUP_WEBHOOK_SECRET \
             GP_SUPABASE_URL \
-            GP_SUPABASE_SERVICE_ROLE_KEY; do
+            GP_SUPABASE_SERVICE_ROLE_KEY \
+            GP_SUPABASE_ANON_KEY; do
             if [ -z "${!v}" ]; then missing+=("$v"); fi
           done
           if [ ${#missing[@]} -ne 0 ]; then
@@ -67,6 +68,7 @@ jobs:
           GP_CLICKUP_WEBHOOK_SECRET: ${{ secrets.GP_CLICKUP_WEBHOOK_SECRET }}
           GP_SUPABASE_URL: ${{ secrets.GP_SUPABASE_URL }}
           GP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.GP_SUPABASE_SERVICE_ROLE_KEY }}
+          GP_SUPABASE_ANON_KEY: ${{ secrets.GP_SUPABASE_ANON_KEY }}
 
   # ──────────────────────────────────────────────
   # 1. Build — instala deps prod e gera artifact
@@ -82,18 +84,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ env.PHP_VERSION }}
-          tools: composer:v2
           coverage: none
-
-      - name: Cache Composer dependencies
-        uses: actions/cache@v4
-        with:
-          path: vendor
-          key: composer-prod-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-prod-
-
-      - name: Composer install (no-dev)
-        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
       - name: Setup Node ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -110,6 +101,7 @@ jobs:
           GP_CLICKUP_WEBHOOK_SECRET: ${{ secrets.GP_CLICKUP_WEBHOOK_SECRET }}
           GP_SUPABASE_URL: ${{ secrets.GP_SUPABASE_URL }}
           GP_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.GP_SUPABASE_SERVICE_ROLE_KEY }}
+          GP_SUPABASE_ANON_KEY: ${{ secrets.GP_SUPABASE_ANON_KEY }}
           GP_SHEETS_SYNC_URL: ${{ secrets.GP_SHEETS_SYNC_URL }}
           GP_SHEETS_SYNC_SECRET: ${{ secrets.GP_SHEETS_SYNC_SECRET }}
           GP_MAIL_FROM_EMAIL: 'infra@advmais.com'
@@ -140,6 +132,7 @@ jobs:
           SetEnv GP_CLICKUP_WEBHOOK_SECRET "${GP_CLICKUP_WEBHOOK_SECRET}"
           SetEnv GP_SUPABASE_URL "${GP_SUPABASE_URL}"
           SetEnv GP_SUPABASE_SERVICE_ROLE_KEY "${GP_SUPABASE_SERVICE_ROLE_KEY}"
+          SetEnv GP_SUPABASE_ANON_KEY "${GP_SUPABASE_ANON_KEY}"
           SetEnv GP_SUPABASE_SCHEMA "portal"
           SetEnv GP_STORAGE_DRIVER "json"
           SetEnv GP_PORTALS_SOURCE "json"
@@ -189,7 +182,7 @@ jobs:
               Header set Referrer-Policy "strict-origin-when-cross-origin"
               Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
               Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
-              Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.clickup.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+              Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.clickup.com https://*.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
           </IfModule>
           EOF
           echo "===.htaccess gerado (SetEnv mascarados)==="
@@ -288,46 +281,46 @@ jobs:
       - name: Wait for server to settle
         run: sleep 10
 
-      - name: Smoke — health endpoint (DEVE retornar 200 ok; 503 falha o deploy)
+      - name: Smoke — login page renders (index.html)
         run: |
           set -euo pipefail
-          HTTP_STATUS=$(curl -s -o /tmp/health.json -w "%{http_code}" "${{ env.TARGET_URL }}")
+          HTTP_STATUS=$(curl -s -o /tmp/login.html -w "%{http_code}" "https://diamantes.grupoparticipa.app.br/servico/")
           echo "HTTP status: $HTTP_STATUS"
-          echo "Health response:"
-          cat /tmp/health.json
-          echo ""
           if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::Health endpoint retornou $HTTP_STATUS — deploy considerado falho."
-            echo "Em 503, verifique o JSON acima — provável env var faltando ou ClickUp inacessível."
+            echo "::error::Login page retornou $HTTP_STATUS — deploy considerado falho."
             exit 1
           fi
-          # Parse JSON e exige status=ok (defensive: 200 com degraded body também falha)
-          STATUS_FIELD=$(grep -oE '"status"[[:space:]]*:[[:space:]]*"[^"]+"' /tmp/health.json | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
-          if [ "$STATUS_FIELD" != "ok" ]; then
-            echo "::error::Health JSON status='$STATUS_FIELD' (esperado 'ok'). Deploy degraded — abortando."
-            exit 1
+          # Confirma que supabase-js é referenciado (garante que o rewrite chegou)
+          if grep -q "supabase.min.js" /tmp/login.html; then
+            echo "Login page OK — supabase-js tag presente."
+          else
+            echo "::warning::Login page não contém supabase.min.js — possível deploy antigo em cache."
           fi
-          echo "Health OK + status=ok confirmados."
 
-      - name: Smoke — login page renders
+      - name: Smoke — clickup webhook endpoint (DEVE aceitar POST vazio com 400, não 5xx)
         run: |
           set -euo pipefail
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://diamantes.grupoparticipa.app.br/servico/")
-          if [ "$STATUS" != "200" ]; then
-            echo "::error::Login page retornou $STATUS"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            "https://diamantes.grupoparticipa.app.br/servico/api/clickup-webhook.php")
+          echo "Webhook status: $STATUS"
+          # 400 (signature missing) ou 200 são OK. 5xx = deploy quebrado.
+          if [[ "$STATUS" == 5* ]]; then
+            echo "::error::clickup-webhook.php retornou $STATUS — erro no servidor."
             exit 1
           fi
-          echo "Login page OK: $STATUS"
+          echo "Webhook endpoint OK: $STATUS"
 
-      - name: Smoke — CSRF endpoint
+      - name: Smoke — portal redirect (sem auth deve retornar 200 index.html)
         run: |
           set -euo pipefail
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://diamantes.grupoparticipa.app.br/servico/api/csrf.php")
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L \
+            "https://diamantes.grupoparticipa.app.br/servico/portal/?slug=anthony-sodre")
+          echo "Portal status: $STATUS"
           if [ "$STATUS" != "200" ]; then
-            echo "::error::CSRF endpoint retornou $STATUS"
+            echo "::error::Portal page retornou $STATUS"
             exit 1
           fi
-          echo "CSRF endpoint OK: $STATUS"
+          echo "Portal page OK: $STATUS"
 
       - name: Notify success
         if: success()

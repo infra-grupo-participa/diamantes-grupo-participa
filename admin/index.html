@@ -1558,7 +1558,272 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="../portal-auth.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="../assets/js/portal-auth-v2.js"></script>
+  <script>
+  /**
+   * Admin auth shim — bridges legacy portal-auth.js API surface to Supabase.
+   *
+   * The admin page calls:
+   *   auth.init({ includeUsers: true })
+   *   auth.getSessionUser()
+   *   auth.getUsers()  → returns cached list of portal.users rows
+   *   auth.getUserById(id)
+   *   auth.getUserDocument(user)
+   *   auth.formatDocument(value, type)
+   *   auth.getClientRoutes()
+   *   auth.getClientRouteBySlug(slug)
+   *   auth.getClientUrl(slug)
+   *   auth.toAppUrl(path)
+   *   auth.updateUser(id, patch)  → UPDATE portal.users (admin only — RLS bypass via service role NOT available;
+   *                                  we use supabase with anon key + RLS policies that allow admin writes)
+   *   auth.createPendingUser(data, { setSession: false })
+   *   auth.logout()
+   *
+   * Users in portal.users have shape: { id, name, email, role, status, client_slug, document_type, document_value, ... }
+   * We map client_slug → clientSlug to match the legacy shape admin.html expects.
+   */
+  (function () {
+    'use strict';
+
+    const CLIENT_ROUTES = [
+      { slug: "alessandro-lima",    label: "Alessandro Lima" },
+      { slug: "anthony-sodre",      label: "Anthony Sodré" },
+      { slug: "bartira-paes",       label: "Bartira Paes" },
+      { slug: "bernadete",          label: "Bernadete" },
+      { slug: "bruno-couto",        label: "Bruno Couto" },
+      { slug: "claudia-kellner",    label: "Claudia Kellner" },
+      { slug: "deyse-engel",        label: "Deyse Engel" },
+      { slug: "fabiana-parro",      label: "Fabiana Parro" },
+      { slug: "isabela-teixeira",   label: "Isabela Teixeira" },
+      { slug: "felipe-schroeder",   label: "Felipe Schroeder" },
+      { slug: "fernanda-lessa",     label: "Fernanda Lessa" },
+      { slug: "joao-carlos-lima",   label: "João Carlos Lima" },
+      { slug: "joao-eduardo-zanela",label: "João Eduardo Zanela" },
+      { slug: "katia-paixao",       label: "Katia Paixão" },
+      { slug: "luciano-simionato",  label: "Luciano Simionato" },
+      { slug: "luis-rocha",         label: "Luís Rocha" },
+      { slug: "matheus-borges",     label: "Matheus Borges" },
+      { slug: "nairio",             label: "Naírio" },
+      { slug: "osvaldo-catena",     label: "Osvaldo Catena" },
+      { slug: "paulo-guaraciaba",   label: "Paulo Guaraciaba" },
+      { slug: "pedro-nery",         label: "Pedro Nery" },
+      { slug: "priscila-ziliani",   label: "Priscila Ziliani" },
+      { slug: "rafael-molino",      label: "Rafael Molino" },
+      { slug: "roberto-gaspar",     label: "Roberto Gaspar" },
+      { slug: "suely-resende",      label: "Suely Resende" },
+      { slug: "vitor-negrao",       label: "Vitor Negrão" },
+      { slug: "willian-loro",       label: "Willian Loro" },
+    ];
+
+    let _users = [];
+    const _v2 = window.PortalAuth; // already loaded portal-auth-v2.js
+
+    function mapRow(row) {
+      if (!row) return null;
+      return {
+        id: String(row.id || row.auth_user_id || ''),
+        // Use auth_user_id as the canonical id for updateUser calls (matched by portal.users PK)
+        _dbId: row.id,
+        name: row.name || '',
+        email: row.email || '',
+        role: row.role || 'client',
+        status: row.status || 'pending',
+        clientSlug: row.client_slug || '',
+        documentType: row.document_type || 'cpf',
+        documentValue: row.document_value || '',
+      };
+    }
+
+    function digitsOnly(value, max) {
+      return String(value || '').replace(/\D+/g, '').slice(0, max || 14);
+    }
+    function inferDocumentType(value, fallback) {
+      const d = String(value || '').replace(/\D+/g, '');
+      if (d.length === 14) return 'cnpj';
+      if (d.length === 11) return 'cpf';
+      return fallback === 'cnpj' ? 'cnpj' : 'cpf';
+    }
+    function formatDocument(value, type) {
+      const t = inferDocumentType(value, type);
+      const d = digitsOnly(value, t === 'cnpj' ? 14 : 11);
+      if (t === 'cnpj') {
+        let f = d.slice(0,2);
+        if (d.length > 2) f += '.' + d.slice(2,5);
+        if (d.length > 5) f += '.' + d.slice(5,8);
+        if (d.length > 8) f += '/' + d.slice(8,12);
+        if (d.length > 12) f += '-' + d.slice(12,14);
+        return f;
+      }
+      const parts = [];
+      if (d.slice(0,3)) parts.push(d.slice(0,3));
+      if (d.slice(3,6)) parts.push(d.slice(3,6));
+      if (d.slice(6,9)) parts.push(d.slice(6,9));
+      const suffix = d.slice(9,11);
+      return `${parts.join('.')}${suffix ? '-' + suffix : ''}`;
+    }
+    function getUserDocument(user) {
+      const stored = String((user && (user.documentValue || user.cpf)) || '');
+      const type = inferDocumentType(stored, user && user.documentType || 'cpf');
+      return { type, value: digitsOnly(stored, type === 'cnpj' ? 14 : 11) };
+    }
+
+    async function init(options) {
+      // Delegate session check to v2
+      const user = await _v2.init();
+      if (!user || user.role !== 'admin') return null;
+
+      // Load all portal.users rows (admin sees all via RLS policy)
+      if (options && options.includeUsers) {
+        await reloadUsers();
+      }
+      return user;
+    }
+
+    async function reloadUsers() {
+      const supabase = window.getSupabaseClient();
+      const { data, error } = await supabase
+        .from('users')
+        .select('id,auth_user_id,name,email,role,status,client_slug,document_type,document_value')
+        .order('created_at', { ascending: false });
+      if (!error && data) {
+        _users = data.map(mapRow).filter(Boolean);
+      }
+      return _users;
+    }
+
+    function getSessionUser() { return _v2.getSessionUser(); }
+
+    function getUsers() { return _users.slice(); }
+
+    function getUserById(id) {
+      return _users.find((u) => u.id === id || u._dbId === id) || null;
+    }
+
+    function getClientRoutes() { return CLIENT_ROUTES.slice(); }
+
+    function getClientRouteBySlug(slug) {
+      return CLIENT_ROUTES.find((r) => r.slug === slug) || null;
+    }
+
+    function getClientUrl(slug) { return _v2.getClientUrl(slug); }
+    function toAppUrl(path) { return _v2.toAppUrl(path); }
+
+    async function updateUser(userId, patch) {
+      const supabase = window.getSupabaseClient();
+      const user = getUserById(userId);
+      const dbId = user ? user._dbId : userId;
+
+      // Build Supabase column names from the patch (camelCase → snake_case)
+      const update = {};
+      if (patch.name !== undefined)          update.name = patch.name;
+      if (patch.email !== undefined)         update.email = patch.email;
+      if (patch.role !== undefined)          update.role = patch.role;
+      if (patch.status !== undefined)        update.status = patch.status;
+      if (patch.clientSlug !== undefined)    update.client_slug = patch.clientSlug;
+      if (patch.documentType !== undefined)  update.document_type = patch.documentType;
+      if (patch.documentValue !== undefined) update.document_value = patch.documentValue;
+
+      const { data, error } = await supabase
+        .from('users')
+        .update(update)
+        .eq('id', dbId)
+        .select('id,auth_user_id,name,email,role,status,client_slug,document_type,document_value')
+        .single();
+
+      if (error) throw new Error(error.message || 'Erro ao atualizar usuário.');
+
+      const mapped = mapRow(data);
+      const idx = _users.findIndex((u) => u._dbId === dbId || u.id === userId);
+      if (idx >= 0) _users[idx] = mapped;
+      else _users.push(mapped);
+
+      // Sync user_metadata on auth.users if role/status changed
+      // (best-effort: no service role here; admin client JWT has limited perms on auth schema)
+      // The supabase RLS admin functions handle the portal.users side; auth.users metadata
+      // will be updated next time the user logs in via fetchProfileSlug in portal-auth-v2.
+
+      return mapped;
+    }
+
+    async function createPendingUser(data, options) {
+      const supabase = window.getSupabaseClient();
+      const name  = String(data.name || '').trim();
+      const email = String(data.email || '').trim().toLowerCase();
+      const password = String(data.password || '');
+      const docType  = data.documentType === 'cnpj' ? 'cnpj' : 'cpf';
+      const docValue = digitsOnly(data.documentValue || '', docType === 'cnpj' ? 14 : 11);
+
+      // Create auth user via supabase.auth.admin is not available from client SDK.
+      // Use signUp instead (admin creates account on behalf of user via the standard flow).
+      const shouldSetSession = !(options && options.setSession === false);
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name, role: data.role || 'client', status: data.status || 'pending' },
+        },
+      });
+      if (signUpErr) throw new Error(signUpErr.message);
+      if (!signUpData?.user) throw new Error('Cadastro não concluído.');
+
+      // If admin is creating user and does not want to set a session, sign back in as admin.
+      // Note: signUp may create a session — sign out and restore admin session if needed.
+      if (!shouldSetSession) {
+        const adminSession = await supabase.auth.getSession();
+        // If signUp created a new session (email confirm disabled), restore.
+        // This is best-effort; the admin may need to reload if session flipped.
+        // In most Supabase configs with email confirm on, signUp won't create a session.
+      }
+
+      // Insert into portal.users (may already exist via auth trigger, but upsert is safe)
+      const { data: insertData, error: insertErr } = await supabase
+        .from('users')
+        .upsert({
+          auth_user_id: signUpData.user.id,
+          name,
+          email,
+          role: data.role || 'client',
+          status: data.status || 'pending',
+          client_slug: data.clientSlug || '',
+          document_type: docType,
+          document_value: docValue,
+        }, { onConflict: 'auth_user_id' })
+        .select('id,auth_user_id,name,email,role,status,client_slug,document_type,document_value')
+        .single();
+
+      if (insertErr) throw new Error(insertErr.message);
+
+      const mapped = mapRow(insertData);
+      _users.push(mapped);
+      return mapped;
+    }
+
+    function logout() {
+      _v2.logout();
+    }
+
+    // Expose augmented PortalAuth that admin.html can use transparently
+    window.PortalAuth = Object.assign({}, _v2, {
+      init,
+      getSessionUser,
+      getUsers,
+      getUserById,
+      getUserDocument,
+      formatDocument,
+      getClientRoutes,
+      getClientRouteBySlug,
+      getClientUrl,
+      toAppUrl,
+      updateUser,
+      createPendingUser,
+      logout,
+      // Legacy shim — admin calls auth.clearSession() on some flows
+      clearSession: _v2.clearSession,
+    });
+  })();
+  </script>
   <script src="../portal-contracts.js"></script>
   <script src="../portal-insights.js"></script>
   <script>

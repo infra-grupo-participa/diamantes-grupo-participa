@@ -673,7 +673,9 @@
     </section>
   </div>
 
-  <script src="./portal-auth.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/portal-auth-v2.js"></script>
   <script>
     (async function () {
       const auth = window.PortalAuth;
@@ -685,11 +687,40 @@
       const registerDocumentType = document.getElementById("registerDocumentType");
       const registerDocumentValue = document.getElementById("registerDocumentValue");
 
+      // ── Document field helpers (previously in portal-auth.js) ──
+      function digitsOnly(value, max) {
+        return String(value || "").replace(/\D+/g, "").slice(0, max || 14);
+      }
+      function inferDocumentType(value, fallback) {
+        const d = String(value || "").replace(/\D+/g, "");
+        if (d.length === 14) return "cnpj";
+        if (d.length === 11) return "cpf";
+        return fallback === "cnpj" ? "cnpj" : "cpf";
+      }
+      function formatDocument(value, type) {
+        const t = inferDocumentType(value, type);
+        const d = digitsOnly(value, t === "cnpj" ? 14 : 11);
+        if (t === "cnpj") {
+          let f = d.slice(0,2);
+          if (d.length > 2) f += "." + d.slice(2,5);
+          if (d.length > 5) f += "." + d.slice(5,8);
+          if (d.length > 8) f += "/" + d.slice(8,12);
+          if (d.length > 12) f += "-" + d.slice(12,14);
+          return f;
+        }
+        const parts = [];
+        if (d.slice(0,3)) parts.push(d.slice(0,3));
+        if (d.slice(3,6)) parts.push(d.slice(3,6));
+        if (d.slice(6,9)) parts.push(d.slice(6,9));
+        const suffix = d.slice(9,11);
+        return `${parts.join(".")}${suffix ? "-" + suffix : ""}`;
+      }
+
       function syncRegisterDocumentField() {
         const type = registerDocumentType.value === "cnpj" ? "cnpj" : "cpf";
         registerDocumentValue.maxLength = type === "cnpj" ? 18 : 14;
         registerDocumentValue.placeholder = type === "cnpj" ? "00.000.000/0000-00" : "000.000.000-00";
-        registerDocumentValue.value = auth.formatDocument(registerDocumentValue.value, type);
+        registerDocumentValue.value = formatDocument(registerDocumentValue.value, type);
       }
 
       function setMessage(text, type) {
@@ -722,7 +753,7 @@
         sessionPill.classList.add("show");
         sessionPill.textContent = user ? `${user.email}` : "sessão salva";
 
-        if (mode === "rejected") {
+        if (mode === "rejected" || mode === "disabled") {
           waitingText.textContent = "Seu acesso ainda não foi liberado. Fale com a equipe ou aguarde um novo ajuste no cadastro.";
           return;
         }
@@ -760,41 +791,66 @@
 
       document.getElementById("loginForm").addEventListener("submit", async (event) => {
         event.preventDefault();
+        setMessage("", "");
+        const btn = event.target.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
         try {
           const result = await auth.login(
             document.getElementById("loginIdentifier").value,
             document.getElementById("loginPassword").value
           );
-          setMessage("", "");
+          if (!result.ok) {
+            setMessage(result.error || "Não foi possível entrar.", "error");
+            return;
+          }
           if (result.redirect) {
             window.location.replace(result.redirect);
             return;
           }
-          showWaiting(result.user, result.status);
+          showWaiting(result.user, result.user && result.user.status);
         } catch (error) {
           setMessage(error.message || "Não foi possível entrar.", "error");
+        } finally {
+          if (btn) btn.disabled = false;
         }
       });
 
       document.getElementById("registerForm").addEventListener("submit", async (event) => {
         event.preventDefault();
+        setMessage("", "");
+        const btn = event.target.querySelector('button[type="submit"]');
+        if (btn) btn.disabled = true;
         try {
-          const user = await auth.createPendingUser({
-            name: document.getElementById("registerName").value,
-            email: document.getElementById("registerEmail").value,
-            password: document.getElementById("registerPassword").value,
-            documentType: registerDocumentType.value,
-            documentValue: registerDocumentValue.value
+          // Registration flow: create user via Supabase, insert pending row in portal.users
+          const supabase = window.getSupabaseClient();
+          const name = document.getElementById("registerName").value.trim();
+          const email = document.getElementById("registerEmail").value.trim().toLowerCase();
+          const password = document.getElementById("registerPassword").value;
+          const documentType = registerDocumentType.value;
+          const documentValue = document.getElementById("registerDocumentValue").value.trim();
+
+          if (!name) throw new Error("Informe seu nome.");
+          if (!email || !email.includes("@")) throw new Error("Informe um email válido.");
+          if (password.length < 8) throw new Error("A senha precisa ter no mínimo 8 caracteres.");
+
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email,
+            password,
+            options: { data: { name, role: "client", status: "pending" } },
           });
+          if (signUpError) throw new Error(signUpError.message);
+          if (!signUpData?.user) throw new Error("Cadastro não concluído. Tente novamente.");
 
           document.getElementById("registerForm").reset();
           registerDocumentType.value = "cpf";
           registerDocumentValue.value = "";
           syncRegisterDocumentField();
           setMessage("", "");
-          showWaiting(user, "pending");
+          showWaiting({ name, email, status: "pending" }, "pending");
         } catch (error) {
           setMessage(error.message || "Não foi possível cadastrar.", "error");
+        } finally {
+          if (btn) btn.disabled = false;
         }
       });
 
@@ -815,7 +871,7 @@
       try {
         await auth.init();
       } catch (error) {
-        setMessage("Não foi possível conectar com o ambiente publicado.", "error");
+        setMessage("Não foi possível conectar com o ambiente.", "error");
       }
 
       redirectIfApproved();

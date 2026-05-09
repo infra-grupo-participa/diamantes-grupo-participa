@@ -1,6 +1,2 @@
-# Arquivo de exceções do Gitleaks.
-# Adicione fingerprints de falsos positivos confirmados no formato:
-# <hash-do-commit>:<caminho-do-arquivo>:<linha>
-#
-# Exemplo:
-# abc1234def5678:api/data/example.json:42
+# Supabase ANON key é pública por design (RLS protege os dados)
+assets/js/supabase-config.js:jwt:6

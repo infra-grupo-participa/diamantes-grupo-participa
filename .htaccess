@@ -54,8 +54,9 @@ DirectoryIndex index.html index.php
     # Permissions-Policy: desativa features não usadas.
     Header always set Permissions-Policy "geolocation=(), camera=(), microphone=()"
 
-    # CSP mínimo para Fase 1 (unsafe-inline necessário até Fase 4 extrair scripts inline).
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.clickup.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    # CSP — unsafe-inline necessário até Fase 4 extrair scripts inline.
+    # cdn.jsdelivr.net: supabase-js CDN. *.supabase.co: Supabase Auth + REST.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.clickup.com https://*.supabase.co; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 </IfModule>
 
 # LOW-1 defense-in-depth: bloqueia .json no webroot (além do .htaccess em api/storage/).

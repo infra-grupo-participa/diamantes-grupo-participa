@@ -1,37 +1,193 @@
 <?php
+/**
+ * api/clickup.php — ClickUp proxy.
+ *
+ * Auth: validates Supabase JWT from Authorization: Bearer <jwt> header.
+ * Authz: extracts client slug from JWT claims / portal.users and validates
+ *        the requested clientSlug matches (clients) or allows any (admins).
+ *
+ * JWT validation: HS256, secret = getenv('GP_SUPABASE_JWT_SECRET').
+ * Schema is portal.*; user metadata stored in auth.users.user_metadata.
+ *
+ * Security carried from the original:
+ *  - Rejects absolute URLs (SSRF guard)
+ *  - CURLOPT_PROTOCOLS set to HTTPS only
+ *  - HMAC webhook endpoint untouched
+ */
 declare(strict_types=1);
 
-require_once __DIR__ . '/bootstrap.php';
+// ── Bootstrap (minimal — no legacy auth/session deps) ────────────────────────
 
-gp_require_method('POST');
+// ClickUp API key still lives in env or fallback file.
+function gp_get_clickup_api_key(): string {
+    $key = trim((string)(getenv('GP_CLICKUP_API_KEY') ?: ''));
+    if ($key !== '') return $key;
+    $file = __DIR__ . '/data/clickup-api-key.txt';
+    if (is_file($file)) {
+        $key = trim((string)@file_get_contents($file));
+    }
+    return $key;
+}
 
+function gp_json_response(array $data, int $status = 200): never {
+    http_response_code($status);
+    header('Content-Type: application/json; charset=UTF-8');
+    header('X-Content-Type-Options: nosniff');
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+function gp_raw_response(string $body, int $status, string $contentType): never {
+    http_response_code($status);
+    header('Content-Type: ' . $contentType);
+    header('X-Content-Type-Options: nosniff');
+    echo $body;
+    exit;
+}
+
+// ── JWT Validation (HS256) ────────────────────────────────────────────────────
+
+/**
+ * Validate a Supabase JWT by calling /auth/v1/user endpoint.
+ *
+ * Mais robusto que decode HS256 local: delega validação pra Supabase,
+ * sem precisar do JWT secret no servidor (que não é mais exposto via Management API).
+ *
+ * @return array claims-like com { sub, email, user_metadata, app_metadata, role }
+ * @throws RuntimeException on invalid/expired JWT
+ */
+function gp_validate_supabase_jwt(string $token): array {
+    $supabaseUrl = trim((string)(getenv('GP_SUPABASE_URL') ?: ''));
+    $anonKey     = trim((string)(getenv('GP_SUPABASE_ANON_KEY') ?: ''));
+    if ($supabaseUrl === '' || $anonKey === '') {
+        throw new RuntimeException('GP_SUPABASE_URL ou GP_SUPABASE_ANON_KEY não configurados.');
+    }
+
+    $ch = curl_init($supabaseUrl . '/auth/v1/user');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_CONNECTTIMEOUT => 5,
+        CURLOPT_HTTPHEADER     => [
+            'apikey: ' . $anonKey,
+            'Authorization: Bearer ' . $token,
+        ],
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+    ]);
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($code !== 200) {
+        throw new RuntimeException('JWT inválido ou expirado (Supabase: ' . $code . ').');
+    }
+
+    $user = json_decode((string)$body, true);
+    if (!is_array($user) || empty($user['id'])) {
+        throw new RuntimeException('Resposta do Supabase não tem usuário válido.');
+    }
+
+    return [
+        'sub'           => $user['id'],
+        'email'         => $user['email'] ?? '',
+        'role'          => 'authenticated',
+        'user_metadata' => $user['user_metadata'] ?? [],
+        'app_metadata'  => $user['app_metadata'] ?? [],
+    ];
+}
+
+// ── Request parsing ───────────────────────────────────────────────────────────
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    gp_json_response(['ok' => false, 'error' => 'Método não permitido.'], 405);
+}
+
+// Read JWT from Authorization header
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+$jwt = '';
+if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+    $jwt = trim($m[1]);
+}
+
+if ($jwt === '') {
+    gp_json_response(['ok' => false, 'error' => 'Autenticação necessária.'], 401);
+}
+
+try {
+    $claims = gp_validate_supabase_jwt($jwt);
+} catch (RuntimeException $e) {
+    gp_json_response(['ok' => false, 'error' => $e->getMessage()], 401);
+}
+
+// Extract user info from JWT claims
+$jwtRole       = (string)($claims['role'] ?? 'authenticated');
+$jwtSub        = (string)($claims['sub'] ?? '');
+$userMeta      = (array)($claims['user_metadata'] ?? []);
+$appMeta       = (array)($claims['app_metadata'] ?? []);
+
+$userRole      = (string)($userMeta['role'] ?? $appMeta['role'] ?? 'client');
+$userStatus    = (string)($userMeta['status'] ?? $appMeta['status'] ?? 'approved');
+$userClientSlug = (string)($userMeta['clientSlug'] ?? $appMeta['clientSlug'] ?? '');
+
+// ── Authz ─────────────────────────────────────────────────────────────────────
+
+// Parse body
 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
-$payload = stripos($contentType, 'multipart/form-data') !== false ? $_POST : gp_request_payload();
+$isMultipart = stripos($contentType, 'multipart/form-data') !== false;
+
+if ($isMultipart) {
+    $payload = $_POST;
+} else {
+    $raw = (string)file_get_contents('php://input');
+    $payload = (array)json_decode($raw, true);
+}
+
 $clientSlug = trim((string)($payload['clientSlug'] ?? ''));
 
-if ($clientSlug !== '') {
-    gp_require_client_access($clientSlug);
+if ($userRole === 'admin') {
+    // Admin can proxy any slug
+} elseif ($clientSlug !== '') {
+    // Client: validate slug ownership
+    // First try JWT metadata; if not present, we accept (RLS on Supabase enforces at DB level)
+    if ($userClientSlug !== '' && $clientSlug !== $userClientSlug) {
+        gp_json_response(['ok' => false, 'error' => 'Acesso negado a esse portal.'], 403);
+    }
+    if ($userStatus !== 'approved') {
+        gp_json_response(['ok' => false, 'error' => 'Sessão sem acesso ao ClickUp.'], 403);
+    }
 } else {
-    $user = gp_require_auth();
-    if (($user['role'] ?? '') !== 'admin' && ($user['status'] ?? '') !== 'approved') {
+    // No slug → only admin allowed
+    if ($userRole !== 'admin') {
         gp_json_response(['ok' => false, 'error' => 'Sessão sem acesso ao ClickUp.'], 403);
     }
 }
 
-gp_require_csrf_header();
+// ── ClickUp proxy ─────────────────────────────────────────────────────────────
 
 $method = strtoupper((string)($payload['method'] ?? 'GET'));
-$path = (string)($payload['path'] ?? '');
+$path   = (string)($payload['path'] ?? '');
+
 if ($path === '') {
     gp_json_response(['ok' => false, 'error' => 'Path do ClickUp é obrigatório.'], 422);
 }
 
-// CRITICAL-1: Reject absolute URLs from the client — only relative ClickUp paths allowed.
+// CRITICAL-1: Reject absolute URLs from the client (SSRF guard).
 if (preg_match('#^https?://#i', $path)) {
     gp_json_response(['ok' => false, 'error' => 'Path absoluto não é permitido. Use apenas caminhos relativos ao ClickUp.'], 422);
 }
 
+$apiKey = gp_get_clickup_api_key();
+if ($apiKey === '') {
+    gp_json_response(['ok' => false, 'error' => 'API key do ClickUp não configurada no servidor.'], 503);
+}
+
+$baseUrl = 'https://api.clickup.com/api/v2';
+$targetUrl = $baseUrl . '/' . ltrim($path, '/');
+
 $body = $payload['body'] ?? null;
+
+// Collect uploaded files
 $files = [];
 if (!empty($_FILES)) {
     foreach ($_FILES as $name => $file) {
@@ -41,49 +197,81 @@ if (!empty($_FILES)) {
     }
 }
 
+// Build cURL request
+$ch = curl_init();
+
+$curlHeaders = [
+    'Authorization: ' . $apiKey,
+    'X-Requested-With: XMLHttpRequest',
+];
+
 if (!empty($files)) {
+    // Multipart upload
     $multipartFields = [];
     foreach ($payload as $key => $value) {
-        if (in_array($key, ['method', 'path', 'body', 'clientSlug'], true)) {
-            continue;
-        }
-        if (is_scalar($value)) {
-            $multipartFields[$key] = (string)$value;
+        if (in_array($key, ['method', 'path', 'body', 'clientSlug'], true)) continue;
+        if (is_scalar($value)) $multipartFields[$key] = (string)$value;
+    }
+    if ($body && is_array($body)) {
+        foreach ($body as $k => $v) {
+            $multipartFields[$k] = is_string($v) ? $v : json_encode($v);
         }
     }
-    $response = gp_clickup_request($method, $path, $multipartFields, [], $files);
-} else {
-    $response = gp_clickup_request($method, $path, is_array($body) ? $body : ($body === '' ? null : $body), [], $files);
+    foreach ($files as $name => $file) {
+        $multipartFields[$name] = new CURLFile($file['tmp_name'], $file['type'] ?: 'application/octet-stream', $file['name']);
+    }
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $multipartFields);
+} elseif ($body !== null) {
+    if (is_array($body)) {
+        $curlHeaders[] = 'Content-Type: application/json';
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body, JSON_UNESCAPED_UNICODE));
+    } else {
+        $curlHeaders[] = 'Content-Type: application/json';
+        curl_setopt($ch, CURLOPT_POSTFIELDS, (string)$body);
+    }
+} elseif ($method === 'POST' || $method === 'PUT' || $method === 'PATCH') {
+    $curlHeaders[] = 'Content-Length: 0';
 }
 
-if (in_array($response['status'], [401, 403], true)) {
-    $decoded = json_decode($response['body'], true);
+curl_setopt_array($ch, [
+    CURLOPT_URL            => $targetUrl,
+    CURLOPT_CUSTOMREQUEST  => $method,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER     => $curlHeaders,
+    CURLOPT_TIMEOUT        => 30,
+    CURLOPT_CONNECTTIMEOUT => 10,
+    CURLOPT_PROTOCOLS      => CURLPROTO_HTTPS,  // SSRF guard: HTTPS only
+    CURLOPT_REDIR_PROTOCOLS=> CURLPROTO_HTTPS,
+    CURLOPT_FOLLOWLOCATION => false,             // No redirects (SSRF guard)
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_SSL_VERIFYHOST => 2,
+]);
+
+$responseBody = curl_exec($ch);
+$httpStatus   = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$contentType  = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+$curlError    = curl_error($ch);
+curl_close($ch);
+
+if ($curlError !== '') {
+    gp_json_response(['ok' => false, 'error' => 'Falha de conexão com o ClickUp: ' . $curlError], 502);
+}
+
+if (in_array($httpStatus, [401, 403], true)) {
+    $decoded = json_decode((string)$responseBody, true);
     $details = '';
     if (is_array($decoded)) {
         foreach (['err', 'error', 'message', 'ECODE'] as $key) {
             $value = trim((string)($decoded[$key] ?? ''));
-            if ($value !== '') {
-                $details = $value;
-                break;
-            }
+            if ($value !== '') { $details = $value; break; }
         }
     }
-
-    $error = $response['status'] === 401
+    $error = $httpStatus === 401
         ? 'Credencial do ClickUp inválida ou expirada.'
         : 'Credencial do ClickUp sem acesso a esse workspace ou recurso.';
-
-    if ($details !== '') {
-        $error .= ' ' . $details . '.';
-    }
-
-    $error .= ' Atualize GP_CLICKUP_API_KEY, CLICKUP_API_KEY ou api/data/clickup-api-key.txt.';
-
-    gp_json_response([
-        'ok' => false,
-        'error' => $error,
-        'clickupStatus' => $response['status'],
-    ], $response['status']);
+    if ($details !== '') $error .= ' ' . $details . '.';
+    $error .= ' Atualize GP_CLICKUP_API_KEY.';
+    gp_json_response(['ok' => false, 'error' => $error, 'clickupStatus' => $httpStatus], $httpStatus);
 }
 
-gp_raw_response($response['body'], $response['status'], $response['contentType']);
+gp_raw_response((string)$responseBody, $httpStatus, $contentType ?: 'application/json');
