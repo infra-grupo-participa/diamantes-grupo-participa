@@ -4,8 +4,7 @@ name: PR Quality Report
 # Métricas focadas em PHP lint + Vitest coverage + diff stats.
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 permissions:
   contents: read

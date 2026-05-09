@@ -1,9 +1,6 @@
 name: Security Scan
 
 on:
-  schedule:
-    # Toda segunda-feira às 6h UTC
-    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 jobs:

@@ -6,21 +6,6 @@ name: PHP Smoke Tests
 # Auth/users/portal agora são client-side (supabase-js + RLS).
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'api/**'
-      - 'index.html'
-      - 'portal/**'
-      - 'admin/**'
-      - '.github/workflows/php-smoke.yml'
-  pull_request:
-    paths:
-      - 'api/**'
-      - 'index.html'
-      - 'portal/**'
-      - 'admin/**'
-      - '.github/workflows/php-smoke.yml'
   workflow_dispatch:
 
 jobs:
