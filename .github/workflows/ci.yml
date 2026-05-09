@@ -120,10 +120,20 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          tools: none
+          tools: composer:v2
           coverage: none
 
-      - name: Install dependencies
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer deps (autoload required by api/bootstrap.php)
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Install npm deps
         run: npm ci
 
       - name: Install Playwright browsers

@@ -4,24 +4,47 @@ declare(strict_types=1);
 
 namespace Diamantes\Tests\Smoke;
 
-use Diamantes\Placeholder;
+use Diamantes\Container;
+use Diamantes\Http\JsonResponse;
+use Diamantes\Http\Request;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Smoke test — apenas garante que a suite PHPUnit está funcional.
+ * Smoke test — verifies the PSR-4 autoloader resolves Diamantes\ classes.
  *
- * Este arquivo vai crescer na Fase 2, quando as classes PSR-4 em src/
- * forem extraídas de api/bootstrap.php e puderem ser testadas unitariamente.
+ * Updated in Fase 2: Placeholder.php removed; checks real extracted classes.
  */
 final class SanityTest extends TestCase
 {
+    public static function setUpBeforeClass(): void
+    {
+        if (!defined('GP_STORAGE_DIR')) {
+            $_SERVER['REQUEST_METHOD'] = 'GET';
+            require_once dirname(__DIR__, 2) . '/api/bootstrap.php';
+        }
+    }
+
     public function testSuiteIsRunning(): void
     {
         $this->assertTrue(true, 'PHPUnit está funcionando.');
     }
 
-    public function testPlaceholderIsAutoloaded(): void
+    public function testHttpClassesAreAutoloaded(): void
     {
-        $this->assertSame('0.0.0-phase-0', Placeholder::version());
+        $this->assertTrue(class_exists(JsonResponse::class));
+        $this->assertTrue(class_exists(Request::class));
+    }
+
+    public function testContainerIsAutoloaded(): void
+    {
+        $this->assertTrue(class_exists(Container::class));
+    }
+
+    public function testContainerProvidesServices(): void
+    {
+        $c = Container::getInstance();
+        $this->assertNotNull($c->stateRepository());
+        $this->assertNotNull($c->rateLimiter());
+        $this->assertNotNull($c->auditLogger());
     }
 }

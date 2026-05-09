@@ -22,5 +22,9 @@
         <include>
             <directory suffix=".php">src</directory>
         </include>
+        <exclude>
+            <!-- Removed in Fase 2 — deleted file kept here as exclusion guard. -->
+            <file>src/Placeholder.php</file>
+        </exclude>
     </source>
 </phpunit>
