@@ -12,11 +12,15 @@ window.getSupabaseClient = function () {
   if (!window.supabase || !window.supabase.createClient) {
     throw new Error('@supabase/supabase-js não carregado — adicione o <script src="...supabase.min.js"> antes deste arquivo');
   }
+  // No-op lock: evita deadlock do navigator.locks quando callbacks de
+  // onAuthStateChange chamam métodos do supabase (re-entrada). Aceitável
+  // single-tab; em multi-tab pode haver corrida no refresh do token.
+  const noopLock = (_name, _timeout, fn) => fn();
   window.__supabaseClient = window.supabase.createClient(
     window.SUPABASE_CONFIG.url,
     window.SUPABASE_CONFIG.anonKey,
     {
-      auth: { persistSession: true, autoRefreshToken: true, storageKey: 'gp-portal-auth' },
+      auth: { persistSession: true, autoRefreshToken: true, storageKey: 'gp-portal-auth', lock: noopLock },
       db: { schema: window.SUPABASE_CONFIG.schema },
       global: { headers: { 'X-Client-Info': 'diamantes-portal/2.0' } },
     }

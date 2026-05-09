@@ -131,19 +131,28 @@
     appBase: APP_BASE,
   };
 
-  // Wire onAuthStateChange do supabase pra atualizar cache automaticamente
+  // Wire onAuthStateChange — desacoplado via setTimeout pra não chamar
+  // métodos do supabase de DENTRO do callback (causava deadlock no lock
+  // do gotrue quando o lock nativo estava ativo; mantido pro caso de
+  // re-introdução do lock).
   if (window.getSupabaseClient) {
     try {
       const supabase = window.getSupabaseClient();
-      supabase.auth.onAuthStateChange(async (event, session) => {
+      supabase.auth.onAuthStateChange((event, session) => {
         if (!session?.user) { emit(null); return; }
-        const profile = await fetchProfileSlug(supabase, session.user.id);
-        const user = formatUser(session.user, profile?.client_slug);
-        if (profile) {
-          user.role = profile.role || user.role;
-          user.status = profile.status || user.status;
-        }
-        emit(user);
+        // Emit imediato com dados do auth.user (sem profile) pra UI reagir
+        emit(formatUser(session.user, undefined));
+        // Profile fetch desacoplado
+        setTimeout(async () => {
+          try {
+            const profile = await fetchProfileSlug(supabase, session.user.id);
+            if (!profile) return;
+            const user = formatUser(session.user, profile.client_slug);
+            user.role = profile.role || user.role;
+            user.status = profile.status || user.status;
+            emit(user);
+          } catch (_) { /* ignore */ }
+        }, 0);
       });
     } catch (_) { /* supabase ainda não carregou — init() vai cuidar */ }
   }
