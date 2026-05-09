@@ -17,6 +17,9 @@ import {
   humanizeText,
   uniqueValues
 } from "./insights-utils.js";
+
+// Re-export pra que ratings/reviews/task-cards importem de cá (caminho histórico)
+export { normalizeServiceName } from "./insights-utils.js";
 import { SERVICE_LABELS, CLIENT_PROFILE_SCHEMA } from "./insights-state.js";
 
 // ── Name formatters ─────────────────────────────────────────────────────────
