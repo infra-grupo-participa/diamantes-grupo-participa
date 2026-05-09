@@ -22,28 +22,41 @@ namespace Diamantes\Storage;
  *  - RLS is bypassed by service_role; row-level authZ is enforced above this layer.
  *
  * Configuration (env vars):
- *  - GP_SUPABASE_URL            (e.g. https://gfynspfdkhtjrsboceka.supabase.co)
+ *  - GP_SUPABASE_URL            (e.g. https://npqyvjhvtfahuxfmuhie.supabase.co)
  *  - GP_SUPABASE_SERVICE_ROLE_KEY
+ *  - GP_SUPABASE_SCHEMA         (default: 'portal' — isolates from co-tenant `public`
+ *                                schema used by the Digisac bot in the same project)
+ *
+ * Schema isolation:
+ *  PostgREST exposes additional schemas via the Accept-Profile (read) and
+ *  Content-Profile (write) headers. The schema must be added to the project's
+ *  exposed-schemas list in Settings → API. See docs/migration-supabase.md.
  *
  * All HTTP errors are wrapped in StorageException.
  */
 class SupabaseStateRepository implements StorageDriver
 {
+    public const DEFAULT_SCHEMA = 'portal';
+
     private string $baseUrl;
     private string $serviceRoleKey;
+    private string $schema;
 
     /** @var array<string, string> */
     private array $defaultHeaders;
 
-    public function __construct(string $baseUrl, string $serviceRoleKey)
+    public function __construct(string $baseUrl, string $serviceRoleKey, string $schema = self::DEFAULT_SCHEMA)
     {
         $this->baseUrl        = rtrim($baseUrl, '/');
         $this->serviceRoleKey = $serviceRoleKey;
+        $this->schema         = $schema;
         $this->defaultHeaders = [
             'apikey: '        . $this->serviceRoleKey,
             'Authorization: Bearer ' . $this->serviceRoleKey,
             'Content-Type: application/json',
             'Accept: application/json',
+            'Accept-Profile: '  . $this->schema,
+            'Content-Profile: ' . $this->schema,
             'Prefer: return=representation',
         ];
     }
@@ -56,12 +69,13 @@ class SupabaseStateRepository implements StorageDriver
      */
     public static function fromEnv(): ?self
     {
-        $url = trim((string)(getenv('GP_SUPABASE_URL') ?: ''));
-        $key = trim((string)(getenv('GP_SUPABASE_SERVICE_ROLE_KEY') ?: ''));
+        $url    = trim((string)(getenv('GP_SUPABASE_URL') ?: ''));
+        $key    = trim((string)(getenv('GP_SUPABASE_SERVICE_ROLE_KEY') ?: ''));
+        $schema = trim((string)(getenv('GP_SUPABASE_SCHEMA') ?: self::DEFAULT_SCHEMA));
         if ($url === '' || $key === '') {
             return null;
         }
-        return new self($url, $key);
+        return new self($url, $key, $schema);
     }
 
     // ─── Users ────────────────────────────────────────────────────────────────

@@ -42,6 +42,7 @@ if (is_file($envFile)) {
 
 $supabaseUrl = trim((string)(getenv('GP_SUPABASE_URL') ?: ''));
 $serviceKey  = trim((string)(getenv('GP_SUPABASE_SERVICE_ROLE_KEY') ?: ''));
+$schema      = trim((string)(getenv('GP_SUPABASE_SCHEMA') ?: 'portal'));
 
 if ($supabaseUrl === '' || $serviceKey === '') {
     fwrite(STDERR, "ERROR: GP_SUPABASE_URL and GP_SUPABASE_SERVICE_ROLE_KEY must be set.\n");
@@ -125,6 +126,8 @@ curl_setopt_array($ch, [
         'apikey: '         . $serviceKey,
         'Authorization: Bearer ' . $serviceKey,
         'Content-Type: application/json',
+        'Accept-Profile: ' . $schema,
+        'Content-Profile: ' . $schema,
         'Accept: application/json',
         'Prefer: resolution=merge-duplicates,return=minimal',
     ],
