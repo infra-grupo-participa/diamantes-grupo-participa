@@ -218,20 +218,14 @@ export function updatePortalUploadPreview() {
 
 export async function syncProfileAttachments(context, files) {
   if (typeof CLIENTE_TASK_ID === "undefined" || !CLIENTE_TASK_ID || !files.length) return;
-  // FIX (pentest HIGH): rota via proxy server-side. CSRF token + auth são tratados pelo PHP.
-  const clientSlug = typeof CLIENTE_SLUG !== "undefined" ? CLIENTE_SLUG : "";
+  // FIX (pentest HIGH): rota via proxy server-side. JWT é injetado no GP_API.
   for (const file of files) {
-    const formData = new FormData();
-    formData.append("clientSlug", clientSlug);
-    formData.append("method", "POST");
-    formData.append("path", `task/${CLIENTE_TASK_ID}/attachment`);
-    formData.append("attachment", file, file.name);
-
-    const response = await fetch("/api/clickup.php", {
-      method: "POST",
-      credentials: "same-origin",
-      body: formData,
-    });
+    const response = await window.GP_API.clickup(
+      "POST",
+      `task/${CLIENTE_TASK_ID}/attachment`,
+      null,
+      { files: [file] },
+    );
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {

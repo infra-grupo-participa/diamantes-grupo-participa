@@ -12,18 +12,9 @@ import { openRatingModal } from "./insights-rating-modal.js";
 
 async function postPortalTaskComment(taskId, message) {
   // FIX (pentest HIGH): rota via proxy server-side em vez de chamar api.clickup.com direto.
-  const clientSlug = typeof CLIENTE_SLUG !== "undefined" ? CLIENTE_SLUG : "";
   const prefix = typeof CLIENT_COMMENT_PREFIX !== "undefined" ? CLIENT_COMMENT_PREFIX : "";
-  const response = await fetch("/api/clickup.php", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      method: "POST",
-      path: `task/${taskId}/comment`,
-      clientSlug,
-      body: { comment_text: `${prefix}${String(message || "").trim()}` },
-    }),
+  const response = await window.GP_API.clickup("POST", `task/${taskId}/comment`, {
+    comment_text: `${prefix}${String(message || "").trim()}`,
   });
 
   const payload = await response.json().catch(() => null);

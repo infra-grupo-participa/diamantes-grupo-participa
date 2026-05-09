@@ -1189,41 +1189,21 @@
 </div>
 
 <script>
-  // Proxy server-side: chamadas ao ClickUp passam por /api/clickup.php
-  // O slug do cliente é derivado da URL (ex.: /bruno-couto/index.html -> "bruno-couto").
+  // Slug do cliente: URL é /servico/portal/?slug=X após o rewrite Supabase.
   const CLIENTE_SLUG = (function () {
+    const fromQuery = new URLSearchParams(window.location.search).get('slug');
+    if (fromQuery) return fromQuery.trim();
+    // fallback histórico (path-based)
     const parts = window.location.pathname.split('/').filter(Boolean);
     const last = parts[parts.length - 1] || '';
     if (last && !/\.html?$/i.test(last)) return last;
     return parts[parts.length - 2] || '';
   })();
+  // Expõe global pro portal-api.js usar
+  window.CLIENTE_SLUG = CLIENTE_SLUG;
 
   async function cuFetch(method, path, body, options = {}) {
-    const init = { method: 'POST', credentials: 'same-origin' };
-    if (options.files && options.files.length) {
-      const form = new FormData();
-      form.append('clientSlug', CLIENTE_SLUG);
-      form.append('method', method);
-      form.append('path', path);
-      if (body && typeof body === 'object') {
-        for (const [k, v] of Object.entries(body)) {
-          form.append(k, typeof v === 'string' ? v : JSON.stringify(v));
-        }
-      }
-      for (const file of options.files) {
-        form.append('attachment', file, file.name);
-      }
-      init.body = form;
-    } else {
-      init.headers = { 'Content-Type': 'application/json' };
-      init.body = JSON.stringify({
-        clientSlug: CLIENTE_SLUG,
-        method,
-        path,
-        body: body ?? null,
-      });
-    }
-    return fetch('/api/clickup.php', init);
+    return window.GP_API.clickup(method, path, body, options);
   }
 
   const CU_LIST_ID   = '901326399435';

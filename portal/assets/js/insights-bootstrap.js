@@ -527,13 +527,7 @@ export async function hydratePortalTipoOptions() {
 
   // FIX (pentest HIGH): rota via proxy server-side em vez de chamar api.clickup.com direto
   // (que exporia GP_CLICKUP_API_KEY no browser). Backend autentica e repassa.
-  const clientSlug = typeof CLIENTE_SLUG !== "undefined" ? CLIENTE_SLUG : "";
-  state.tipoOptionsPromise = fetch("/api/clickup.php", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ method: "GET", path: `list/${listId}/field`, clientSlug, body: null }),
-  })
+  state.tipoOptionsPromise = window.GP_API.clickup("GET", `list/${listId}/field`, null)
     .then((response) => response.json().catch(() => null).then((payload) => ({ response, payload })))
     .then(({ response, payload }) => {
       if (!response.ok || !payload) throw new Error(`Erro ${response.status}`);

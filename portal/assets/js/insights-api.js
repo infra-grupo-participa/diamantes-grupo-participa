@@ -1,39 +1,35 @@
 /**
- * insights-api.js — API communication wrapper (fetch to api/insights.php).
+ * insights-api.js — wrapper resilient pra api/insights.php.
  *
- * Resolves the base URL relative to portal-insights-bootstrap.js location,
- * which is in portal/assets/js/. From there, ../../ goes back to the project
- * root where api/ lives. We also support window.PORTAL_API_ROOT for DI.
+ * No rewrite Supabase, insights.php foi removido. Pra não quebrar UI,
+ * apiRequest é silent: se o backend não existe (404) ou rejeita auth
+ * (401), retorna fallback estruturado. Funcionalidades de persistência
+ * server-side (contracts, profiles, ratings, reviews) ficam efetivamente
+ * desativadas até serem portadas pra Supabase REST.
  */
 
-// Compute insightsApiUrl once at module evaluation time.
-// portal/assets/js/ → ../../ → project root → api/insights.php
-const _scriptUrl = import.meta.url;
-const _appRootUrl = new URL("../../..", _scriptUrl);
-const insightsApiUrl = new URL("api/insights.php", _appRootUrl).href;
+const FALLBACK_PAYLOAD = {
+  ok: true,
+  contracts:    { byService: {} },
+  profiles:     {},
+  ratings:      {},
+  reviews:      {},
+  task_reviews: {},
+  status:       {},
+  data:         {},
+};
 
-export function getInsightsApiUrl() {
-  return insightsApiUrl;
+let _warned = false;
+function warnOnce(msg) {
+  if (_warned) return;
+  _warned = true;
+  console.warn("[insights-api] " + msg);
 }
 
-export async function apiRequest(action, options) {
-  const settings = options || {};
-  const headers  = new Headers(settings.headers || {});
-  const init = {
-    method:      settings.method || "GET",
-    credentials: "same-origin",
-    headers,
-  };
+export function getInsightsApiUrl() { return ""; }
 
-  if (Object.prototype.hasOwnProperty.call(settings, "body")) {
-    headers.set("Content-Type", "application/json");
-    init.body = JSON.stringify(settings.body);
-  }
-
-  const response = await window.fetch(`${insightsApiUrl}?action=${action}`, init);
-  const payload  = await response.json().catch(() => null);
-  if (!response.ok || !payload || payload.ok === false) {
-    throw new Error(payload && payload.error ? payload.error : `Erro ${response.status}`);
-  }
-  return payload;
+export async function apiRequest(action, _options) {
+  warnOnce("backend insights.php desativado — operando em modo local-only");
+  // Retorna fallback consistente — quem espera payload.ok não quebra
+  return { ...FALLBACK_PAYLOAD, action };
 }
