@@ -10,6 +10,13 @@
  */
 declare(strict_types=1);
 
+// PHP-FPM/CGI compat: copia GP_* de $_SERVER -> putenv() (Apache SetEnv -> getenv()).
+foreach ($_SERVER ?? [] as $envKey => $envVal) {
+    if (is_string($envKey) && is_string($envVal) && strncmp($envKey, 'GP_', 3) === 0 && getenv($envKey) === false) {
+        putenv($envKey . '=' . $envVal);
+    }
+}
+
 const GP_ROOT = __DIR__ . '/..';
 const GP_STORAGE_DIR = __DIR__ . '/storage';
 const GP_DATA_DIR = __DIR__ . '/data';
