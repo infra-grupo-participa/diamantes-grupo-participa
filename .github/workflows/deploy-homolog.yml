@@ -23,8 +23,8 @@ concurrency:
 env:
   PHP_VERSION: '8.2'
   NODE_VERSION: '20'
-  TARGET_URL: 'https://homolog.diamantes.grupoparticipa.app.br/api/health.php'
-  BASE_URL: 'https://homolog.diamantes.grupoparticipa.app.br'
+  TARGET_URL: 'https://homologacao.diamantes.grupoparticipa.app.br/api/health.php'
+  BASE_URL: 'https://homologacao.diamantes.grupoparticipa.app.br'
 
 jobs:
   # ──────────────────────────────────────────────
@@ -185,15 +185,15 @@ jobs:
           name: deploy-artifact-homolog
           path: deploy-artifact/
 
-      - name: Check deploy pause flag
+      - name: Check deploy pause flag (homolog only)
         run: |
-          if [ "${GP_DEPLOY_PAUSED}" = "true" ]; then
-            echo "::warning::Deploy pausado via secret GP_DEPLOY_PAUSED=true."
-            echo "Para retomar: remova ou mude o valor da secret no GitHub."
+          # GP_DEPLOY_PAUSED é específica do prod. Homolog usa GP_DEPLOY_HOMOLOG_PAUSED.
+          if [ "${GP_DEPLOY_HOMOLOG_PAUSED}" = "true" ]; then
+            echo "::warning::Deploy de HOMOLOG pausado via secret GP_DEPLOY_HOMOLOG_PAUSED=true."
             exit 1
           fi
         env:
-          GP_DEPLOY_PAUSED: ${{ secrets.GP_DEPLOY_PAUSED }}
+          GP_DEPLOY_HOMOLOG_PAUSED: ${{ secrets.GP_DEPLOY_HOMOLOG_PAUSED }}
 
       - name: Install lftp
         run: sudo apt-get update && sudo apt-get install -y lftp
