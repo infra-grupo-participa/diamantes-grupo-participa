@@ -3,6 +3,14 @@
   if (!auth) return;
 
   function getCurrentSlug() {
+    // Fase 3+: portal unificado usa query string /portal/?slug=X
+    try {
+      const qs = new URLSearchParams(window.location.search || "");
+      const fromQuery = qs.get("slug");
+      if (fromQuery) return fromQuery;
+    } catch (_) { /* URLSearchParams sempre disponível em browsers modernos */ }
+
+    // Legado: /{slug}/ ou /{slug}/index.html
     const parts = window.location.pathname.split("/").filter(Boolean);
     if (!parts.length) return "";
     const last = decodeURIComponent(parts[parts.length - 1]);
