@@ -15,7 +15,7 @@
 ## Fluxo obrigatório
 
 ```
-feature branch → PR → CI obrigatório (6 checks) → aprovação → squash merge → deploy manual na Hostinger
+feat/* → PR → CI verde (6 checks) → aprovação → squash merge → deploy automático via main → smoke test → done
 ```
 
 **Nunca commite direto em `main` ou `homologacao`.** Veja `CONTRIBUTING.md` para detalhes.
@@ -116,7 +116,8 @@ npm run test:e2e:headed
 │   ├── security.yml       ← varredura semanal
 │   └── pr-quality.yml     ← comentário com métricas no PR
 ├── docs/quality-gate.md   ← como configurar o gate no GitHub
-└── docs/migration-supabase.md ← runbook Fase 5: JSON → Supabase
+├── docs/migration-supabase.md ← runbook Fase 5: JSON → Supabase
+└── docs/deploy.md         ← runbook de deploy: secrets, rollback, smoke test, rotação de creds
 ```
 
 ## Fluxo de request — Portal (Fase 3)
@@ -188,8 +189,8 @@ Legado: `api/data/clickup-api-key.txt` ainda é lido como fallback (remover na F
 | 2 | Quebrar `api/bootstrap.php` em classes PSR-4 (`src/`) | Pendente |
 | 3 | Unificar 27 portais de clientes em portal único CRUD | PR 3a concluído — portais legados coexistindo |
 | 4 | Modularizar `portal-insights.js` + extrair CSS inline | Pendente |
-| 5 | Migrar armazenamento JSON → Supabase Postgres | Implementado (PR pendente) |
-| 6 | Deploy automatizado GitHub Actions → Hostinger | Pendente |
+| 5 | Migrar armazenamento JSON → Supabase Postgres | Concluída |
+| 6 | Deploy automatizado GitHub Actions → Hostinger | Pendente — workflows entregues, aguarda cadastro de secrets + primeiro deploy manual |
 
 ## Decisões tomadas (Fase 0)
 
