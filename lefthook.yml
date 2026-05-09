@@ -1,0 +1,48 @@
+# =============================================================
+# Lefthook — hooks locais OPCIONAIS para conveniência do dev.
+#
+# IMPORTANTE: este arquivo NÃO é o quality gate.
+# O gate real é o CI no GitHub (ci.yml + branch protection).
+# Hooks locais podem ser bypassados com --no-verify e não
+# protegem a branch contra push direto ou merge via UI.
+#
+# Para instalar: npx lefthook install
+# Para desinstalar: npx lefthook uninstall
+# =============================================================
+
+pre-commit:
+  parallel: true
+  commands:
+    php-lint:
+      glob: "*.php"
+      run: |
+        # Linta apenas os arquivos PHP staged neste commit
+        {staged_files} | xargs -I{} php -l {}
+      skip:
+        - merge
+        - rebase
+
+    gitleaks:
+      run: |
+        # Verifica secrets apenas nos arquivos staged
+        npx gitleaks protect --staged --no-banner
+      skip:
+        - merge
+        - rebase
+
+commit-msg:
+  commands:
+    conventional-commits:
+      run: |
+        # Valida formato Conventional Commits sem depender de Node tools extras.
+        # Tipos permitidos: feat|fix|refactor|chore|docs|test|ci|perf|style|build
+        # Scopes opcionais: api|admin|portal|chatbot|backend|infra|deps|docs
+        MSG=$(cat {1})
+        echo "$MSG" | grep -qP \
+          '^(feat|fix|refactor|chore|docs|test|ci|perf|style|build)(\((api|admin|portal|chatbot|backend|infra|deps|docs)\))?(!)?:\s.+' \
+          || (echo "Commit rejeitado: não segue Conventional Commits." \
+              && echo "Exemplos válidos:" \
+              && echo "  feat(portal): adiciona modal de confirmação" \
+              && echo "  fix(api): corrige vazamento de sessão no auth" \
+              && echo "  chore(infra): atualiza dependências" \
+              && exit 1)

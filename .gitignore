@@ -4,6 +4,7 @@ api/data/*.key
 api/data/*.secret
 .env
 .env.*
+!.env.example
 *.pem
 
 # --- dados de produção / runtime ---
@@ -34,3 +35,19 @@ desktop.ini
 # --- empacotamentos ---
 *.zip
 !api/data/*.example
+
+# --- dependências (Fase 0+) ---
+vendor/
+node_modules/
+
+# --- artefatos de build e cobertura ---
+build/
+coverage/
+playwright-report/
+test-results/
+
+# --- cache de testes ---
+.phpunit.result.cache
+
+# --- arquivos locais de env e config ---
+*.local

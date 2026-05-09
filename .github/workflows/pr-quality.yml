@@ -1,0 +1,144 @@
+name: PR Quality Report
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  quality-comment:
+    name: Post quality metrics comment
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── PHP setup ──
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+          coverage: xdebug
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install PHP deps
+        run: composer install --no-interaction --prefer-dist
+
+      # ── PHP lint count ──
+      - name: Count PHP lint errors
+        id: php_lint
+        shell: bash
+        run: |
+          set +e
+          ERRORS=$(find . -name '*.php' -not -path './vendor/*' \
+            -exec php -l {} \; 2>&1 \
+            | grep -c "^Parse error")
+          [ -z "$ERRORS" ] && ERRORS=0
+          echo "errors=${ERRORS}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      # ── PHPUnit coverage ──
+      - name: Run PHPUnit (coverage)
+        id: phpunit
+        shell: bash
+        run: |
+          set +e
+          vendor/bin/phpunit --coverage-clover=build/coverage/clover.xml > /dev/null 2>&1
+          COVERED=0
+          TOTAL=0
+          if [ -f build/coverage/clover.xml ]; then
+            C=$(grep -oP 'coveredstatements="[^"]*"' build/coverage/clover.xml | head -1 | grep -oP '[0-9]+')
+            T=$(grep -oP ' statements="[^"]*"' build/coverage/clover.xml | head -1 | grep -oP '[0-9]+')
+            [ -n "$C" ] && COVERED=$C
+            [ -n "$T" ] && TOTAL=$T
+          fi
+          echo "covered=${COVERED}" >> "$GITHUB_OUTPUT"
+          echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      # ── Node setup ──
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install npm deps
+        run: npm ci
+
+      # ── Vitest coverage ──
+      - name: Run Vitest (coverage)
+        id: vitest
+        shell: bash
+        run: |
+          set +e
+          npx vitest run --coverage > /dev/null 2>&1
+          LINES_HIT=0
+          LINES_TOTAL=0
+          if [ -f build/coverage-js/lcov.info ]; then
+            LH=$(grep -c '^DA:[0-9]*,[^0]' build/coverage-js/lcov.info)
+            LT=$(grep -c '^DA:' build/coverage-js/lcov.info)
+            [ -n "$LH" ] && LINES_HIT=$LH
+            [ -n "$LT" ] && LINES_TOTAL=$LT
+          fi
+          echo "lines_hit=${LINES_HIT}" >> "$GITHUB_OUTPUT"
+          echo "lines_total=${LINES_TOTAL}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      # ── Diff stats ──
+      - name: Compute diff stats
+        id: diff
+        shell: bash
+        run: |
+          set +e
+          FILES_CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | wc -l | tr -d ' ')
+          STAT=$(git diff --shortstat origin/${{ github.base_ref }}...HEAD)
+          LINES_ADDED=$(echo "$STAT" | grep -oP '\d+(?= insertion)')
+          LINES_REMOVED=$(echo "$STAT" | grep -oP '\d+(?= deletion)')
+          [ -z "$FILES_CHANGED" ] && FILES_CHANGED=0
+          [ -z "$LINES_ADDED" ] && LINES_ADDED=0
+          [ -z "$LINES_REMOVED" ] && LINES_REMOVED=0
+          echo "files=${FILES_CHANGED}" >> "$GITHUB_OUTPUT"
+          echo "added=${LINES_ADDED}" >> "$GITHUB_OUTPUT"
+          echo "removed=${LINES_REMOVED}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      # ── Encontra comentário existente (para editar em vez de duplicar) ──
+      - name: Find existing quality comment
+        uses: peter-evans/find-comment@v3
+        id: find_comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: '<!-- gp-quality-report -->'
+
+      # ── Cria ou atualiza comentário ──
+      - name: Create or update quality comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find_comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          edit-mode: replace
+          body: |
+            <!-- gp-quality-report -->
+            ## Relatório de Qualidade
+
+            | Metric | Value |
+            |--------|-------|
+            | PHP lint errors | ${{ steps.php_lint.outputs.errors }} |
+            | PHPUnit statements covered | ${{ steps.phpunit.outputs.covered }} / ${{ steps.phpunit.outputs.total }} |
+            | Vitest lines covered | ${{ steps.vitest.outputs.lines_hit }} / ${{ steps.vitest.outputs.lines_total }} |
+            | Files changed | ${{ steps.diff.outputs.files }} |
+            | Lines added | +${{ steps.diff.outputs.added }} |
+            | Lines removed | -${{ steps.diff.outputs.removed }} |
+
+            > Gerado automaticamente. Atualizado a cada push neste PR.
