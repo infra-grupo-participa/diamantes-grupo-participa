@@ -63,27 +63,47 @@ if ($effectiveSlug === '') {
 }
 
 // ── 3. Load portal config ────────────────────────────────────────────────────
+//
+// GP_PORTALS_SOURCE=supabase → load from Supabase via StorageDriver
+//                   json     → (default) load from api/data/portals.json
+//
+// Falls back to JSON if the Supabase driver is unavailable.
 
-$portalsFile = __DIR__ . '/../api/data/portals.json';
-$portalsRaw  = @file_get_contents($portalsFile);
-if ($portalsRaw === false) {
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=UTF-8');
-    exit('Erro interno: configuração de portais não encontrada.');
-}
-
-$portalsConfig = json_decode($portalsRaw, true);
-if (!is_array($portalsConfig) || !is_array($portalsConfig['portals'] ?? null)) {
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=UTF-8');
-    exit('Erro interno: formato de portais inválido.');
-}
+$portalsSource = strtolower(trim((string)(getenv('GP_PORTALS_SOURCE') ?: 'json')));
 
 $portal = null;
-foreach ($portalsConfig['portals'] as $p) {
-    if (is_array($p) && ($p['slug'] ?? '') === $effectiveSlug) {
-        $portal = $p;
-        break;
+
+if ($portalsSource === 'supabase') {
+    try {
+        $portal = \Diamantes\Container::getInstance()->storage()->findClientBySlug($effectiveSlug);
+    } catch (\Throwable $supabaseError) {
+        // Log and fall back to JSON so production stays up even if DB is unavailable.
+        error_log('[portal/index.php] Supabase findClientBySlug failed, falling back to JSON: ' . $supabaseError->getMessage());
+        $portalsSource = 'json';
+    }
+}
+
+if ($portalsSource !== 'supabase') {
+    $portalsFile = __DIR__ . '/../api/data/portals.json';
+    $portalsRaw  = @file_get_contents($portalsFile);
+    if ($portalsRaw === false) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=UTF-8');
+        exit('Erro interno: configuração de portais não encontrada.');
+    }
+
+    $portalsConfig = json_decode($portalsRaw, true);
+    if (!is_array($portalsConfig) || !is_array($portalsConfig['portals'] ?? null)) {
+        http_response_code(500);
+        header('Content-Type: text/plain; charset=UTF-8');
+        exit('Erro interno: formato de portais inválido.');
+    }
+
+    foreach ($portalsConfig['portals'] as $p) {
+        if (is_array($p) && ($p['slug'] ?? '') === $effectiveSlug) {
+            $portal = $p;
+            break;
+        }
     }
 }
 

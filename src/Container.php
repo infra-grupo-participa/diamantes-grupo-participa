@@ -9,7 +9,11 @@ use Diamantes\Auth\RateLimiter;
 use Diamantes\Integrations\ClickUpClient;
 use Diamantes\Integrations\Mailer;
 use Diamantes\Integrations\SheetsSync;
+use Diamantes\Storage\DualWriteStorageDriver;
+use Diamantes\Storage\JsonStateDriver;
 use Diamantes\Storage\StateRepository;
+use Diamantes\Storage\StorageDriver;
+use Diamantes\Storage\SupabaseStateRepository;
 
 /**
  * Simple service factory / registry.
@@ -83,6 +87,53 @@ final class Container
             $this->storageDir,
             $this->stateFile,
         ));
+    }
+
+    /**
+     * Return the configured StorageDriver.
+     *
+     * Controlled by GP_STORAGE_DRIVER env var:
+     *  - json      — JSON flat-file (default, backward-compatible)
+     *  - supabase  — Supabase PostgREST (requires GP_SUPABASE_URL + GP_SUPABASE_SERVICE_ROLE_KEY)
+     *  - dual      — Fan-out writes to JSON (primary) + Supabase (secondary)
+     */
+    public function storage(): StorageDriver
+    {
+        return $this->make('storage', function (): StorageDriver {
+            $driver = strtolower(trim((string)(getenv('GP_STORAGE_DRIVER') ?: 'json')));
+            return match ($driver) {
+                'supabase' => $this->buildSupabaseDriver(),
+                'dual'     => new DualWriteStorageDriver(
+                    $this->buildJsonDriver(),
+                    $this->buildSupabaseDriver(),
+                ),
+                default    => $this->buildJsonDriver(),
+            };
+        });
+    }
+
+    // ─── Private driver builders ──────────────────────────────────────────────
+
+    private function buildJsonDriver(): JsonStateDriver
+    {
+        return new JsonStateDriver(
+            $this->stateRepository(),
+            'gp_read_state',
+            'gp_update_state',
+            $this->auditLogFile,
+            $this->dataDir . '/portals.json',
+        );
+    }
+
+    private function buildSupabaseDriver(): SupabaseStateRepository
+    {
+        $driver = SupabaseStateRepository::fromEnv();
+        if ($driver === null) {
+            throw new \RuntimeException(
+                'GP_STORAGE_DRIVER=supabase requires GP_SUPABASE_URL and GP_SUPABASE_SERVICE_ROLE_KEY to be set.'
+            );
+        }
+        return $driver;
     }
 
     public function auditLogger(): AuditLogger

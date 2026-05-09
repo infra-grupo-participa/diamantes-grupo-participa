@@ -7,7 +7,7 @@
 | Frontend | HTML/CSS/JS vanilla (sem bundler) |
 | Backend | PHP 8.2 — arquivos em `api/` |
 | Servidor | Hostinger (Apache + PHP shared hosting) |
-| Dados | JSON em `api/storage/` e `api/data/` (migração para Supabase planejada na Fase 5) |
+| Dados | JSON em `api/storage/` (padrão) + Supabase Postgres (Fase 5, opt-in via `GP_STORAGE_DRIVER`) |
 | Integrações | ClickUp API, Google Apps Script (Sheets), e-mail via `mail()` |
 | CI/CD | GitHub Actions (`.github/workflows/`) |
 | Testes | PHPUnit 11 (PHP) + Vitest (JS) + Playwright (E2E) |
@@ -76,12 +76,24 @@ npm run test:e2e:headed
 │   ├── data/
 │   │   └── portals.json   ← config dos 27 portais (cf_tipos, assignee_ids, auto_map)
 │   └── scripts/
-│       ├── setup-admin.php         ← cria/atualiza admin (suporta GP_BOOTSTRAP_USER_CLIENT_SLUG)
-│       └── seed-client-slugs.php   ← idempotente: atribui clientSlug a users existentes
+│       ├── setup-admin.php                    ← cria/atualiza admin
+│       ├── seed-client-slugs.php              ← idempotente: atribui clientSlug a users
+│       ├── migrate-clients-to-supabase.php    ← Fase 5: portals.json → Supabase clients
+│       ├── migrate-users-to-supabase.php      ← Fase 5: app-state.json → Supabase users
+│       ├── migrate-audit-log-to-supabase.php  ← Fase 5: audit-log.jsonl → Supabase
+│       └── migrate-all-to-supabase.php        ← Fase 5: orchestrador (GP_MIGRATION_CONFIRM=yes)
 ├── portal/
 │   ├── index.php          ← endpoint único: auth guard + render por slug
 │   └── template.html      ← template com {{PLACEHOLDERS}} extraído do portal canônico
-├── src/                   ← classes PSR-4 (Fase 2)
+├── src/                   ← classes PSR-4 (Fase 2+)
+│   ├── Container.php      ← factory/registry; Container::storage() retorna StorageDriver
+│   ├── Storage/
+│   │   ├── StorageDriver.php          ← interface (Fase 5)
+│   │   ├── StorageException.php       ← erro tipado do driver
+│   │   ├── StateRepository.php        ← JSON flat-file (Fase 2)
+│   │   ├── JsonStateDriver.php        ← adapta StateRepository p/ StorageDriver (Fase 5)
+│   │   ├── SupabaseStateRepository.php← PostgREST Supabase (Fase 5)
+│   │   └── DualWriteStorageDriver.php ← fan-out primary+secondary (Fase 5)
 │   └── Users/UserService.php  ← normalize() já inclui clientSlug
 ├── admin/index.html       ← painel administrativo
 ├── {slug}/index.html      ← 27 portais legados (coexistem até PR 3b removê-los)
@@ -103,7 +115,8 @@ npm run test:e2e:headed
 │   ├── ci.yml             ← lint + testes + gitleaks + dependency review
 │   ├── security.yml       ← varredura semanal
 │   └── pr-quality.yml     ← comentário com métricas no PR
-└── docs/quality-gate.md   ← como configurar o gate no GitHub
+├── docs/quality-gate.md   ← como configurar o gate no GitHub
+└── docs/migration-supabase.md ← runbook Fase 5: JSON → Supabase
 ```
 
 ## Fluxo de request — Portal (Fase 3)
@@ -144,8 +157,27 @@ Veja `.env.example` para a lista completa. As principais:
 | `GP_SHEETS_SYNC_SECRET` | Secret do sync com Sheets |
 | `GP_MAIL_FROM_EMAIL` | Remetente dos e-mails |
 | `GP_APP_BASE_URL` | URL base da aplicação |
+| `GP_STORAGE_DRIVER` | `json` (padrão) \| `supabase` \| `dual` |
+| `GP_SUPABASE_URL` | URL do projeto Supabase |
+| `GP_SUPABASE_SERVICE_ROLE_KEY` | Service role key (NUNCA expor ao frontend) |
+| `GP_PORTALS_SOURCE` | `json` (padrão) \| `supabase` — fonte dos portais em `portal/index.php` |
 
 Legado: `api/data/clickup-api-key.txt` ainda é lido como fallback (remover na Fase 2).
+
+## Supabase (Fase 5)
+
+- **Project ref:** `gfynspfdkhtjrsboceka` — região `sa-east-1`
+- **Tabelas:** `clients`, `users`, `audit_log` (+ `services`, `ratings`, `task_reviews`, `client_profiles`, `rate_limits`)
+- **RLS:** habilitada em todas as tabelas. Service role bypassa RLS.
+- **Transport:** PostgREST (REST API via curl) — não requer extensão PHP pgsql.
+- **Runbook de migração:** `docs/migration-supabase.md`
+
+### Fluxo de migração recomendado
+
+1. `GP_STORAGE_DRIVER=dual` → dual-write (JSON primário + Supabase shadow)
+2. Monitorar logs por erros do `[DualWriteStorageDriver]`
+3. Validar paridade de dados entre JSON e Supabase
+4. `GP_STORAGE_DRIVER=supabase` + `GP_PORTALS_SOURCE=supabase` → corte completo
 
 ## Roadmap de Fases
 
@@ -156,7 +188,7 @@ Legado: `api/data/clickup-api-key.txt` ainda é lido como fallback (remover na F
 | 2 | Quebrar `api/bootstrap.php` em classes PSR-4 (`src/`) | Pendente |
 | 3 | Unificar 27 portais de clientes em portal único CRUD | PR 3a concluído — portais legados coexistindo |
 | 4 | Modularizar `portal-insights.js` + extrair CSS inline | Pendente |
-| 5 | Migrar armazenamento JSON → Supabase Postgres | Pendente |
+| 5 | Migrar armazenamento JSON → Supabase Postgres | Implementado (PR pendente) |
 | 6 | Deploy automatizado GitHub Actions → Hostinger | Pendente |
 
 ## Decisões tomadas (Fase 0)
