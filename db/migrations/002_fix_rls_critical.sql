@@ -25,10 +25,14 @@ AS $$
   );
 $$;
 
--- ─── portal.users — derruba UPDATE permissivo, recria seguro ──────────────────
+-- ─── portal.users — derruba TODAS policies legacy, recria seguras ─────────────
+-- IMPORTANTE: PostgreSQL avalia policies com OR — UMA permissiva existente
+-- pode neutralizar todas as restritivas. Limpa tudo antes.
 
--- Lista atual de policies UPDATE pra remover todas
+DROP POLICY IF EXISTS "users_admin_all"               ON portal.users;
 DROP POLICY IF EXISTS "users_admin_update_all"        ON portal.users;
+DROP POLICY IF EXISTS "users_self_update_basic"       ON portal.users;
+DROP POLICY IF EXISTS "users_read_own_or_admin"       ON portal.users;
 DROP POLICY IF EXISTS "users_update_own"              ON portal.users;
 DROP POLICY IF EXISTS "users_update_self"             ON portal.users;
 DROP POLICY IF EXISTS "users_update"                  ON portal.users;
@@ -97,6 +101,7 @@ TO authenticated
 USING (auth_user_id = auth.uid());
 
 -- ─── portal.clients — SELECT — admin tudo, user só seu próprio slug ───────────
+DROP POLICY IF EXISTS "clients_read_authenticated"    ON portal.clients;
 DROP POLICY IF EXISTS "clients_select_all"            ON portal.clients;
 DROP POLICY IF EXISTS "clients_read"                  ON portal.clients;
 
