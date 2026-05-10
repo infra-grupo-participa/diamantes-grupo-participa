@@ -711,6 +711,18 @@
     </section>
   </div>
 
+  <script>
+    // CAPTURA o hash de recovery ANTES do supabase-js processar e limpar.
+    // Sem isso, race condition: supabase reseta o hash → detect a posteriori falha.
+    (function captureRecoveryEarly() {
+      try {
+        if ((window.location.hash || "").includes("type=recovery")) {
+          window.__GP_RECOVERY_FLOW = true;
+          sessionStorage.setItem("gp-recovery-flow", "1");
+        }
+      } catch (_) { /* ignore */ }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="assets/js/supabase-config.js"></script>
   <script src="assets/js/portal-auth-v2.js"></script>
@@ -810,6 +822,10 @@
       }
 
       function isRecoveryFlow() {
+        if (window.__GP_RECOVERY_FLOW) return true;
+        try {
+          if (sessionStorage.getItem("gp-recovery-flow") === "1") return true;
+        } catch (_) {}
         return (window.location.hash || "").includes("type=recovery");
       }
 
@@ -957,6 +973,8 @@
           const { error } = await supabase.auth.updateUser({ password: newPassword });
           if (error) throw new Error(error.message);
           setMessage("Senha atualizada! Redirecionando...", "success");
+          try { sessionStorage.removeItem("gp-recovery-flow"); } catch (_) {}
+          window.__GP_RECOVERY_FLOW = false;
           await auth.logout();
           setTimeout(() => {
             window.location.replace(window.location.origin + window.location.pathname);
@@ -968,10 +986,9 @@
         }
       });
 
-      // Detecta link de recovery do Supabase: hash contém type=recovery
+      // Detecta link de recovery: usa flag capturada antes do supabase processar
       (function detectRecoveryLink() {
-        const hash = window.location.hash || "";
-        if (hash.includes("type=recovery")) {
+        if (isRecoveryFlow()) {
           showView("resetView");
         }
       })();
@@ -997,7 +1014,13 @@
       registerDocumentValue.addEventListener("input", syncRegisterDocumentField);
 
       showAuth();
-      setActiveTab("login");
+      // Em recovery flow, NÃO ativar login — preservar resetView mostrado pelo
+      // detectRecoveryLink IIFE acima.
+      if (isRecoveryFlow()) {
+        showView("resetView");
+      } else {
+        setActiveTab("login");
+      }
       syncRegisterDocumentField();
 
       try {
