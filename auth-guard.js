@@ -128,8 +128,13 @@
       }
     }
 
-    window.addEventListener("DOMContentLoaded", () => {
-      injectShell(sessionUser, sessionUser.role === "admin");
-    });
+    // Se DOM já carregou (caso do portal/index.html que faz document.write
+    // depois do load), injeta shell direto. Senão espera DOMContentLoaded.
+    const doInject = () => injectShell(sessionUser, sessionUser.role === "admin");
+    if (document.readyState === "loading") {
+      window.addEventListener("DOMContentLoaded", doInject);
+    } else {
+      doInject();
+    }
   })();
 })();

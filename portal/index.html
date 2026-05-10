@@ -48,6 +48,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
   <script src="../assets/js/supabase-config.js"></script>
+  <script src="../assets/js/supabase-i18n.js"></script>
   <script src="../assets/js/portal-auth-v2.js"></script>
   <script src="../assets/js/portal-api.js"></script>
   <script>
@@ -220,10 +221,11 @@
     // scripts only read window.PortalAuth (don't call auth.init again).
     // auth-guard.js is also already running (window.PortalAuth is set).
     //
-    // We remove those two script tags from the fetched HTML so they don't reload.
+    // Removemos APENAS portal-auth.js legado (não compat com Supabase).
+    // auth-guard.js permanece — é ele quem injeta o shell com botão "Sair"
+    // no canto superior direito do portal cliente.
     tplText = tplText
-      .replace(/<script\s[^>]*src=["'][^"']*portal-auth\.js["'][^>]*>\s*<\/script>/gi, '')
-      .replace(/<script\s[^>]*src=["'][^"']*auth-guard\.js["'][^>]*>\s*<\/script>/gi, '');
+      .replace(/<script\s[^>]*src=["'][^"']*portal-auth\.js["'][^>]*>\s*<\/script>/gi, '');
 
     // Also remove the old supabase/portal-auth-v2 scripts if template ever gets them,
     // to avoid double-loading:

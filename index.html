@@ -728,6 +728,7 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
   <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/supabase-i18n.js"></script>
   <script src="assets/js/portal-auth-v2.js"></script>
   <script>
     (async function () {
@@ -872,7 +873,7 @@
             document.getElementById("loginPassword").value
           );
           if (!result.ok) {
-            setMessage(result.error || "Não foi possível entrar.", "error");
+            setMessage(window.GP_I18N.translateAuthError(result.error), "error");
             return;
           }
           if (result.redirect) {
@@ -881,7 +882,7 @@
           }
           showWaiting(result.user, result.user && result.user.status);
         } catch (error) {
-          setMessage(error.message || "Não foi possível entrar.", "error");
+          setMessage(window.GP_I18N.translateAuthError(error), "error");
         } finally {
           if (btn) btn.disabled = false;
         }
@@ -920,7 +921,7 @@
           setMessage("", "");
           showWaiting({ name, email, status: "pending" }, "pending");
         } catch (error) {
-          setMessage(error.message || "Não foi possível cadastrar.", "error");
+          setMessage(window.GP_I18N.translateAuthError(error), "error");
         } finally {
           if (btn) btn.disabled = false;
         }
@@ -952,10 +953,20 @@
           if (!email || !email.includes("@")) throw new Error("Informe um email válido.");
           const redirectTo = window.location.origin + window.location.pathname;
           const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-          if (error) throw new Error(error.message);
+          // Anti-enumeration + UX consistente: msg genérica de sucesso mesmo
+          // se Supabase rejeitar (email_address_invalid, user_not_found, etc).
+          // Erros reais (rate limit, server error) ainda mostramos.
+          if (error) {
+            const code = (error.code || error.error_code || '').toLowerCase();
+            const benign = ['email_address_invalid', 'user_not_found', 'over_email_send_rate_limit'].includes(code);
+            if (!benign && /(rate|server|network|fetch)/i.test(error.message || '')) {
+              throw error;
+            }
+            // Fall-through para mensagem de sucesso genérica
+          }
           setMessage("Pronto! Se o email existir, você vai receber um link em instantes. Confira sua caixa de entrada e o spam.", "success");
         } catch (error) {
-          setMessage(error.message || "Não foi possível enviar o link.", "error");
+          setMessage(window.GP_I18N.translateAuthError(error), "error");
         } finally {
           if (btn) btn.disabled = false;
         }
@@ -974,7 +985,7 @@
           if (newPassword.length < 8) throw new Error("A senha precisa ter no mínimo 8 caracteres.");
           if (newPassword !== confirm) throw new Error("As senhas não coincidem.");
           const { error } = await supabase.auth.updateUser({ password: newPassword });
-          if (error) throw new Error(error.message);
+          if (error) throw error;
           setMessage("Senha atualizada! Redirecionando...", "success");
           try { sessionStorage.removeItem("gp-recovery-flow"); } catch (_) {}
           window.__GP_RECOVERY_FLOW = false;
@@ -983,7 +994,7 @@
             window.location.replace(window.location.origin + window.location.pathname);
           }, 1500);
         } catch (error) {
-          setMessage(error.message || "Não foi possível atualizar a senha.", "error");
+          setMessage(window.GP_I18N.translateAuthError(error), "error");
         } finally {
           if (btn) btn.disabled = false;
         }
