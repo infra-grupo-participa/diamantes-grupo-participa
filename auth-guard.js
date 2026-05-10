@@ -41,10 +41,16 @@
 
     const info = document.createElement("div");
     info.setAttribute("style", "display:flex;flex-direction:column;gap:2px;min-width:0;");
-    info.innerHTML = `
-      <strong style="font-size:0.78rem;color:#fff;letter-spacing:0.01em;white-space:nowrap;">${user.name || user.email}</strong>
-      <span style="font-size:0.68rem;color:#cbd5e1;white-space:nowrap;">${isAdmin ? "ambiente admin" : user.email}</span>
-    `;
+    // FIX (XSS, pentest 2026-05-09): user.name vem do DB e pode conter HTML
+    // injetado pelo próprio user. Usar textContent + DOM API em vez de
+    // innerHTML interpolado.
+    const nameEl = document.createElement("strong");
+    nameEl.setAttribute("style", "font-size:0.78rem;color:#fff;letter-spacing:0.01em;white-space:nowrap;");
+    nameEl.textContent = user.name || user.email || "";
+    const subEl = document.createElement("span");
+    subEl.setAttribute("style", "font-size:0.68rem;color:#cbd5e1;white-space:nowrap;");
+    subEl.textContent = isAdmin ? "ambiente admin" : (user.email || "");
+    info.append(nameEl, subEl);
 
     const adminButton = document.createElement("button");
     adminButton.type = "button";

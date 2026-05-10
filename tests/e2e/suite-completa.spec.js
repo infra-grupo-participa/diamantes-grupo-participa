@@ -91,29 +91,16 @@ test.describe('Forgot password', () => {
   });
 });
 
-test.describe('Signup', () => {
-  test('UI carrega, valida campos obrigatórios', async ({ page }) => {
+test.describe('Signup (desabilitado — só por convite)', () => {
+  test('Tab "Cadastrar" mostra aviso de convite, form oculto', async ({ page }) => {
     await page.goto(PROD + '/');
     await page.locator('[data-tab="register"]').click();
     await expect(page.locator('#registerView')).toHaveClass(/active/);
-    // submit sem preencher
-    await page.locator('#registerForm button[type=submit]').click();
-    await page.waitForTimeout(2000);
-    const msg = await page.locator('#authMessage').innerText();
-    expect(msg.length).toBeGreaterThan(0);
-  });
-
-  test('senha curta rejeitada', async ({ page }) => {
-    await page.goto(PROD + '/');
-    await page.locator('[data-tab="register"]').click();
-    await page.locator('#registerName').fill('Teste Curto');
-    await page.locator('#registerEmail').fill(`test-${Date.now()}@invalid.test`);
-    await page.locator('#registerPassword').fill('curta');
-    await page.locator('#registerDocumentValue').fill('11144477735');
-    await page.locator('#registerForm button[type=submit]').click();
-    await page.waitForTimeout(2500);
-    const msg = await page.locator('#authMessage').innerText();
-    expect(msg.toLowerCase()).toContain('senha');
+    const text = await page.locator('#registerView').innerText();
+    expect(text.toLowerCase()).toContain('convite');
+    // Form deve estar oculto (display:none)
+    const visible = await page.locator('#registerForm').isVisible();
+    expect(visible).toBe(false);
   });
 });
 

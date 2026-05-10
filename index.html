@@ -660,9 +660,12 @@
 
           <div class="view" id="registerView">
             <h2>Solicitar acesso</h2>
-            <p class="panel-intro">Preencha seus dados para entrar na fila de validação. A aprovação acontece no ambiente administrativo.</p>
+            <p class="panel-intro" style="background:rgba(242,151,37,0.12);border:1px solid rgba(242,151,37,0.35);padding:14px 16px;border-radius:14px;color:#7a4a0a;">
+              <strong>Cadastro disponível somente mediante convite.</strong>
+              Fale com a equipe Grupo Participa para liberar seu acesso ao portal.
+            </p>
 
-            <form id="registerForm">
+            <form id="registerForm" style="display:none;">
               <div class="field-grid">
                 <div class="field">
                   <label for="registerName">Nome completo</label>
@@ -723,7 +726,7 @@
       } catch (_) { /* ignore */ }
     })();
   </script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
   <script src="assets/js/supabase-config.js"></script>
   <script src="assets/js/portal-auth-v2.js"></script>
   <script>

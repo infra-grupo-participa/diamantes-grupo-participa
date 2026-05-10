@@ -37,4 +37,16 @@ if (!gp_clickup_webhook_signature_valid($rawBody, $signature)) {
     gp_json_response(['ok' => false, 'error' => 'Assinatura inválida.'], 401);
 }
 
+// FIX (LOW, pentest 2026-05-09 Finding #10 — replay protection):
+// ClickUp envia campo "date" (epoch ms) no payload. Rejeita reqs > 5min.
+$payload = json_decode($rawBody, true);
+$ts = is_array($payload) && isset($payload['date']) ? (int)($payload['date']) : 0;
+if ($ts > 0) {
+    $tsSeconds = (int) floor($ts / 1000);
+    $skew = abs(time() - $tsSeconds);
+    if ($skew > 300) {
+        gp_json_response(['ok' => false, 'error' => 'Timestamp fora da janela permitida (replay).'], 401);
+    }
+}
+
 gp_json_response(['ok' => true, 'received' => true]);

@@ -18,15 +18,11 @@ declare(strict_types=1);
 
 // ── Bootstrap (minimal — no legacy auth/session deps) ────────────────────────
 
-// ClickUp API key still lives in env or fallback file.
+// ClickUp API key — APENAS via env var. Fallback file removido por hardening
+// (pentest 2026-05-09 Finding #13: arquivo no repo aumentava superfície de
+// vazamento se .htaccess fosse misconfig).
 function gp_get_clickup_api_key(): string {
-    $key = trim((string)(getenv('GP_CLICKUP_API_KEY') ?: ''));
-    if ($key !== '') return $key;
-    $file = __DIR__ . '/data/clickup-api-key.txt';
-    if (is_file($file)) {
-        $key = trim((string)@file_get_contents($file));
-    }
-    return $key;
+    return trim((string)(getenv('GP_CLICKUP_API_KEY') ?: ''));
 }
 
 function gp_json_response(array $data, int $status = 200): never {
@@ -175,6 +171,67 @@ if ($path === '') {
 // CRITICAL-1: Reject absolute URLs from the client (SSRF guard).
 if (preg_match('#^https?://#i', $path)) {
     gp_json_response(['ok' => false, 'error' => 'Path absoluto não é permitido. Use apenas caminhos relativos ao ClickUp.'], 422);
+}
+
+// FIX (HIGH, pentest 2026-05-09 — Finding #4 BOLA + Finding #7 method allowlist):
+// Restringir clientes a métodos seguros + scope de path ao próprio cliente_task_id.
+if ($userRole !== 'admin') {
+    $allowedMethods = ['GET', 'POST'];
+    if (!in_array($method, $allowedMethods, true)) {
+        gp_json_response(['ok' => false, 'error' => 'Método não permitido para esse portal.'], 405);
+    }
+
+    // Resolve cliente_task_id e cu_list_id do client via Supabase REST.
+    // Usa SERVICE_ROLE_KEY (server-side) pra ignorar RLS — necessário porque
+    // após policy fix, anon não enxerga portal.clients.
+    static $portalCfgCache = null;
+    if ($portalCfgCache === null) {
+        $cfgUrl  = trim((string)(getenv('GP_SUPABASE_URL') ?: ''));
+        $srKey   = trim((string)(getenv('GP_SUPABASE_SERVICE_ROLE_KEY') ?: ''));
+        $anonKey = trim((string)(getenv('GP_SUPABASE_ANON_KEY') ?: ''));
+        $apiKey  = $srKey !== '' ? $srKey : $anonKey;
+        $portalCfgCache = ['task_id' => '', 'list_id' => ''];
+        if ($cfgUrl !== '' && $apiKey !== '' && $clientSlug !== '') {
+            $ch = curl_init($cfgUrl . '/rest/v1/clients?slug=eq.' . urlencode($clientSlug) . '&select=cliente_task_id,cu_list_id');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_HTTPHEADER     => [
+                    'apikey: ' . $apiKey,
+                    'Authorization: Bearer ' . $apiKey,
+                    'Accept-Profile: portal',
+                ],
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+            ]);
+            $resp = curl_exec($ch);
+            curl_close($ch);
+            $rows = json_decode((string)$resp, true);
+            if (is_array($rows) && !empty($rows[0])) {
+                $portalCfgCache['task_id'] = trim((string)($rows[0]['cliente_task_id'] ?? ''));
+                $portalCfgCache['list_id'] = trim((string)($rows[0]['cu_list_id'] ?? ''));
+            }
+        }
+    }
+    $allowedTaskId = $portalCfgCache['task_id'];
+    $allowedListId = $portalCfgCache['list_id'];
+
+    // Path normalizado pra comparação
+    $pathClean = ltrim($path, '/');
+
+    // Permitir:
+    //   - task/{allowedTaskId}[/...]   (read/comment do próprio chamado)
+    //   - list/{allowedListId}[/...]   (criação de novos chamados na list do cliente)
+    //   - team/.../task/{allowedTaskId}/...
+    $isOwnTask  = $allowedTaskId !== '' && (strpos($pathClean, 'task/' . $allowedTaskId) !== false);
+    $isOwnList  = $allowedListId !== '' && (strpos($pathClean, 'list/' . $allowedListId) === 0);
+
+    if (!$isOwnTask && !$isOwnList) {
+        gp_json_response([
+            'ok' => false,
+            'error' => 'Path fora do escopo permitido pra esse portal.',
+        ], 403);
+    }
 }
 
 $apiKey = gp_get_clickup_api_key();
