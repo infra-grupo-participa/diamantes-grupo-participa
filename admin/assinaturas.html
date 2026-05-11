@@ -346,7 +346,7 @@
                   <th>Aluno</th>
                   <th>Serviços ativos</th>
                   <th>Valor mensal</th>
-                  <th>Próxima cobrança</th>
+                  <th title="Calculado com base na data de início do contrato">Próxima cobrança</th>
                   <th>Pagamento</th>
                   <th>Status</th>
                   <th style="text-align:right;">Ação</th>
@@ -559,15 +559,40 @@
     }
 
     function nextBillingCell(sub) {
-      if (!sub.next_billing_date) return '<span style="color:var(--muted);">—</span>';
       const today = new Date(); today.setHours(0,0,0,0);
-      const due = new Date(sub.next_billing_date);
-      const diff = Math.ceil((due - today) / (1000*60*60*24));
-      const date = fmtDate(sub.next_billing_date);
-      if (diff < 0)  return `<span style="color:var(--danger); font-weight:600;">Vencido</span><div class="amount-sub">${date}</div>`;
-      if (diff === 0) return `<span style="color:var(--danger); font-weight:600;">Hoje</span><div class="amount-sub">${date}</div>`;
-      if (diff <= 5)  return `<span style="color:var(--warning); font-weight:600;">Em ${diff} dia${diff>1?'s':''}</span><div class="amount-sub">${date}</div>`;
-      return `<span style="font-weight:600;">${date}</span><div class="amount-sub">Em ${diff} dias</div>`;
+
+      // Vencimento do acesso: menor access_until entre os serviços ativos
+      const accessDates = (sub.active_services || [])
+        .map(sv => sv.access_until ? new Date(sv.access_until) : null)
+        .filter(Boolean);
+      const nearestAccess = accessDates.length
+        ? new Date(Math.min(...accessDates))
+        : null;
+
+      // Próxima cobrança
+      const billing = sub.next_billing_date ? new Date(sub.next_billing_date) : null;
+
+      let billingHtml = '<span style="color:var(--muted);">—</span>';
+      if (billing) {
+        const diff = Math.ceil((billing - today) / 86400000);
+        const date = fmtDate(sub.next_billing_date);
+        if (diff < 0)   billingHtml = `<span style="color:var(--danger);font-weight:600;">Vencido</span><div class="amount-sub">${date}</div>`;
+        else if (diff === 0) billingHtml = `<span style="color:var(--danger);font-weight:600;">Hoje</span><div class="amount-sub">${date}</div>`;
+        else if (diff <= 5)  billingHtml = `<span style="color:var(--warning);font-weight:600;">Em ${diff}d</span><div class="amount-sub">${date}</div>`;
+        else billingHtml = `<span style="font-weight:600;">${date}</span><div class="amount-sub">Em ${diff} dias</div>`;
+      }
+
+      // Badge de acesso vencendo (quando é diferente da cobrança)
+      let accessHtml = '';
+      if (nearestAccess) {
+        const diffA = Math.ceil((nearestAccess - today) / 86400000);
+        if (diffA < 0)
+          accessHtml = `<div style="font-size:0.68rem;color:#b91c1c;margin-top:2px;">Acesso vencido</div>`;
+        else if (diffA <= 10)
+          accessHtml = `<div style="font-size:0.68rem;color:#b45309;margin-top:2px;">Acesso até ${nearestAccess.toLocaleDateString('pt-BR')}</div>`;
+      }
+
+      return billingHtml + accessHtml;
     }
 
     function rowHtml(sub) {
