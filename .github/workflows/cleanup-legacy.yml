@@ -32,7 +32,7 @@ jobs:
           echo "=== Antes — api/data/ ==="
           curl -sS --user "$CREDS" "ftp://${FTP_HOST}/api/data/" || echo "(api/data não existe)"
 
-      - name: Apagar arquivos órfãos (DELE)
+      - name: Apagar arquivos órfãos (DELE/RMD recursivo)
         env:
           FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
           FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
@@ -40,27 +40,21 @@ jobs:
         run: |
           set +e
           CREDS="${FTP_USER}:${FTP_PASS}"
+          BASE="ftp://${FTP_HOST}"
 
-          # Função: dele arquivo dado caminho absoluto (passa CWD via URL e
-          # DELE com nome relativo via -Q "+CMD" pós-CWD).
-          ftp_dele() {
-            local fullpath="$1"
-            local dir name
-            dir=$(dirname "$fullpath")
-            name=$(basename "$fullpath")
-            echo "  DELE $fullpath"
-            curl -sS --user "$CREDS" "ftp://${FTP_HOST}${dir}/" -Q "DELE $name" -o /dev/null
-            echo "    exit=$?"
-          }
-
-          # Função recursiva de wipe de dir (usada para legados):
-          ftp_rmdir() {
-            local rel="$1"   # caminho relativo a /, sem barra final
-            local url="ftp://${FTP_HOST}${rel}/"
+          # Wipe recursivo, mesmo padrão do wipe-and-redeploy.yml.
+          # rel: caminho relativo à raiz do user FTP (já é public_html/),
+          #      sem barra inicial e SEM barra final. Ex: "portal/assets/js"
+          delete_recursive() {
+            local rel="$1"
+            local url="${BASE}/${rel}/"
             local listing
             listing=$(curl -sS --user "$CREDS" "$url" 2>/dev/null)
-            [ -z "$listing" ] && { echo "  (vazio ou não existe: $rel)"; return; }
-            echo "$listing" | while IFS= read -r line; do
+            if [ -z "$listing" ]; then
+              echo "    (vazio ou não existe: $rel)"
+              return
+            fi
+            while IFS= read -r line; do
               [ -z "$line" ] && continue
               local perm name
               perm=$(echo "$line" | awk '{print $1}')
@@ -68,32 +62,43 @@ jobs:
               [ -z "$name" ] && continue
               [ "$name" = "." ] && continue
               [ "$name" = ".." ] && continue
+              local child="${rel}/${name}"
               if [[ "$perm" == d* ]]; then
-                ftp_rmdir "${rel}/${name}"
-                echo "  RMD ${rel}/${name}"
-                curl -sS --user "$CREDS" "ftp://${FTP_HOST}${rel}/" -Q "RMD $name" -o /dev/null
+                delete_recursive "$child"
+                echo "  RMD  $child"
+                curl -sS --user "$CREDS" "${BASE}/${rel}/" -Q "RMD ${name}" -o /dev/null
               else
-                echo "  DELE ${rel}/${name}"
-                curl -sS --user "$CREDS" "ftp://${FTP_HOST}${rel}/" -Q "DELE $name" -o /dev/null
+                echo "  DELE $child"
+                curl -sS --user "$CREDS" "${BASE}/${rel}/" -Q "DELE ${name}" -o /dev/null
               fi
-            done
+            done <<< "$listing"
           }
 
-          echo "1) Arquivos avulsos:"
-          ftp_dele "/admin/app.html"
-          ftp_dele "/portal/template.html"
-          ftp_dele "/assets/js/portal-api.js"
-          ftp_dele "/assets/js/legacy-insights-stub.js"
-
-          echo "2) Pastas legadas:"
-          for d in /backend /chatbot "/calculadora%20do%20inventario" /google-apps-script /api/data /admin/_legacy /portal/assets/css /portal/assets/js; do
-            echo "  -> $d"
-            ftp_rmdir "$d"
-            # tenta remover o dir vazio depois
-            local_parent=$(dirname "$d")
-            local_name=$(basename "$d")
-            curl -sS --user "$CREDS" "ftp://${FTP_HOST}${local_parent}/" -Q "RMD $local_name" -o /dev/null
+          # Arquivos avulsos primeiro (parent CWD + DELE no nome)
+          echo "=== Arquivos avulsos ==="
+          for entry in \
+            "admin|app.html" \
+            "portal|template.html" \
+            "assets/js|portal-api.js" \
+            "assets/js|legacy-insights-stub.js"
+          do
+            parent="${entry%%|*}"
+            name="${entry##*|}"
+            echo "  DELE $parent/$name"
+            curl -sS --user "$CREDS" "${BASE}/${parent}/" -Q "DELE ${name}" -o /dev/null
           done
+
+          echo ""
+          echo "=== Pastas legadas (wipe + RMD) ==="
+          for d in "backend" "chatbot" "calculadora do inventario" "google-apps-script" "api/data" "admin/_legacy" "portal/assets/css" "portal/assets/js"; do
+            echo "  -> $d"
+            delete_recursive "$d"
+            # Remove o dir vazio agora
+            parent=$(dirname "$d")
+            base=$(basename "$d")
+            curl -sS --user "$CREDS" "${BASE}/${parent}/" -Q "RMD ${base}" -o /dev/null
+          done
+          set -e
 
       - name: Listar depois
         env:
