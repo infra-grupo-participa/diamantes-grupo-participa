@@ -9,11 +9,6 @@
     "tests/**",
     "docs/**",
     "tmp/**",
-    "admin/_legacy/**",
-    "chatbot/**",
-    "calculadora do inventario/**",
-    "backend/**",
-    "portal/template.html",
     "scripts/**"
   ],
   "format": ["javascript", "html", "css", "php"],

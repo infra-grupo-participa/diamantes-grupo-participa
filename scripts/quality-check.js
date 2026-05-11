@@ -19,16 +19,10 @@ function safeJSON(s, fallback) {
   try { return JSON.parse(s); } catch { return fallback; }
 }
 
-// Diretórios/arquivos que NÃO contam pro gate (gigantes, gerados, externos):
-//  - portal/template.html: renderização dinâmica do portal (gigante)
-//  - chatbot/, calculadora do inventario/: legados não tocados aqui
-//  - assets/img, fontes, etc.
+// Diretórios/arquivos que NÃO contam pro gate (gerados, migrations, etc).
 const IGNORE_GLOB = [
   '/node_modules/', '/.git/', '/.quality/',
-  '/portal/template.html',
-  '/chatbot/', '/calculadora do inventario/',
-  '/backend/', '/db/migrations/',
-  '/admin/_legacy/',
+  '/db/migrations/',
 ];
 
 function walk(dir, filterFn) {

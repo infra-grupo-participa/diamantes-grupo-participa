@@ -5,20 +5,19 @@
 
 Options -Indexes
 
-DirectoryIndex index.html index.php
+DirectoryIndex index.html
 
 # Página de login fica na raiz; se vier "/" ou variantes vazias, garante index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Acesso direto à raiz -> serve index.html
+    # Acesso direto à raiz -> serve index.html (login)
     RewriteRule ^$ index.html [L]
 
-    # Backward-compat: URLs legadas /{slug}/ continuam funcionando via redirect 302.
-    # Aceita qualquer slug kebab-case; portal/index.php valida em api/data/portals.json
-    # (slugs inválidos retornam 404). Exclui rotas internas com RewriteCond acima.
-    RewriteCond %{REQUEST_URI} !^/(api|admin|assets|portal|chatbot|backend|src|vendor|node_modules|tests|docs|tmp|infra|tools|\.github)(/|$)
-    RewriteRule ^([a-z][a-z0-9-]+)/?$ /portal/?slug=$1 [L,R=302]
+    # /{slug}/ é a rota pública do cliente — redireciona para o dashboard.
+    # Slug kebab-case; rotas internas excluídas abaixo. RLS valida o acesso.
+    RewriteCond %{REQUEST_URI} !^/(api|admin|assets|portal|node_modules|tests|docs|tmp|tools|\.github)(/|$)
+    RewriteRule ^([a-z][a-z0-9-]+)/?$ /portal/dashboard.html?slug=$1 [L,R=302]
 </IfModule>
 
 # Bloqueia acesso a configs locais e arquivos sensíveis

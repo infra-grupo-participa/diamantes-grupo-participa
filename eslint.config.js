@@ -41,11 +41,6 @@ export default [
       'scripts/',
       'docs/',
       'tmp/',
-      'admin/_legacy/',
-      'chatbot/',
-      'calculadora do inventario/',
-      'backend/',
-      'portal/template.html',
     ],
   },
 ];

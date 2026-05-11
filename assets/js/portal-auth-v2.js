@@ -10,7 +10,7 @@
  *   - logout() — destrói sessão
  *   - getSessionUser() — { id, email, role, status, clientSlug, name } | null
  *   - onAuthChange(cb) — listener
- *   - getClientUrl(slug) — '/portal/?slug=X'
+ *   - getClientUrl(slug) — '/portal/dashboard.html?slug=X'
  *   - toAppUrl(path) — URL absoluta dentro do app
  *   - clearSession() — alias logout
  */
@@ -27,7 +27,7 @@
 
   function getClientUrl(slug) {
     if (!slug) return toAppUrl('index.html');
-    return toAppUrl('portal/?slug=' + encodeURIComponent(slug));
+    return toAppUrl('portal/dashboard.html?slug=' + encodeURIComponent(slug));
   }
 
   // Cache do user formatado

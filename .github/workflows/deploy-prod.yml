@@ -123,7 +123,7 @@ jobs:
           ${GP_SHEETS_SYNC_SECRET:+SetEnv GP_SHEETS_SYNC_SECRET "${GP_SHEETS_SYNC_SECRET}"}
 
           Options -Indexes
-          DirectoryIndex index.html index.php
+          DirectoryIndex index.html
 
           <IfModule mod_rewrite.c>
               RewriteEngine On
@@ -131,8 +131,8 @@ jobs:
 
               RewriteRule ^\$ index.html [L]
 
-              RewriteCond %{REQUEST_URI} !^/(api|admin|assets|portal|chatbot|backend|src|vendor|tests|docs|tmp|infra)(/|\$)
-              RewriteRule ^([a-z][a-z0-9-]+)/?\$ portal/?slug=\$1 [L,R=302]
+              RewriteCond %{REQUEST_URI} !^/(api|admin|assets|portal|tests|docs|tmp)(/|\$)
+              RewriteRule ^([a-z][a-z0-9-]+)/?\$ portal/dashboard.html?slug=\$1 [L,R=302]
           </IfModule>
 
           <FilesMatch "^(\.htaccess|\.htpasswd|\.DS_Store|php\.ini|.*\.example|.*\.md)\$">

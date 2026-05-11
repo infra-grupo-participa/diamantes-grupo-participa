@@ -1,0 +1,112 @@
+name: Cleanup legado no FTP (temporário)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: [self-hosted, windows-self-hosted]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Listar legado no FTP
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+        run: |
+          CREDS="${FTP_USER}:${FTP_PASS}"
+          echo "=== Antes — raiz ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/" | grep -E "backend|chatbot|calculadora|google-apps-script" || echo "(nenhum legado na raiz)"
+          echo ""
+          echo "=== Antes — portal/ ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/portal/"
+          echo ""
+          echo "=== Antes — admin/ ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/admin/" | grep -E "app\.html|_legacy"
+          echo ""
+          echo "=== Antes — assets/js/ ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/assets/js/" | grep -E "legacy-insights-stub|portal-api"
+          echo ""
+          echo "=== Antes — api/data/ ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/api/data/" || echo "(api/data não existe)"
+
+      - name: Apagar arquivos órfãos (DELE)
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+        run: |
+          set +e
+          CREDS="${FTP_USER}:${FTP_PASS}"
+
+          # Função: dele arquivo dado caminho absoluto (passa CWD via URL e
+          # DELE com nome relativo via -Q "+CMD" pós-CWD).
+          ftp_dele() {
+            local fullpath="$1"
+            local dir name
+            dir=$(dirname "$fullpath")
+            name=$(basename "$fullpath")
+            echo "  DELE $fullpath"
+            curl -sS --user "$CREDS" "ftp://${FTP_HOST}${dir}/" -Q "DELE $name" -o /dev/null
+            echo "    exit=$?"
+          }
+
+          # Função recursiva de wipe de dir (usada para legados):
+          ftp_rmdir() {
+            local rel="$1"   # caminho relativo a /, sem barra final
+            local url="ftp://${FTP_HOST}${rel}/"
+            local listing
+            listing=$(curl -sS --user "$CREDS" "$url" 2>/dev/null)
+            [ -z "$listing" ] && { echo "  (vazio ou não existe: $rel)"; return; }
+            echo "$listing" | while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              local perm name
+              perm=$(echo "$line" | awk '{print $1}')
+              name=$(echo "$line" | awk '{for (i=9; i<=NF; i++) printf "%s%s", $i, (i<NF?" ":"")}')
+              [ -z "$name" ] && continue
+              [ "$name" = "." ] && continue
+              [ "$name" = ".." ] && continue
+              if [[ "$perm" == d* ]]; then
+                ftp_rmdir "${rel}/${name}"
+                echo "  RMD ${rel}/${name}"
+                curl -sS --user "$CREDS" "ftp://${FTP_HOST}${rel}/" -Q "RMD $name" -o /dev/null
+              else
+                echo "  DELE ${rel}/${name}"
+                curl -sS --user "$CREDS" "ftp://${FTP_HOST}${rel}/" -Q "DELE $name" -o /dev/null
+              fi
+            done
+          }
+
+          echo "1) Arquivos avulsos:"
+          ftp_dele "/admin/app.html"
+          ftp_dele "/portal/template.html"
+          ftp_dele "/assets/js/portal-api.js"
+          ftp_dele "/assets/js/legacy-insights-stub.js"
+
+          echo "2) Pastas legadas:"
+          for d in /backend /chatbot "/calculadora%20do%20inventario" /google-apps-script /api/data /admin/_legacy /portal/assets/css /portal/assets/js; do
+            echo "  -> $d"
+            ftp_rmdir "$d"
+            # tenta remover o dir vazio depois
+            local_parent=$(dirname "$d")
+            local_name=$(basename "$d")
+            curl -sS --user "$CREDS" "ftp://${FTP_HOST}${local_parent}/" -Q "RMD $local_name" -o /dev/null
+          done
+
+      - name: Listar depois
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+        run: |
+          CREDS="${FTP_USER}:${FTP_PASS}"
+          echo "=== Depois — portal/ ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/portal/"
+          echo ""
+          echo "=== Depois — admin/ ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/admin/"
+          echo ""
+          echo "=== Depois — raiz (procurando órfãos) ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/" | grep -E "backend|chatbot|calculadora|google-apps-script" || echo "  ✅ raiz limpa"
