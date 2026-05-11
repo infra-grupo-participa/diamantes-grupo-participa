@@ -129,6 +129,13 @@
   async function disableEmployee(id) { return setEmployeeStatus(id, 'disabled'); }
   async function enableEmployee(id)  { return setEmployeeStatus(id, 'approved'); }
 
+  async function deleteEmployee(id) {
+    if (!id) throw new Error('id obrigatório');
+    const { error } = await client().rpc('delete_employee', { target_id: id });
+    if (error) throw error;
+    return true;
+  }
+
   async function getEmployeeStats() {
     const supabase = client();
 
@@ -235,6 +242,7 @@
     setEmployeeStatus,
     disableEmployee,
     enableEmployee,
+    deleteEmployee,
     getEmployeeStats,
     exportEmployeesCsv,
     listPositions,
