@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diamantes — Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fdfaf5;
+      --bg-soft: #fffdf9;
+      --surface: #ffffff;
+      --border: #f1ebe0;
+      --border-strong: #e6dfd0;
+      --text: #1a1410;
+      --text-secondary: #5b524a;
+      --muted: #9c8f81;
+      --accent: #F29725;
+      --accent-soft: #fff4e3;
+      --accent-strong: #d97e0f;
+      --success: #16a34a;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+
+      --shadow-sm: 0 1px 2px rgba(85, 60, 30, 0.04);
+      --shadow-md: 0 4px 16px rgba(85, 60, 30, 0.06);
+      --shadow-lg: 0 18px 40px rgba(85, 60, 30, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 90% -10%, rgba(242,151,37,0.10), transparent 60%),
+        radial-gradient(900px 500px at -10% 30%, rgba(242,151,37,0.06), transparent 60%),
+        var(--bg);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+    }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ============ TOPBAR ============ */
+    .topbar {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em;
+    }
+    .brand-mark {
+      width: 32px; height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      display: grid; place-items: center; color: #fff;
+    }
+
+    .topnav {
+      display: flex; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px;
+      box-shadow: var(--shadow-sm);
+    }
+    .topnav a {
+      padding: 8px 18px;
+      border-radius: 999px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: background 0.15s, color 0.15s;
+    }
+    .topnav a:hover { background: var(--bg-soft); color: var(--text); }
+    .topnav a.active {
+      background: var(--text);
+      color: #fff;
+    }
+
+    .user-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 14px 6px 6px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .user-chip:hover { border-color: var(--accent); }
+    .avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fcd9a5, var(--accent));
+      display: grid; place-items: center;
+      color: #fff; font-weight: 700; font-size: 0.78rem;
+      flex-shrink: 0;
+    }
+    .user-chip-name { font-weight: 600; font-size: 0.85rem; }
+
+    /* ============ MAIN ============ */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 8px 28px 64px;
+    }
+
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 24px;
+      margin: 24px 0 32px;
+    }
+    .hero-greet h1 {
+      margin: 0;
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+    .hero-greet .wave { display: inline-block; transform: rotate(-8deg); animation: wave 1.4s ease-in-out 2; }
+    @keyframes wave { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(14deg); } }
+    .hero-sub {
+      margin-top: 8px;
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+    .hero-sub strong { color: var(--text); }
+    .hero-plan {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+    .hero-plan .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      font-weight: 700;
+      font-size: 0.74rem;
+    }
+
+    /* ============ GRID PRINCIPAL ============ */
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+      .hero { flex-direction: column; align-items: flex-start; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card-title {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin: 0 0 18px;
+    }
+    .card-title h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card-title .hint {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    /* ============ HIGHLIGHT — resumo da semana ============ */
+    .highlight {
+      background: linear-gradient(135deg, #fff7ea 0%, #fff 60%);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .highlight::after {
+      content: '';
+      position: absolute;
+      right: -40px; top: -40px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(242,151,37,0.18), transparent 70%);
+      border-radius: 50%;
+    }
+    .highlight-eyebrow {
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent-strong);
+      margin-bottom: 10px;
+    }
+    .highlight-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+      margin: 0 0 16px;
+      max-width: 520px;
+    }
+    .highlight-pills {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(4px);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+    .pill-num {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.74rem;
+      font-weight: 800;
+    }
+
+    /* ============ EQUIPE ============ */
+    .team-list {
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .team-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 14px;
+      align-items: center;
+    }
+    .team-item .avatar { width: 42px; height: 42px; font-size: 0.84rem; }
+    .team-name { font-weight: 700; font-size: 0.94rem; }
+    .team-role {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .team-action {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text-secondary);
+      display: grid; place-items: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .team-action:hover { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
+    .team-action svg { width: 16px; height: 16px; }
+
+    /* ============ DEMANDAS (timeline) ============ */
+    .demand-list {
+      display: flex; flex-direction: column;
+      gap: 14px;
+    }
+    .demand {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px;
+      border-radius: 14px;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      transition: transform 0.12s, box-shadow 0.12s;
+      cursor: pointer;
+    }
+    .demand:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .demand-icon {
+      width: 42px; height: 42px;
+      border-radius: 12px;
+      display: grid; place-items: center;
+      flex-shrink: 0;
+    }
+    .demand-icon.in_progress { background: #dbeafe; color: #1d4ed8; }
+    .demand-icon.review      { background: #fff4d6; color: #b45309; }
+    .demand-icon.done        { background: #e7f7ee; color: #15803d; }
+    .demand-icon.late        { background: #fee2e2; color: #b91c1c; }
+    .demand-icon svg { width: 18px; height: 18px; }
+    .demand-body { min-width: 0; }
+    .demand-title { font-weight: 600; font-size: 0.94rem; }
+    .demand-meta {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .demand-resp { display: inline-flex; align-items: center; gap: 6px; }
+    .demand-resp .mini-avatar {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fcd9a5, var(--accent));
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.55rem;
+      display: grid; place-items: center;
+    }
+    .demand-tag {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .demand-tag.in_progress { background: #dbeafe; color: #1d4ed8; }
+    .demand-tag.review      { background: #fff4d6; color: #b45309; }
+    .demand-tag.done        { background: #e7f7ee; color: #15803d; }
+    .demand-tag.late        { background: #fee2e2; color: #b91c1c; }
+
+    /* ============ SERVIÇOS ============ */
+    .service-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .service-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px;
+      border-radius: 12px;
+      background: var(--bg-soft);
+      border: 1px solid var(--border);
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+    .service-chip .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+
+    /* ============ TIMELINE de atividade ============ */
+    .activity {
+      display: flex; flex-direction: column;
+      gap: 12px;
+    }
+    .activity-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 10px 0;
+    }
+    .activity-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      margin-top: 6px;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .activity-item:not(:last-child) .activity-dot {
+      box-shadow: 0 14px 0 -3px var(--border);
+    }
+    .activity-text { font-size: 0.86rem; line-height: 1.45; }
+    .activity-text strong { font-weight: 700; }
+    .activity-when { font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
+
+    /* ============ CTA AJUDA ============ */
+    .help-banner {
+      margin-top: 28px;
+      background:
+        linear-gradient(135deg, #1a1410 0%, #2b1f18 60%);
+      color: #fff;
+      border-radius: 20px;
+      padding: 26px 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+    }
+    .help-banner::before {
+      content: '';
+      position: absolute;
+      right: 200px; top: -40px;
+      width: 220px; height: 220px;
+      background: radial-gradient(circle, rgba(242,151,37,0.25), transparent 70%);
+      border-radius: 50%;
+    }
+    .help-text { position: relative; z-index: 1; }
+    .help-text h3 { margin: 0 0 6px; font-size: 1.15rem; font-weight: 700; }
+    .help-text p  { margin: 0; color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+    .help-cta {
+      position: relative; z-index: 1;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 22px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.92rem;
+      border: none;
+      box-shadow: 0 8px 20px rgba(242,151,37,0.32);
+    }
+    .help-cta:hover { background: var(--accent-strong); }
+
+    @media (max-width: 720px) {
+      .topbar { flex-wrap: wrap; }
+      .topnav { order: 3; width: 100%; justify-content: space-around; }
+      .hero-greet h1 { font-size: 1.5rem; }
+      .highlight-title { font-size: 1.2rem; }
+      .help-banner { flex-direction: column; align-items: flex-start; }
+      .service-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+      </div>
+      Diamantes
+    </div>
+    <nav class="topnav">
+      <a href="#" class="active">Início</a>
+      <a href="#">Demandas</a>
+      <a href="#">Meu perfil</a>
+    </nav>
+    <div class="user-chip">
+      <div class="avatar" id="navAvatar">AC</div>
+      <div class="user-chip-name" id="navName">Ana Carolina</div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="container">
+    <section class="hero">
+      <div class="hero-greet">
+        <h1>Olá, <span id="firstName">Ana</span> <span class="wave">👋</span></h1>
+        <p class="hero-sub" id="heroSub">É bom te ver por aqui.</p>
+      </div>
+      <div class="hero-plan">
+        <span class="badge">💎 Diamante</span>
+        <span>Com você desde <strong id="contractStart">12/06/2024</strong></span>
+      </div>
+    </section>
+
+    <!-- Highlight: resumo da semana -->
+    <section class="highlight">
+      <div class="highlight-eyebrow">Sua semana</div>
+      <h2 class="highlight-title" id="highlightTitle">Sua equipe está trabalhando em <strong>4 demandas</strong> e tem <strong>2 entregas</strong> previstas até o fim da semana.</h2>
+      <div class="highlight-pills" id="highlightPills"></div>
+    </section>
+
+    <!-- Grid principal -->
+    <div class="grid">
+      <!-- Coluna esquerda -->
+      <div style="display:flex; flex-direction:column; gap:20px; min-width:0;">
+
+        <!-- Demandas ativas -->
+        <div class="card">
+          <div class="card-title">
+            <h2>O que está rolando agora</h2>
+            <span class="hint">4 demandas ativas</span>
+          </div>
+          <div class="demand-list" id="demandList"></div>
+        </div>
+
+        <!-- Atividade recente -->
+        <div class="card">
+          <div class="card-title">
+            <h2>Atividade recente</h2>
+            <span class="hint">Últimos 7 dias</span>
+          </div>
+          <div class="activity" id="activityList"></div>
+        </div>
+      </div>
+
+      <!-- Coluna direita -->
+      <div style="display:flex; flex-direction:column; gap:20px; min-width:0;">
+
+        <!-- Sua equipe -->
+        <div class="card">
+          <div class="card-title">
+            <h2>Sua equipe</h2>
+            <span class="hint" id="teamCount">—</span>
+          </div>
+          <div class="team-list" id="teamList"></div>
+        </div>
+
+        <!-- Serviços contratados -->
+        <div class="card">
+          <div class="card-title">
+            <h2>Seus serviços</h2>
+          </div>
+          <div class="service-grid" id="serviceGrid"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Banner ajuda -->
+    <div class="help-banner">
+      <div class="help-text">
+        <h3>Precisa de algo da gente?</h3>
+        <p>Fale com sua equipe ou abra uma nova demanda — respondemos em até 1 dia útil.</p>
+      </div>
+      <button class="help-cta">
+        Abrir nova demanda
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+  </main>
+
+  <script>
+    'use strict';
+
+    // ============ MOCK por slug ============
+    // (Quando ligarmos o Supabase, substituímos por fetch real.)
+    function getSlug() {
+      const fromQuery = new URLSearchParams(window.location.search).get('slug');
+      if (fromQuery) return fromQuery;
+      const fromPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
+      if (fromPath && !fromPath.includes('/')) return fromPath;
+      return 'ana-carolina';
+    }
+
+    const MOCK_STUDENTS = {
+      'ana-carolina': {
+        name: 'Ana Carolina Silva', first: 'Ana', initials: 'AC',
+        contract: '12/06/2024',
+        team: [
+          { name: 'Juliana Costa',  role: 'Gestora de tráfego',  initials: 'JC', color: '#0ea5e9' },
+          { name: 'Rafael Mendes',  role: 'Web-Designer',         initials: 'RM', color: '#3b82f6' },
+          { name: 'Bianca Souza',   role: 'Social Media',         initials: 'BS', color: '#ec4899' },
+          { name: 'Diego Ramalho',  role: 'Editor de Vídeo',      initials: 'DR', color: '#eab308' },
+        ],
+        services: [
+          { name: 'Web-Designer',      color: '#3b82f6' },
+          { name: 'Gestor de tráfego', color: '#0ea5e9' },
+          { name: 'Social Media',      color: '#ec4899' },
+          { name: 'Editor de Vídeo',   color: '#eab308' },
+        ],
+        demands: [
+          { title: 'Landing page do novo lançamento', resp: 'Rafael', when: 'Vence em 3 dias', status: 'in_progress', icon: 'pen' },
+          { title: 'Edição do vídeo de bastidores',   resp: 'Diego',  when: 'Em revisão',       status: 'review',      icon: 'video' },
+          { title: 'Campanha de Dia das Mães',         resp: 'Juliana',when: 'Vence amanhã',     status: 'in_progress', icon: 'megaphone' },
+          { title: 'Calendário de posts — junho',     resp: 'Bianca', when: 'Vence em 5 dias', status: 'in_progress', icon: 'grid' },
+        ],
+        activity: [
+          { text: '<strong>Bianca</strong> publicou o calendário semanal de Instagram.', when: 'Há 2 horas' },
+          { text: '<strong>Diego</strong> enviou um vídeo para sua aprovação.',            when: 'Ontem, 18:42' },
+          { text: '<strong>Rafael</strong> atualizou a página de captura.',                when: 'Quinta-feira' },
+          { text: '<strong>Juliana</strong> pausou a campanha "Black May" e enviou relatório.', when: 'Quarta-feira' },
+        ],
+      },
+    };
+
+    function lookupStudent(slug) {
+      // fallback genérico para qualquer slug — em produção vem do Supabase
+      if (MOCK_STUDENTS[slug]) return MOCK_STUDENTS[slug];
+      const first = (slug || 'aluno').split('-')[0].replace(/^./, c => c.toUpperCase());
+      return {
+        ...MOCK_STUDENTS['ana-carolina'],
+        name: first + ' (preview)',
+        first: first,
+        initials: first.slice(0, 2).toUpperCase(),
+      };
+    }
+
+    const student = lookupStudent(getSlug());
+
+    // ============ Render ============
+    document.getElementById('navAvatar').textContent = student.initials;
+    document.getElementById('navName').textContent   = student.first;
+    document.getElementById('firstName').textContent = student.first;
+    document.getElementById('contractStart').textContent = student.contract;
+    document.getElementById('heroSub').innerHTML =
+      `Tudo certo por aqui — sua equipe está cuidando do que importa. 🌟`;
+
+    // Highlight pills
+    const active = student.demands.filter(d => d.status === 'in_progress' || d.status === 'review').length;
+    const dueSoon = student.demands.filter(d => /vence/i.test(d.when) || /amanhã/i.test(d.when)).length;
+    document.getElementById('highlightTitle').innerHTML =
+      `Sua equipe está trabalhando em <strong>${active} demanda${active===1?'':'s'}</strong> e tem <strong>${dueSoon} entrega${dueSoon===1?'':'s'}</strong> previstas até o fim da semana.`;
+    document.getElementById('highlightPills').innerHTML = `
+      <span class="pill"><span class="pill-num">${student.team.length}</span> Integrantes</span>
+      <span class="pill"><span class="pill-num">${active}</span> Em andamento</span>
+      <span class="pill"><span class="pill-num">${student.services.length}</span> Serviços ativos</span>
+    `;
+
+    // Equipe
+    document.getElementById('teamCount').textContent = `${student.team.length} pessoas com você`;
+    document.getElementById('teamList').innerHTML = student.team.map(m => `
+      <div class="team-item">
+        <div class="avatar" style="background:linear-gradient(135deg, ${m.color}33, ${m.color});">${m.initials}</div>
+        <div>
+          <div class="team-name">${m.name}</div>
+          <div class="team-role">${m.role}</div>
+        </div>
+        <button class="team-action" title="Mandar mensagem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </button>
+      </div>
+    `).join('');
+
+    // Serviços
+    document.getElementById('serviceGrid').innerHTML = student.services.map(s => `
+      <div class="service-chip"><span class="dot" style="background:${s.color};"></span>${s.name}</div>
+    `).join('');
+
+    // Demandas (timeline)
+    const ICONS = {
+      pen:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
+      video:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>',
+      megaphone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 11 3 11 21 3 13 3 11"/><path d="M14 7a5 5 0 0 1 0 10"/></svg>',
+      grid:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
+    };
+    const STATUS_LABEL = {
+      in_progress: 'Em andamento',
+      review:      'Em revisão',
+      done:        'Concluída',
+      late:        'Atrasada',
+    };
+    document.getElementById('demandList').innerHTML = student.demands.map(d => `
+      <div class="demand">
+        <div class="demand-icon ${d.status}">${ICONS[d.icon] || ICONS.pen}</div>
+        <div class="demand-body">
+          <div class="demand-title">${d.title}</div>
+          <div class="demand-meta">
+            <span class="demand-resp">
+              <span class="mini-avatar">${d.resp[0]}</span>
+              ${d.resp}
+            </span>
+            <span>•</span>
+            <span>${d.when}</span>
+          </div>
+        </div>
+        <span class="demand-tag ${d.status}">${STATUS_LABEL[d.status] || d.status}</span>
+      </div>
+    `).join('');
+
+    // Atividade
+    document.getElementById('activityList').innerHTML = student.activity.map(a => `
+      <div class="activity-item">
+        <div class="activity-dot"></div>
+        <div>
+          <div class="activity-text">${a.text}</div>
+          <div class="activity-when">${a.when}</div>
+        </div>
+      </div>
+    `).join('');
+  </script>
+</body>
+</html>
