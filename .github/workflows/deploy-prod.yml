@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TARGET_URL: 'https://diamantes.grupoparticipa.app.br/servico/'
+  TARGET_URL: 'https://diamantes.grupoparticipa.app.br/'
 
 defaults:
   run:
@@ -115,7 +115,7 @@ jobs:
           SetEnv GP_SUPABASE_SCHEMA "portal"
           SetEnv GP_STORAGE_DRIVER "json"
           SetEnv GP_PORTALS_SOURCE "json"
-          SetEnv GP_APP_BASE_URL "https://diamantes.grupoparticipa.app.br/servico"
+          SetEnv GP_APP_BASE_URL "https://diamantes.grupoparticipa.app.br"
           SetEnv GP_MAIL_FROM_EMAIL "${GP_MAIL_FROM_EMAIL}"
           SetEnv GP_MAIL_FROM_NAME "${GP_MAIL_FROM_NAME}"
           SetEnv GP_COOKIE_SECURE "true"
@@ -127,11 +127,11 @@ jobs:
 
           <IfModule mod_rewrite.c>
               RewriteEngine On
-              RewriteBase /servico/
+              RewriteBase /
 
               RewriteRule ^\$ index.html [L]
 
-              RewriteCond %{REQUEST_URI} !^/servico/(api|admin|assets|portal|chatbot|backend|src|vendor|tests|docs|tmp|infra)(/|\$)
+              RewriteCond %{REQUEST_URI} !^/(api|admin|assets|portal|chatbot|backend|src|vendor|tests|docs|tmp|infra)(/|\$)
               RewriteRule ^([a-z][a-z0-9-]+)/?\$ portal/?slug=\$1 [L,R=302]
           </IfModule>
 
@@ -175,7 +175,7 @@ jobs:
           FTP_PATH: ${{ secrets.HOSTINGER_FTP_PATH }}
         run: |
           set -e
-          # FTP_PATH típico: /public_html/servico/
+          # FTP_PATH típico: /public_html/
           FTP_PATH="${FTP_PATH%/}/"
           CREDS="${FTP_USER}:${FTP_PASS}"
 
