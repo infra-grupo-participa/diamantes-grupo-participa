@@ -21,21 +21,33 @@
   }
 
   // =============================================================
-  // FUNCIONÁRIOS (portal.users WHERE role='admin')
+  // POSIÇÕES (cargos)
   // =============================================================
 
-  async function listEmployees({ search = '', status = 'all', limit = 25, offset = 0 } = {}) {
-    let q = client()
-      .from('users')
-      .select('id, auth_user_id, email, name, role, status, created_at, last_login_at, metadata', { count: 'exact' })
-      .eq('role', 'admin')
-      .order('created_at', { ascending: true });
+  async function listPositions() {
+    const { data, error } = await client()
+      .from('positions')
+      .select('id, slug, name, color, sort_order, active')
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
 
-    if (status && status !== 'all') {
-      q = q.eq('status', status);
-    }
+  // =============================================================
+  // FUNCIONÁRIOS (admins + operators via view v_employees)
+  // =============================================================
+
+  async function listEmployees({ search = '', status = 'all', role = 'all', limit = 25, offset = 0 } = {}) {
+    let q = client()
+      .from('v_employees')
+      .select('*', { count: 'exact' })
+      .order('role', { ascending: false }) // admin antes
+      .order('name', { ascending: true });
+
+    if (status && status !== 'all') q = q.eq('status', status);
+    if (role && role !== 'all')     q = q.eq('role', role);
     if (search && search.trim()) {
-      const s = search.trim().replace(/[%_]/g, ''); // remove curingas
+      const s = search.trim().replace(/[%_]/g, '');
       q = q.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
     }
     q = q.range(offset, offset + limit - 1);
@@ -45,23 +57,19 @@
     return { data: data || [], count: count || 0 };
   }
 
-  async function createEmployee({ name, email, password }) {
+  async function createEmployee({ name, email, password, role = 'admin', position_id = null }) {
     if (!name || !email || !password) throw new Error('Nome, email e senha são obrigatórios.');
     if (password.length < 8) throw new Error('Senha precisa ter no mínimo 8 caracteres.');
+    if (!['admin', 'operator'].includes(role)) throw new Error('role inválido.');
+    if (role === 'operator' && !position_id) throw new Error('Operador precisa de cargo.');
 
-    // 1) Cria em auth.users via signUp (anonKey + RLS valida senão).
-    //    Como o admin já está logado, este signUp deslogaria o admin atual,
-    //    então usamos uma sessão isolada. Truque: salvar a sessão atual,
-    //    chamar signUp (que cria o user), depois restaurar.
     const supabase = client();
     const { data: currentSession } = await supabase.auth.getSession();
 
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password,
-      options: {
-        data: { name, role: 'admin', status: 'approved' },
-      },
+      options: { data: { name, role, status: 'approved' } },
     });
     if (signUpError) throw new Error(signUpError.message);
     if (!signUpData?.user) throw new Error('Falha ao criar usuário no Auth.');
@@ -76,15 +84,14 @@
       });
     }
 
-    // 2) Insere em portal.users (RLS users_admin_insert exige is_admin())
     const { data: row, error: insertError } = await supabase
       .from('users')
       .insert({
         auth_user_id: newUserId,
         email: email.trim().toLowerCase(),
-        name,
-        role: 'admin',
+        name, role,
         status: 'approved',
+        position_id: role === 'operator' ? position_id : null,
       })
       .select()
       .single();
@@ -94,18 +101,20 @@
 
   async function updateEmployee(id, patch) {
     if (!id) throw new Error('id obrigatório');
-    const allowed = ['name', 'email', 'status'];
+    const allowed = ['name', 'email', 'status', 'role', 'position_id'];
     const clean = {};
     for (const k of allowed) {
       if (patch[k] !== undefined) clean[k] = patch[k];
     }
     if (clean.email) clean.email = String(clean.email).trim().toLowerCase();
+    if (clean.role && !['admin', 'operator'].includes(clean.role)) throw new Error('role inválido.');
+    if (clean.role === 'admin') clean.position_id = null;
     clean.updated_at = new Date().toISOString();
     const { data, error } = await client()
       .from('users')
       .update(clean)
       .eq('id', id)
-      .eq('role', 'admin')
+      .in('role', ['admin', 'operator']) // só permite update de funcionários
       .select()
       .single();
     if (error) throw error;
@@ -122,15 +131,32 @@
 
   async function getEmployeeStats() {
     const supabase = client();
-    const [total, active, disabled] = await Promise.all([
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin'),
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'approved'),
-      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin').eq('status', 'disabled'),
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayIso = today.toISOString();
+
+    const [employees, students, ratingsCount, ratingsScores, activeToday] = await Promise.all([
+      supabase.from('users').select('id', { count: 'exact', head: true }).in('role', ['admin', 'operator']),
+      supabase.from('clients').select('slug', { count: 'exact', head: true }),
+      supabase.from('ratings').select('id', { count: 'exact', head: true }),
+      supabase.from('ratings').select('score'),
+      supabase.from('users').select('id', { count: 'exact', head: true })
+        .in('role', ['admin', 'operator']).gte('last_login_at', todayIso),
     ]);
+
+    let avg = 0;
+    if (ratingsScores.data && ratingsScores.data.length) {
+      const sum = ratingsScores.data.reduce((s, r) => s + (Number(r.score) || 0), 0);
+      avg = (sum / ratingsScores.data.length) / 2.0; // 1-10 → 0-5
+    }
+
     return {
-      total: total.count || 0,
-      active: active.count || 0,
-      disabled: disabled.count || 0,
+      employees:   employees.count || 0,
+      students:    students.count  || 0,
+      ratings:     ratingsCount.count || 0,
+      ratingAvg:   Number(avg.toFixed(2)) || 0,
+      activeToday: activeToday.count || 0,
     };
   }
 
@@ -143,11 +169,15 @@
 
   async function exportEmployeesCsv() {
     const { data } = await listEmployees({ limit: 1000, offset: 0 });
-    const header = ['Nome', 'Email', 'Status', 'Criado em', 'Último login'];
+    const header = ['Nome', 'Email', 'Função', 'Cargo', 'Status', 'Avaliação geral', 'Alunos atendidos', 'Criado em', 'Último login'];
     const rows = data.map(u => [
       u.name,
       u.email,
+      u.role === 'admin' ? 'Admin' : 'Operador',
+      u.position_name || '',
       u.status,
+      u.rating_avg ?? '0.00',
+      u.students_count ?? 0,
       u.created_at ? new Date(u.created_at).toLocaleString('pt-BR') : '',
       u.last_login_at ? new Date(u.last_login_at).toLocaleString('pt-BR') : '',
     ]);
@@ -207,6 +237,7 @@
     enableEmployee,
     getEmployeeStats,
     exportEmployeesCsv,
+    listPositions,
     downloadBlob,
     requireAdmin,
     logout,

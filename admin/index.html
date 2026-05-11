@@ -623,7 +623,7 @@
         </div>
       </div>
 
-      <!-- KPIs -->
+      <!-- KPIs (fiel à referência: 5 cards) -->
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-icon" style="background: var(--kpi-blue); color: var(--kpi-blue-ico);">
@@ -631,27 +631,47 @@
           </div>
           <div class="kpi-info">
             <div class="kpi-label">Total de funcionários</div>
-            <div class="kpi-value" id="kpiTotal">—</div>
+            <div class="kpi-value" id="kpiEmployees">—</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background: var(--kpi-purple); color: var(--kpi-purple-ico);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
+          </div>
+          <div class="kpi-info">
+            <div class="kpi-label">Alunos diamantes</div>
+            <div class="kpi-value" id="kpiStudents">—</div>
           </div>
         </div>
 
         <div class="kpi-card">
           <div class="kpi-icon" style="background: var(--kpi-green); color: var(--kpi-green-ico);">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
           </div>
           <div class="kpi-info">
-            <div class="kpi-label">Ativos</div>
-            <div class="kpi-value" id="kpiActive">—</div>
+            <div class="kpi-label">Avaliações recebidas</div>
+            <div class="kpi-value" id="kpiRatings">—</div>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background: var(--kpi-yellow); color: var(--kpi-yellow-ico);">
+            <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0.4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div class="kpi-info">
+            <div class="kpi-label">Média geral</div>
+            <div class="kpi-value" id="kpiRatingAvg">—</div>
           </div>
         </div>
 
         <div class="kpi-card">
           <div class="kpi-icon" style="background: var(--kpi-pink); color: var(--kpi-pink-ico);">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
           <div class="kpi-info">
-            <div class="kpi-label">Desabilitados</div>
-            <div class="kpi-value" id="kpiDisabled">—</div>
+            <div class="kpi-label">Ativos hoje</div>
+            <div class="kpi-value" id="kpiActiveToday">—</div>
           </div>
         </div>
       </div>
@@ -668,8 +688,13 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input class="search-input" id="searchInput" type="text" placeholder="Buscar por nome ou email" />
             </div>
+            <select class="search-input" id="roleFilter" style="max-width:160px; padding-left:12px;">
+              <option value="all">Função: Todos</option>
+              <option value="admin">Admin</option>
+              <option value="operator">Operador</option>
+            </select>
             <select class="search-input" id="statusFilter" style="max-width:170px; padding-left:12px;">
-              <option value="all">Todos</option>
+              <option value="all">Status: Todos</option>
               <option value="approved">Ativos</option>
               <option value="disabled">Desabilitados</option>
               <option value="rejected">Rejeitados</option>
@@ -683,8 +708,10 @@
               <tr>
                 <th>Funcionário</th>
                 <th>Email</th>
+                <th>Função / Cargo</th>
+                <th>Avaliação geral</th>
+                <th>Alunos atendidos</th>
                 <th>Status</th>
-                <th>Cadastro</th>
                 <th style="text-align:right;">Ação</th>
               </tr>
             </thead>
@@ -725,6 +752,21 @@
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">E-mail</label>
             <input id="empEmail" type="email" required class="search-input" style="padding-left:12px;" />
           </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div>
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Função</label>
+              <select id="empRole" class="search-input" style="padding-left:12px;">
+                <option value="admin">Admin</option>
+                <option value="operator">Operador</option>
+              </select>
+            </div>
+            <div id="empPositionWrap">
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Cargo</label>
+              <select id="empPosition" class="search-input" style="padding-left:12px;">
+                <option value="">—</option>
+              </select>
+            </div>
+          </div>
           <div id="empPasswordWrap">
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Senha (mín. 8 caracteres)</label>
             <input id="empPassword" type="password" minlength="8" class="search-input" style="padding-left:12px;" />
@@ -759,7 +801,7 @@
   <script>
     'use strict';
 
-    const state = { page: 1, pageSize: 25, search: '', status: 'all', total: 0, editingId: null };
+    const state = { page: 1, pageSize: 25, search: '', status: 'all', role: 'all', total: 0, editingId: null, positions: [] };
 
     function initials(name) {
       return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
@@ -780,6 +822,30 @@
       };
       const b = map[status] || { cls: 'badge-yellow', txt: status || '—' };
       return `<span class="badge ${b.cls}">${b.txt}</span>`;
+    }
+
+    function starsHtml(rating) {
+      const r = parseFloat(rating) || 0;
+      const full = Math.round(r);
+      let html = '<span class="stars" style="display:inline-flex; gap:1px; color:#f59e0b;">';
+      for (let i = 1; i <= 5; i++) {
+        const filled = i <= full;
+        html += `<svg width="13" height="13" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+      }
+      html += `</span><span style="font-weight:600; margin-left:6px;">${r.toFixed(2).replace('.', ',')}</span>`;
+      return html;
+    }
+
+    function roleBadge(role, position_name, position_color) {
+      if (role === 'admin') {
+        return `<span class="badge badge-blue">Admin</span>`;
+      }
+      if (role === 'operator') {
+        const color = position_color || '#94a3b8';
+        const name = position_name || 'Sem cargo';
+        return `<span class="badge" style="background:${color}1a; color:${color};">${name}</span>`;
+      }
+      return `<span class="badge badge-yellow">${role || '—'}</span>`;
     }
 
     function toast(message, kind = 'success') {
@@ -805,8 +871,10 @@
             </div>
           </td>
           <td><span style="color:var(--text-secondary)">${u.email || '—'}</span></td>
+          <td>${roleBadge(u.role, u.position_name, u.position_color)}</td>
+          <td>${starsHtml(u.rating_avg)}</td>
+          <td><span style="font-weight:600;">${u.students_count ?? 0}</span></td>
           <td>${badge(u.status)}</td>
-          <td><span style="color:var(--text-secondary)">${fmtDate(u.created_at)}</span></td>
           <td style="text-align:right;">
             <div class="row-actions" style="justify-content:flex-end;">
               <button class="icon-btn" data-action="edit" title="Editar">
@@ -856,9 +924,11 @@
     async function loadStats() {
       try {
         const s = await AdminAPI.getEmployeeStats();
-        document.getElementById('kpiTotal').textContent    = s.total;
-        document.getElementById('kpiActive').textContent   = s.active;
-        document.getElementById('kpiDisabled').textContent = s.disabled;
+        document.getElementById('kpiEmployees').textContent    = s.employees;
+        document.getElementById('kpiStudents').textContent     = s.students;
+        document.getElementById('kpiRatings').textContent      = s.ratings.toLocaleString('pt-BR');
+        document.getElementById('kpiRatingAvg').textContent    = s.ratingAvg.toFixed(2).replace('.', ',');
+        document.getElementById('kpiActiveToday').textContent  = s.activeToday;
       } catch (e) {
         console.error(e);
       }
@@ -866,22 +936,34 @@
 
     async function load() {
       const tbody = document.getElementById('usersTableBody');
-      tbody.innerHTML = `<tr><td colspan="5" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
       try {
         const offset = (state.page - 1) * state.pageSize;
         const { data, count } = await AdminAPI.listEmployees({
-          search: state.search, status: state.status, limit: state.pageSize, offset,
+          search: state.search, status: state.status, role: state.role,
+          limit: state.pageSize, offset,
         });
         state.total = count;
         if (data.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5" style="padding:32px; text-align:center; color:var(--muted);">Nenhum funcionário encontrado.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" style="padding:32px; text-align:center; color:var(--muted);">Nenhum funcionário encontrado.</td></tr>`;
         } else {
           tbody.innerHTML = data.map(rowHtml).join('');
         }
         renderPagination();
         attachRowHandlers(data);
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        console.error(e);
+      }
+    }
+
+    async function loadPositions() {
+      try {
+        state.positions = await AdminAPI.listPositions();
+        const sel = document.getElementById('empPosition');
+        sel.innerHTML = '<option value="">— selecione —</option>' +
+          state.positions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      } catch (e) {
         console.error(e);
       }
     }
@@ -910,12 +992,19 @@
     }
 
     // ===== Modal =====
+    function syncPositionVisibility() {
+      const role = document.getElementById('empRole').value;
+      document.getElementById('empPositionWrap').style.display = role === 'operator' ? '' : 'none';
+    }
     function openCreateModal() {
       state.editingId = null;
       document.getElementById('empModalTitle').textContent = 'Criar funcionário';
       document.getElementById('empPasswordWrap').style.display = '';
       document.getElementById('empStatusWrap').style.display = 'none';
       document.getElementById('empForm').reset();
+      document.getElementById('empRole').value = 'admin';
+      document.getElementById('empPosition').value = '';
+      syncPositionVisibility();
       document.getElementById('empError').style.display = 'none';
       document.getElementById('empModal').style.display = 'flex';
       document.getElementById('empName').focus();
@@ -927,11 +1016,16 @@
       document.getElementById('empStatusWrap').style.display = '';
       document.getElementById('empName').value = u.name || '';
       document.getElementById('empEmail').value = u.email || '';
+      document.getElementById('empRole').value = u.role || 'admin';
+      document.getElementById('empPosition').value = u.position_id || '';
       document.getElementById('empStatus').value = u.status || 'approved';
+      syncPositionVisibility();
       document.getElementById('empError').style.display = 'none';
       document.getElementById('empModal').style.display = 'flex';
     }
     function closeModal() { document.getElementById('empModal').style.display = 'none'; }
+
+    document.getElementById('empRole').addEventListener('change', syncPositionVisibility);
 
     document.getElementById('btnNew').addEventListener('click', openCreateModal);
     document.getElementById('empModalClose').addEventListener('click', closeModal);
@@ -950,13 +1044,16 @@
       try {
         const name  = document.getElementById('empName').value.trim();
         const email = document.getElementById('empEmail').value.trim();
+        const role  = document.getElementById('empRole').value;
+        const position_id = role === 'operator' ? document.getElementById('empPosition').value || null : null;
+        if (role === 'operator' && !position_id) throw new Error('Selecione um cargo para o operador.');
         if (state.editingId) {
           const status = document.getElementById('empStatus').value;
-          await AdminAPI.updateEmployee(state.editingId, { name, email, status });
+          await AdminAPI.updateEmployee(state.editingId, { name, email, status, role, position_id });
           toast('Funcionário atualizado.');
         } else {
           const password = document.getElementById('empPassword').value;
-          await AdminAPI.createEmployee({ name, email, password });
+          await AdminAPI.createEmployee({ name, email, password, role, position_id });
           toast('Funcionário criado.');
         }
         closeModal();
@@ -982,6 +1079,11 @@
     });
     document.getElementById('statusFilter').addEventListener('change', (e) => {
       state.status = e.target.value;
+      state.page = 1;
+      load();
+    });
+    document.getElementById('roleFilter').addEventListener('change', (e) => {
+      state.role = e.target.value;
       state.page = 1;
       load();
     });
@@ -1020,7 +1122,7 @@
       const profile = await AdminAPI.requireAdmin();
       if (!profile) return; // já redirecionou
       await fillSession(profile);
-      await Promise.all([load(), loadStats()]);
+      await Promise.all([loadPositions(), load(), loadStats()]);
     })();
   </script>
 </body>
