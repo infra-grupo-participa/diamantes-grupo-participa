@@ -61,3 +61,7 @@ tmp/
 # Composer tools (local only)
 tools/
 
+
+# Quality gate (CI gera; baseline e history são versionados)
+.quality/
+node_modules/

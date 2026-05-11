@@ -1,0 +1,22 @@
+{
+  "threshold": 0,
+  "reporters": ["json", "html"],
+  "output": ".quality/jscpd",
+  "ignore": [
+    "**/node_modules/**",
+    "**/.quality/**",
+    "**/.git/**",
+    "tests/**",
+    "docs/**",
+    "tmp/**",
+    "admin/_legacy/**",
+    "chatbot/**",
+    "calculadora do inventario/**",
+    "backend/**",
+    "portal/template.html",
+    "scripts/**"
+  ],
+  "format": ["javascript", "html", "css", "php"],
+  "min-lines": 20,
+  "min-tokens": 80
+}

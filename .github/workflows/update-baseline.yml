@@ -1,0 +1,49 @@
+name: Update Quality Baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.quality-baseline.json'
+      - '.quality-history.json'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz
+          sudo mv gitleaks /usr/local/bin/
+
+      - run: npm ci || npm install
+      - run: npm run quality
+      - run: npm run quality:update-baseline
+
+      - name: Commit baseline (se mudou)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet .quality-baseline.json .quality-history.json; then
+            echo "Baseline inalterada."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .quality-baseline.json .quality-history.json
+          git commit -m "chore(quality): atualiza baseline (melhoria de métrica)"
+          git push

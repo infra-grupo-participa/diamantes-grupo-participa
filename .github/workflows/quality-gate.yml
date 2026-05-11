@@ -1,0 +1,77 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  gate:
+    name: Quality metrics + comparação contra baseline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.21.2/gitleaks_8.21.2_linux_x64.tar.gz | tar -xz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Install deps
+        run: npm ci || npm install
+
+      - name: Run quality check
+        run: npm run quality
+
+      - name: Compare against baseline
+        id: compare
+        run: npm run quality:compare
+        continue-on-error: true
+
+      - name: Generate PR comment markdown
+        if: always()
+        run: npm run quality:pr-comment
+
+      - name: Upload artifacts (HTML report + JSON)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-report-${{ github.event_name }}-${{ github.run_id }}
+          path: |
+            .quality/quality-report.html
+            .quality/quality-report.json
+            .quality/comparison.json
+            .quality/gitleaks-report.json
+            .quality/jscpd/
+
+      - name: Post / update PR comment
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: quality-gate
+          path: .quality/pr-comment.md
+
+      - name: Job summary
+        if: always()
+        run: cat .quality/pr-comment.md >> $GITHUB_STEP_SUMMARY || true
+
+      - name: Fail if gate regressed
+        if: steps.compare.outcome == 'failure'
+        run: |
+          echo "::error::Quality gate falhou — métricas regrediram além da margem."
+          exit 1
