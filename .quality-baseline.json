@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-11T19:11:20.197Z",
+  "generated_at": "2026-05-11T19:15:14.107Z",
   "tolerance_percent": 10,
   "metrics": {
     "lint_errors": 0,
@@ -9,10 +9,10 @@
     "complexity_avg": 0,
     "duplication_percent": 0,
     "duplication_clones": 0,
-    "loc_total": 11465,
+    "loc_total": 11535,
     "files_over_500_loc": 8,
     "secrets_found": 0,
-    "bytes_public": 286450,
+    "bytes_public": 290516,
     "test_coverage": 0
   },
   "note": "Baseline inicial conservador. Será recalibrado automaticamente após o primeiro run do gate em CI via workflow update-baseline.yml."
