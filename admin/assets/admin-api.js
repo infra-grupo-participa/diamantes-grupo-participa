@@ -576,7 +576,13 @@
       .from('hotmart_purchases')
       .select('transaction_code, buyer_email, offer_code, service_name, amount, status, payment_type, installments_total, installment_number, charged_at, client_slug', { count: 'exact' })
       .order('charged_at', { ascending: false });
-    if (month)      q = q.like('charged_at', `${month}%`);
+    if (month) {
+      // month = 'YYYY-MM' — filtra pelo intervalo exato do mês
+      const [y, m] = month.split('-').map(Number);
+      const from = new Date(y, m - 1, 1).toISOString();
+      const to   = new Date(y, m, 1).toISOString();
+      q = q.gte('charged_at', from).lt('charged_at', to);
+    }
     if (clientSlug) q = q.eq('client_slug', clientSlug);
     q = q.range(offset, offset + limit - 1);
     const { data, count, error } = await q;

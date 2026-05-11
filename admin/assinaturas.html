@@ -619,7 +619,7 @@
           if (diff < 0) badge = `<span style="font-size:0.6rem;color:#b91c1c;margin-left:3px;">vencido</span>`;
           else if (diff <= 7) badge = `<span style="font-size:0.6rem;color:#b45309;margin-left:3px;">${diff}d</span>`;
         }
-        return `<span style="display:inline-flex;align-items:center;background:var(--accent-light);color:var(--accent-strong);border-radius:4px;padding:2px 7px;font-size:0.72rem;font-weight:600;margin:2px 2px 2px 0;white-space:nowrap;">${label}${badge}</span>`;
+        return `<span style="display:inline-flex;align-items:center;background:var(--accent-soft);color:var(--accent-strong);border-radius:4px;padding:2px 7px;font-size:0.72rem;font-weight:600;margin:2px 2px 2px 0;white-space:nowrap;">${label}${badge}</span>`;
       }).join('') || '<span style="color:var(--muted);font-size:0.78rem;">—</span>';
 
       return `
@@ -864,7 +864,7 @@
               <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">
                 <span style="font-size:0.75rem;color:var(--muted);">${pm.label}</span>
                 <span style="font-size:0.75rem;color:var(--muted);">·</span>
-                <span class="service-bar-fill ${scolor}" style="display:inline-block;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:600;color:#fff;">${setor}</span>
+                <span style="display:inline-block;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:600;background:var(--accent-soft);color:var(--accent-strong);">${setor}</span>
                 ${instLabel}
               </div>
               <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">${date} · ${p.transaction_code}</div>
@@ -913,7 +913,7 @@
 
     async function load() {
       const tbody = document.getElementById('subsBody');
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
       try {
         const offset = (state.page - 1) * state.pageSize;
         const { data, count } = await AdminAPI.listSubscriptions({
@@ -921,14 +921,14 @@
         });
         state.total = count;
         if (data.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" style="padding:32px; text-align:center; color:var(--muted);">Nenhuma assinatura encontrada.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7" style="padding:32px; text-align:center; color:var(--muted);">Nenhuma assinatura encontrada.</td></tr>`;
         } else {
           tbody.innerHTML = data.map(rowHtml).join('');
         }
         renderPagination();
         attachRowHandlers(data);
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
         console.error(e);
       }
     }
