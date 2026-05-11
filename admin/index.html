@@ -474,6 +474,15 @@
       font-size: 0.84rem;
     }
 
+    /* Rating vazio — quando ainda não há avaliações */
+    .rating-empty {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    .rating-empty .dash { font-weight: 700; font-size: 0.86rem; color: var(--muted); }
+    .rating-empty .sub { font-size: 0.72rem; opacity: 0.85; }
+
     /* Alunos atendidos — pill numérica */
     .count-pill {
       display: inline-flex; align-items: center; justify-content: center;
@@ -903,6 +912,14 @@
 
     function starsHtml(rating) {
       const r = parseFloat(rating) || 0;
+      // Sem avaliação ainda → placeholder discreto
+      if (r <= 0) {
+        return `<span class="rating-empty" title="Ainda sem avaliações vinculadas">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" style="opacity:0.5;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span class="dash">—</span>
+          <span class="sub">sem avaliações</span>
+        </span>`;
+      }
       const full = Math.round(r);
       let html = '<span class="stars" style="display:inline-flex; gap:1px; color:#f59e0b;">';
       for (let i = 1; i <= 5; i++) {

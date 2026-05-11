@@ -1,0 +1,13 @@
+# portal/assets/.htaccess — JS do portal não deve ser cacheado agressivamente
+# (mudanças em portal-api.js precisam refletir imediato no cliente)
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js)$">
+        Header set Cache-Control "no-cache, must-revalidate, max-age=0"
+    </FilesMatch>
+</IfModule>
+<IfModule mod_expires.c>
+    <FilesMatch "\.(js)$">
+        ExpiresActive On
+        ExpiresDefault "access plus 0 seconds"
+    </FilesMatch>
+</IfModule>
