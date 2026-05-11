@@ -132,8 +132,58 @@ if ($txCode === '' || $buyerEmail === '') {
 }
 
 // ---------------------------------------------------------------------------
-// Chama RPC do Supabase
+// Chama RPC do Supabase — bifurca entre compra e cancelamento
 // ---------------------------------------------------------------------------
+
+$isCancellation = in_array($status, ['canceled', 'refunded', 'chargeback'], true);
+
+if ($isCancellation) {
+    // Primeiro grava o evento de cancelamento no histórico
+    hm_supabase_rpc('process_hotmart_purchase', [
+        'p_transaction_code'   => $txCode,
+        'p_buyer_email'        => $buyerEmail,
+        'p_offer_code'         => $offerCode,
+        'p_service_name'       => $serviceName,
+        'p_amount'             => $amount,
+        'p_status'             => $status,
+        'p_payment_type'       => $paymentType,
+        'p_installments_total' => $installTotal,
+        'p_installment_number' => $installNum,
+        'p_charged_at'         => $chargedAt,
+        'p_raw_payload'        => $payload,
+    ]);
+
+    // Resolve client_slug pelo email para passar ao cancel RPC
+    $lookupResult = hm_supabase_rpc('process_hotmart_purchase', [
+        'p_transaction_code'   => $txCode . '_cancel_lookup',
+        'p_buyer_email'        => $buyerEmail,
+        'p_offer_code'         => $offerCode,
+        'p_service_name'       => $serviceName,
+        'p_amount'             => 0,
+        'p_status'             => 'other',
+        'p_payment_type'       => '',
+        'p_installments_total' => 0,
+        'p_installment_number' => 0,
+        'p_charged_at'         => $chargedAt,
+        'p_raw_payload'        => [],
+    ]);
+    $lookupBody = json_decode($lookupResult['body'], true);
+    $clientSlug = $lookupBody['client_slug'] ?? null;
+
+    if ($clientSlug && $offerCode !== '') {
+        $result = hm_supabase_rpc('cancel_client_service', [
+            'p_client_slug' => $clientSlug,
+            'p_offer_code'  => $offerCode,
+        ]);
+        if ($result['status'] !== 200) {
+            hm_json(['ok' => false, 'error' => 'Erro ao cancelar serviço.', 'detail' => $result['body']], 500);
+        }
+        $cancelResult = json_decode($result['body'], true);
+        hm_json(['ok' => true, 'event' => $event, 'result' => $cancelResult]);
+    }
+
+    hm_json(['ok' => true, 'event' => $event, 'matched' => false, 'note' => 'cliente nao identificado']);
+}
 
 $result = hm_supabase_rpc('process_hotmart_purchase', [
     'p_transaction_code'   => $txCode,

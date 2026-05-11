@@ -287,6 +287,187 @@
     await updateMe({ metadata: { avatar_url: null } });
   }
 
+  // ============================================================
+  // DEMANDAS (Etapa D)
+  // ============================================================
+
+  async function listMyDemands({ status = 'all' } = {}) {
+    let q = client()
+      .from('v_demands').select('*').order('created_at', { ascending: false });
+    if (status && status !== 'all') q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getDemand(id) {
+    const { data, error } = await client()
+      .from('v_demands').select('*').eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function getDemandMembers(demand_id) {
+    const supabase = client();
+    const { data: members, error } = await supabase
+      .from('demand_members')
+      .select('id, user_id, role, approved_finish, approved_at, added_at')
+      .eq('demand_id', demand_id);
+    if (error) throw error;
+    if (!members || members.length === 0) return [];
+    const ids = members.map(m => m.user_id);
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email, role, position_id, metadata')
+      .in('id', ids);
+    const usersById = Object.fromEntries((users || []).map(u => [u.id, u]));
+    // Junta position name
+    const positionIds = [...new Set((users || []).map(u => u.position_id).filter(Boolean))];
+    let positionsById = {};
+    if (positionIds.length) {
+      const { data: positions } = await supabase
+        .from('positions').select('id, name, color').in('id', positionIds);
+      positionsById = Object.fromEntries((positions || []).map(p => [p.id, p]));
+    }
+    return members.map(m => {
+      const u = usersById[m.user_id] || {};
+      const p = positionsById[u.position_id] || null;
+      return {
+        ...m,
+        user_name: u.name,
+        user_email: u.email,
+        user_role: u.role,
+        avatar_url: u.metadata?.avatar_url || null,
+        position_name: p?.name || null,
+        position_color: p?.color || null,
+      };
+    });
+  }
+
+  async function listOperatorsForClient() {
+    const supabase = client();
+    const me = await getMe();
+    if (!me) throw new Error('Sessão expirada.');
+    // Operadores que estão na team_assignments do cliente OU todos os operadores aprovados
+    const { data, error } = await supabase
+      .from('team_assignments')
+      .select('user_id, position_id')
+      .eq('client_slug', me.client_slug);
+    if (error) throw error;
+    const userIds = (data || []).map(t => t.user_id);
+    if (userIds.length === 0) {
+      // Sem equipe atribuída — devolve operadores aprovados pro cliente escolher
+      const { data: all } = await supabase
+        .from('users').select('id, name, email, position_id, metadata')
+        .eq('role', 'operator').eq('status', 'approved').order('name');
+      return enrichOperators(all || []);
+    }
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, name, email, position_id, metadata')
+      .in('id', userIds);
+    return enrichOperators(users || []);
+  }
+
+  async function enrichOperators(users) {
+    const supabase = client();
+    const pids = [...new Set(users.map(u => u.position_id).filter(Boolean))];
+    let positionsById = {};
+    if (pids.length) {
+      const { data: positions } = await supabase
+        .from('positions').select('id, name, color').in('id', pids);
+      positionsById = Object.fromEntries((positions || []).map(p => [p.id, p]));
+    }
+    return users.map(u => ({
+      ...u,
+      position_name: positionsById[u.position_id]?.name || null,
+      position_color: positionsById[u.position_id]?.color || null,
+      avatar_url: u.metadata?.avatar_url || null,
+    }));
+  }
+
+  async function createDemand({ title, description, operator_ids, starts_at, ends_at }) {
+    if (!title || !title.trim()) throw new Error('Título obrigatório.');
+    if (!operator_ids || operator_ids.length === 0) throw new Error('Selecione pelo menos um operador.');
+    const { data, error } = await client().rpc('create_demand', {
+      p_title:       title.trim(),
+      p_description: description || null,
+      p_operators:   operator_ids,
+      p_starts_at:   starts_at || null,
+      p_ends_at:     ends_at   || null,
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function updateDemand(id, patch) {
+    const allowed = ['title','description','status','starts_at','ends_at'];
+    const clean = {};
+    for (const k of allowed) if (patch[k] !== undefined) clean[k] = patch[k];
+    clean.updated_at = new Date().toISOString();
+    const { data, error } = await client()
+      .from('demands').update(clean).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function listDemandMessages(demand_id) {
+    const supabase = client();
+    const { data: msgs, error } = await supabase
+      .from('demand_messages')
+      .select('id, user_id, content, attachments, created_at')
+      .eq('demand_id', demand_id)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    if (!msgs || msgs.length === 0) return [];
+    const ids = [...new Set(msgs.map(m => m.user_id))];
+    const { data: users } = await supabase
+      .from('users').select('id, name, role, metadata, position_id').in('id', ids);
+    const usersById = Object.fromEntries((users || []).map(u => [u.id, u]));
+    return msgs.map(m => {
+      const u = usersById[m.user_id] || {};
+      return {
+        ...m,
+        author_name: u.name,
+        author_role: u.role,
+        avatar_url: u.metadata?.avatar_url || null,
+      };
+    });
+  }
+
+  async function postDemandMessage(demand_id, content, attachments = []) {
+    if (!content || !content.trim()) return null;
+    const me = await getMe();
+    if (!me) throw new Error('Sessão expirada.');
+    const { data, error } = await client()
+      .from('demand_messages')
+      .insert({ demand_id, user_id: me.id, content: content.trim(), attachments })
+      .select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function finalizeMyPart(demand_id) {
+    const { data, error } = await client().rpc('finalize_my_part', { p_demand_id: demand_id });
+    if (error) throw error;
+    return data; // { status, approved, total_operators, finalized_at }
+  }
+
+  // Subscribe a mudanças em tempo real (mensagens + status da demanda).
+  // Retorna função pra unsubscribe.
+  function subscribeDemand(demand_id, { onMessage, onDemandUpdate }) {
+    const supabase = client();
+    const channel = supabase.channel('demand:' + demand_id)
+      .on('postgres_changes',
+          { event: 'INSERT', schema: 'portal', table: 'demand_messages', filter: 'demand_id=eq.' + demand_id },
+          (payload) => onMessage && onMessage(payload.new))
+      .on('postgres_changes',
+          { event: 'UPDATE', schema: 'portal', table: 'demands', filter: 'id=eq.' + demand_id },
+          (payload) => onDemandUpdate && onDemandUpdate(payload.new))
+      .subscribe();
+    return () => { try { supabase.removeChannel(channel); } catch (_) {} };
+  }
+
   async function logout() {
     clearCachedProfile();
     await client().auth.signOut();
@@ -306,6 +487,18 @@
     changePassword,
     uploadAvatar,
     removeAvatar,
+    // Demandas
+    listMyDemands,
+    getDemand,
+    getDemandMembers,
+    listOperatorsForClient,
+    createDemand,
+    updateDemand,
+    listDemandMessages,
+    postDemandMessage,
+    finalizeMyPart,
+    subscribeDemand,
+    // Sessão
     logout,
     getSlugFromUrl,
     _client: client,

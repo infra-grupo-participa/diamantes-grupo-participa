@@ -245,9 +245,15 @@
   async function getStudentServices(slug) {
     const { data, error } = await client()
       .from('services')
-      .select('id, service_type, status, metadata, created_at')
+      .select('id, service_type, status, metadata, access_until, offer_code, canceled_at, created_at')
       .eq('client_slug', slug)
       .order('service_type', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getClientActiveServices(slug) {
+    const { data, error } = await client().rpc('get_client_active_services', { p_client_slug: slug });
     if (error) throw error;
     return data || [];
   }

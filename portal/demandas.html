@@ -847,354 +847,374 @@
   <script>
     'use strict';
 
-    function getSlug() {
-      const q = new URLSearchParams(window.location.search).get('slug');
-      return q || 'ana-carolina';
+    function initials(name) {
+      return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+    }
+    function fmtDate(s) {
+      if (!s) return '—';
+      const d = new Date(s); if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('pt-BR');
+    }
+    function fmtTime(s) {
+      if (!s) return '';
+      const d = new Date(s);
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    function fmtDayLabel(s) {
+      if (!s) return '';
+      const d = new Date(s); const now = new Date();
+      const sameDay = d.toDateString() === now.toDateString();
+      if (sameDay) return 'Hoje';
+      const y = new Date(now); y.setDate(now.getDate() - 1);
+      if (d.toDateString() === y.toDateString()) return 'Ontem';
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+    }
+    function dueLabel(d) {
+      if (d.status === 'done') return 'Concluída em ' + fmtDate(d.finalized_at);
+      if (d.status === 'canceled') return 'Cancelada';
+      if (!d.ends_at) return 'Sem prazo';
+      const today = new Date(); today.setHours(0,0,0,0);
+      const due = new Date(d.ends_at);
+      const diff = Math.ceil((due - today) / (1000*60*60*24));
+      if (diff < 0)  return 'Atrasada — ' + fmtDate(d.ends_at);
+      if (diff === 0) return 'Vence hoje';
+      if (diff === 1) return 'Vence amanhã';
+      return 'Vence em ' + diff + ' dias';
+    }
+    function categoryOf(members) {
+      const ops = (members || []).filter(m => m.role === 'operator');
+      const positions = [...new Set(ops.map(m => m.position_name).filter(Boolean))];
+      if (positions.length === 0) return 'Sem categoria';
+      if (positions.length === 1) return positions[0];
+      return positions.length + ' cargos';
+    }
+    function iconKeyFor(d) {
+      // Mapeia status visual → ícone usado no list-icon
+      if (d.status === 'done') return 'done';
+      if (d.status === 'review') return 'review';
+      return 'in_progress';
     }
 
-    // ============ MOCK ============
-    // Estrutura realista de demanda com chat + etapas + anexos.
-    const DEMANDS = [
-      {
-        id: 'cri-abr',
-        title: 'Criação de criativos — Campanha Abr/24',
-        category: 'Design',
-        icon: 'pen',
-        status: 'in_progress',  // primário
-        unread: true,
-        opened: '20/03/2024',
-        due: '03/04/2024',
-        dueLabel: 'Vence em 3 dias',
-        dueClass: 'due-soon',
-        period: 'Abr/24',
-        team: [
-          { name: 'Rafael Mendes', role: 'Web-Designer',      initials: 'RM' },
-          { name: 'Bianca Souza',  role: 'Social Media',      initials: 'BS' },
-        ],
-        steps: [
-          { title: 'Briefing recebido',     when: '20/03/2024', state: 'done' },
-          { title: 'Conceito aprovado',     when: '23/03/2024', state: 'done' },
-          { title: 'Criação dos criativos', when: 'Em andamento', state: 'current' },
-          { title: 'Aprovação final',       when: 'Aguardando', state: 'pending' },
-          { title: 'Entrega',               when: 'Previsto 03/04', state: 'pending' },
-        ],
-        attachments: [
-          { name: 'briefing_campanha_abr24.pdf', size: '1,2 MB', kind: 'pdf' },
-          { name: 'mockup_capa.png',              size: '684 KB', kind: 'img' },
-        ],
-        messages: [
-          { day: '20 de março', items: [
-            { author: 'Juliana Costa', role: 'Gestora de tráfego', initials: 'JC', text: 'Olá Ana! Recebi o briefing da campanha de abril. Vou alinhar com a equipe e te trago os primeiros conceitos até quarta-feira. 😊', time: '09:14' },
-            { mine: true, author: 'Você', initials: 'AC', text: 'Perfeito Juliana! Lembrando que o foco dessa campanha é o lançamento do curso novo.', time: '09:32' },
-          ]},
-          { day: '23 de março', items: [
-            { author: 'Rafael Mendes', role: 'Web-Designer', initials: 'RM', text: 'Bom dia! Subi a primeira versão dos creatives no drive. Dá uma olhada e me diz o que acha:', time: '10:05',
-              attachment: { name: 'briefing_campanha_abr24.pdf', size: '1,2 MB' } },
-            { mine: true, author: 'Você', initials: 'AC', text: 'Achei muito bom! Só ajustaria a cor do CTA pra ficar mais quente. O resto está ótimo. 🔥', time: '14:48' },
-          ]},
-          { day: 'Hoje', items: [
-            { author: 'Bianca Souza', role: 'Social Media', initials: 'BS', text: 'Oi Ana! Já estou montando o calendário com a Rafael pra distribuir os criativos no Instagram. Você prefere começar de segunda ou na sexta?', time: '08:42' },
-          ]},
-        ],
-      },
-      {
-        id: 'lp-curso',
-        title: 'Revisão de landing page',
-        category: 'Web',
-        icon: 'globe',
-        status: 'awaiting',
-        unread: true,
-        opened: '18/03/2024',
-        due: '01/04/2024',
-        dueLabel: 'Aguardando sua aprovação',
-        dueClass: 'due-soon',
-        period: 'Mar/24',
-        team: [
-          { name: 'Rafael Mendes', role: 'Web-Designer', initials: 'RM' },
-        ],
-        steps: [
-          { title: 'Análise da página atual',  when: '18/03/2024', state: 'done' },
-          { title: 'Novas seções desenhadas',  when: '25/03/2024', state: 'done' },
-          { title: 'Aguardando sua aprovação', when: 'Hoje',       state: 'current' },
-          { title: 'Publicação',               when: 'Após aprovar', state: 'pending' },
-        ],
-        attachments: [
-          { name: 'landing_preview_v2.png', size: '2,4 MB', kind: 'img' },
-          { name: 'projeto_lp.fig',         size: '12,1 MB', kind: 'fig' },
-        ],
-        messages: [
-          { day: '25 de março', items: [
-            { author: 'Rafael Mendes', role: 'Web-Designer', initials: 'RM', text: 'Ana, segue o preview da landing com as alterações. Pode dar uma olhada e me dizer se aprova?', time: '16:20',
-              attachment: { name: 'landing_preview_v2.png', size: '2,4 MB' } },
-          ]},
-        ],
-      },
-      {
-        id: 'mentoria',
-        title: 'Mentoria estratégica — Q2',
-        category: 'Estratégia',
-        icon: 'target',
-        status: 'in_progress',
-        opened: '15/03/2024',
-        due: '15/04/2024',
-        dueLabel: 'Em andamento',
-        dueClass: '',
-        period: 'Q2',
-        team: [
-          { name: 'Juliana Costa', role: 'Gestora de tráfego', initials: 'JC' },
-        ],
-        steps: [
-          { title: 'Sessão 1 — Diagnóstico', when: '20/03', state: 'done' },
-          { title: 'Sessão 2 — Estratégia',  when: '03/04', state: 'current' },
-          { title: 'Sessão 3 — Execução',    when: '15/04', state: 'pending' },
-        ],
-        attachments: [
-          { name: 'roadmap_q2.pdf', size: '820 KB', kind: 'pdf' },
-        ],
-        messages: [
-          { day: '20 de março', items: [
-            { author: 'Juliana Costa', role: 'Gestora de tráfego', initials: 'JC', text: 'Ana, segue o resumo da nossa primeira sessão. Próximo encontro marcado pra 03/04. 📅', time: '17:30' },
-          ]},
-        ],
-      },
-      {
-        id: 'video-inst',
-        title: 'Edição do vídeo institucional',
-        category: 'Vídeo',
-        icon: 'video',
-        status: 'review',
-        opened: '10/03/2024',
-        due: '30/03/2024',
-        dueLabel: 'Em revisão',
-        dueClass: '',
-        period: 'Mar/24',
-        team: [
-          { name: 'Diego Ramalho', role: 'Editor de Vídeo', initials: 'DR' },
-        ],
-        steps: [
-          { title: 'Gravações entregues', when: '10/03', state: 'done' },
-          { title: 'Primeira versão',     when: '22/03', state: 'done' },
-          { title: 'Ajustes finais',      when: 'Hoje',  state: 'current' },
-          { title: 'Entrega',             when: '30/03', state: 'pending' },
-        ],
-        attachments: [
-          { name: 'video_v2_preview.mp4', size: '48 MB', kind: 'zip' },
-        ],
-        messages: [
-          { day: '22 de março', items: [
-            { author: 'Diego Ramalho', role: 'Editor de Vídeo', initials: 'DR', text: 'Subi a primeira versão pra você revisar. Estou aguardando feedback pra finalizar! 🎬', time: '11:15' },
-          ]},
-        ],
-      },
-      {
-        id: 'redes',
-        title: 'Redes sociais — Posts da semana',
-        category: 'Social',
-        icon: 'grid',
-        status: 'done',
-        opened: '15/03/2024',
-        due: '22/03/2024',
-        dueLabel: 'Entregue em 22/03',
-        dueClass: 'on-time',
-        period: 'Mar/24',
-        team: [
-          { name: 'Bianca Souza', role: 'Social Media', initials: 'BS' },
-        ],
-        steps: [
-          { title: 'Pauta aprovada',   when: '15/03', state: 'done' },
-          { title: 'Posts produzidos', when: '20/03', state: 'done' },
-          { title: 'Publicado',        when: '22/03', state: 'done' },
-        ],
-        attachments: [
-          { name: 'posts_semana12.zip', size: '24 MB', kind: 'zip' },
-        ],
-        messages: [
-          { day: '22 de março', items: [
-            { author: 'Bianca Souza', role: 'Social Media', initials: 'BS', text: 'Tudo publicado, Ana! Os números semanais eu mando na próxima segunda. 🌟', time: '18:00' },
-          ]},
-        ],
-      },
-    ];
+    const STATUS_LABEL = {
+      open:        'Aberta',
+      in_progress: 'Em andamento',
+      review:      'Em revisão',
+      done:        'Concluída',
+      canceled:    'Cancelada',
+    };
+    const STATUS_TAG = {
+      open:        'in_progress', // visual: laranja sutil
+      in_progress: 'in_progress',
+      review:      'review',
+      done:        'done',
+      canceled:    'done',
+    };
 
     const ICONS = {
       pen:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
-      globe:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
-      target: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
-      video:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>',
-      grid:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
     };
 
-    const FILE_ICONS = {
-      pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
-      img: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
-      fig: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="3"/><path d="M9 6h6a3 3 0 0 1 0 6H9z"/><path d="M9 12h3a3 3 0 0 1 0 6 3 3 0 0 1 0-6"/></svg>',
-      zip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><polyline points="1 3 23 3 23 8 1 8 1 3"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
+    const state = {
+      filter: 'all',
+      search: '',
+      currentId: null,
+      demands: [],
+      members: {},     // demand_id → members[]
+      messages: {},    // demand_id → messages[]
+      me: null,
+      unsubscribe: null,
     };
 
-    const STATUS_LABEL = {
-      in_progress: 'Em andamento',
-      review:      'Em revisão',
-      awaiting:    'Aguardando você',
-      done:        'Concluída',
-      late:        'Atrasada',
-    };
-
-    const state = { filter: 'all', search: '', currentId: DEMANDS[0].id };
-
-    function counts() {
+    function counts(items) {
       return {
-        all:  DEMANDS.length,
-        in_progress: DEMANDS.filter(d => d.status === 'in_progress' || d.status === 'review').length,
-        awaiting: DEMANDS.filter(d => d.status === 'awaiting').length,
-        done: DEMANDS.filter(d => d.status === 'done').length,
+        all:  items.length,
+        in_progress: items.filter(d => d.status === 'open' || d.status === 'in_progress' || d.status === 'review').length,
+        awaiting:    items.filter(d => d.status === 'review').length,
+        done:        items.filter(d => d.status === 'done').length,
       };
     }
 
     function renderTabs() {
-      const c = counts();
+      const c = counts(state.demands);
       document.getElementById('cntAll').textContent   = c.all;
       document.getElementById('cntProg').textContent  = c.in_progress;
       document.getElementById('cntAwait').textContent = c.awaiting;
       document.getElementById('cntDone').textContent  = c.done;
     }
 
-    function renderList() {
+    function filterDemands() {
       const search = state.search.toLowerCase();
-      let items = DEMANDS;
-      if (state.filter === 'in_progress') items = items.filter(d => d.status === 'in_progress' || d.status === 'review');
-      else if (state.filter === 'awaiting') items = items.filter(d => d.status === 'awaiting');
+      let items = state.demands;
+      if (state.filter === 'in_progress')   items = items.filter(d => d.status === 'open' || d.status === 'in_progress' || d.status === 'review');
+      else if (state.filter === 'awaiting') items = items.filter(d => d.status === 'review');
       else if (state.filter === 'done')     items = items.filter(d => d.status === 'done');
-      if (search) items = items.filter(d => d.title.toLowerCase().includes(search) || d.category.toLowerCase().includes(search));
+      if (search) items = items.filter(d => (d.title || '').toLowerCase().includes(search));
+      return items;
+    }
 
+    function renderList() {
+      const items = filterDemands();
       const scroll = document.getElementById('listScroll');
       if (items.length === 0) {
         scroll.innerHTML = `<div style="padding:30px 16px; text-align:center; color:var(--muted); font-size:0.86rem;">Nenhuma demanda nessa categoria.</div>`;
         return;
       }
       scroll.innerHTML = items.map(d => `
-        <div class="list-item ${d.id === state.currentId ? 'active' : ''} ${d.status === 'awaiting' ? 'awaiting' : ''} ${d.unread ? 'unread' : ''}" data-id="${d.id}">
-          <div class="list-icon ${d.status}">${ICONS[d.icon] || ICONS.pen}</div>
+        <div class="list-item ${d.id === state.currentId ? 'active' : ''} ${d.status === 'review' ? 'awaiting' : ''}" data-id="${d.id}">
+          <div class="list-icon ${iconKeyFor(d)}">${ICONS.pen}</div>
           <div class="list-body">
-            <div class="list-title">${d.title}</div>
+            <div class="list-title">${d.title || 'Sem título'}</div>
             <div class="list-meta">
-              <span>${d.category}</span>
+              <span>${categoryOf(state.members[d.id])}</span>
               <span>•</span>
-              <span>${d.dueLabel}</span>
+              <span>${dueLabel(d)}</span>
             </div>
           </div>
-          <div class="list-unread" title="Mensagem nova"></div>
+          <div class="list-unread"></div>
         </div>
       `).join('');
 
       scroll.querySelectorAll('.list-item').forEach(el => {
         el.addEventListener('click', () => {
+          if (el.dataset.id === state.currentId) return;
           state.currentId = el.dataset.id;
-          // marca como lido visualmente
-          const d = DEMANDS.find(x => x.id === state.currentId);
-          if (d) d.unread = false;
-          renderList();
-          renderChat();
-          renderDetails();
+          renderList(); renderChat(); renderDetails();
+          loadMessages(state.currentId);
+          subscribeCurrent();
         });
       });
     }
 
     function renderChat() {
-      const d = DEMANDS.find(x => x.id === state.currentId);
-      if (!d) return;
-      document.getElementById('chatTitle').textContent  = d.title;
-      const badge = document.getElementById('chatBadge');
-      badge.className = 'badge ' + d.status;
-      badge.textContent = STATUS_LABEL[d.status] || d.status;
-      document.getElementById('chatPeriod').textContent = d.period;
-      document.getElementById('cntFiles').textContent   = d.attachments.length;
+      const d = state.demands.find(x => x.id === state.currentId);
+      const titleEl  = document.getElementById('chatTitle');
+      const periodEl = document.getElementById('chatPeriod');
+      const badge    = document.getElementById('chatBadge');
+      const scroll   = document.getElementById('chatScroll');
+      const composer = document.getElementById('composer');
 
-      const scroll = document.getElementById('chatScroll');
+      if (!d) {
+        titleEl.textContent = 'Selecione uma demanda';
+        periodEl.textContent = '';
+        badge.className = 'badge in_progress';
+        badge.textContent = '—';
+        scroll.innerHTML = `<div style="margin:auto; color:var(--muted); font-size:0.9rem; text-align:center;">Nada por aqui ainda.<br><small>Clique em uma demanda na lista ao lado.</small></div>`;
+        composer.disabled = true;
+        return;
+      }
+      composer.disabled = false;
+      titleEl.textContent = d.title;
+      badge.className = 'badge ' + STATUS_TAG[d.status];
+      badge.textContent = STATUS_LABEL[d.status] || d.status;
+      periodEl.textContent = d.starts_at ? `Início ${fmtDate(d.starts_at)}` : '';
+      document.getElementById('cntFiles').textContent = '0';
+
+      const msgs = state.messages[d.id] || [];
+      const me = state.me;
+      if (msgs.length === 0) {
+        scroll.innerHTML = `<div style="margin:auto; color:var(--muted); font-size:0.86rem; text-align:center;">Comece a conversa com sua equipe — diga o que precisa pra essa demanda. 💬</div>`;
+        return;
+      }
+      let lastDay = '';
       const html = [];
-      d.messages.forEach(grp => {
-        html.push(`<div class="msg-day">${grp.day}</div>`);
-        grp.items.forEach(m => {
-          const av = `<div class="avatar" title="${m.author}">${m.initials || '??'}</div>`;
-          const author = m.mine
-            ? `<div class="msg-author">${m.author} <span style="color:var(--muted);font-weight:400">•</span> <span class="role">cliente</span></div>`
-            : `<div class="msg-author">${m.author} <span style="color:var(--muted);font-weight:400">•</span> <span class="role">${m.role || 'equipe'}</span></div>`;
-          const att = m.attachment ? `
-            <div class="msg-attachment">
-              <div class="file-ico">${FILE_ICONS.pdf}</div>
-              <div class="file-info">
-                <div class="file-name">${m.attachment.name}</div>
-                <div class="file-size">${m.attachment.size}</div>
-              </div>
-              <button class="file-dl" title="Baixar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+      msgs.forEach(m => {
+        const day = fmtDayLabel(m.created_at);
+        if (day !== lastDay) {
+          html.push(`<div class="msg-day">${day}</div>`);
+          lastDay = day;
+        }
+        const mine = me && m.user_id === me.id;
+        const role = mine ? 'cliente' : (m.author_role === 'operator' ? 'equipe' : (m.author_role || 'equipe'));
+        const avatarStyle = m.avatar_url ? `style="background:url('${m.avatar_url}') center/cover no-repeat;"` : '';
+        const avatarText = m.avatar_url ? '' : initials(m.author_name);
+        html.push(`
+          <div class="msg ${mine ? 'mine' : ''}">
+            <div class="avatar" ${avatarStyle}>${avatarText}</div>
+            <div>
+              <div class="msg-author">${m.author_name || 'Alguém'} <span style="color:var(--muted);font-weight:400">•</span> <span class="role">${role}</span></div>
+              <div class="msg-bubble">${escapeHtml(m.content || '')}</div>
+              <div class="msg-time" style="text-align:${mine ? 'right' : 'left'}">${fmtTime(m.created_at)}</div>
             </div>
-          ` : '';
-          html.push(`
-            <div class="msg ${m.mine ? 'mine' : ''}">
-              ${av}
-              <div>
-                ${author}
-                <div class="msg-bubble">
-                  ${m.text}
-                  ${att}
-                </div>
-                <div class="msg-time" style="text-align:${m.mine ? 'right' : 'left'}">${m.time}</div>
-              </div>
-            </div>
-          `);
-        });
+          </div>
+        `);
       });
       scroll.innerHTML = html.join('');
-      // Rola pro final
       scroll.scrollTop = scroll.scrollHeight;
     }
 
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+
     function renderDetails() {
-      const d = DEMANDS.find(x => x.id === state.currentId);
-      if (!d) return;
-      document.getElementById('infoStatus').innerHTML   = `<span class="badge ${d.status}">${STATUS_LABEL[d.status] || d.status}</span>`;
-      document.getElementById('infoOpened').textContent = d.opened;
-      const dueVal = document.getElementById('infoDue');
-      dueVal.textContent = d.dueLabel;
-      dueVal.className = 'val ' + (d.dueClass || '');
-      document.getElementById('infoCategory').textContent = d.category;
+      const d = state.demands.find(x => x.id === state.currentId);
+      const opPanel = document.querySelector('.detail-pane');
+      if (!d) {
+        document.getElementById('infoStatus').innerHTML = '—';
+        document.getElementById('infoOpened').textContent = '—';
+        document.getElementById('infoDue').textContent = '—';
+        document.getElementById('infoCategory').textContent = '—';
+        document.getElementById('stepsList').innerHTML = '';
+        document.getElementById('teamMini').innerHTML = '';
+        document.getElementById('teamMiniCount').textContent = '—';
+        document.getElementById('attachList').innerHTML = '';
+        document.getElementById('attachCount').textContent = '—';
+        return;
+      }
+      document.getElementById('infoStatus').innerHTML = `<span class="badge ${STATUS_TAG[d.status]}">${STATUS_LABEL[d.status]}</span>`;
+      document.getElementById('infoOpened').textContent = fmtDate(d.created_at);
+      const dueEl = document.getElementById('infoDue');
+      dueEl.textContent = dueLabel(d);
+      dueEl.className = 'val';
+      if (d.status !== 'done' && d.ends_at) {
+        const diff = Math.ceil((new Date(d.ends_at) - new Date()) / (1000*60*60*24));
+        if (diff < 0) dueEl.classList.add('late');
+        else if (diff <= 3) dueEl.classList.add('due-soon');
+      } else if (d.status === 'done') {
+        dueEl.classList.add('on-time');
+      }
+      document.getElementById('infoCategory').textContent = categoryOf(state.members[d.id]);
 
-      // Steps
-      document.getElementById('stepsList').innerHTML = d.steps.map(s => `
-        <div class="step ${s.state}">
-          <div class="dot">
-            ${s.state === 'done' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
-          </div>
-          <div class="step-info">
-            <div class="step-title">${s.title}</div>
-            <div class="step-when">${s.when}</div>
-          </div>
-        </div>
-      `).join('');
+      // Etapas baseadas em aprovações de operadores
+      const members = state.members[d.id] || [];
+      const operators = members.filter(m => m.role === 'operator');
+      const approved = operators.filter(m => m.approved_finish).length;
+      const total = operators.length;
+      const stepsHtml = [];
+      stepsHtml.push(`
+        <div class="step done">
+          <div class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="step-info"><div class="step-title">Demanda aberta</div><div class="step-when">${fmtDate(d.created_at)}</div></div>
+        </div>`);
+      stepsHtml.push(`
+        <div class="step ${d.status === 'open' ? 'current' : 'done'}">
+          <div class="dot">${d.status !== 'open' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>
+          <div class="step-info"><div class="step-title">Equipe trabalhando</div><div class="step-when">${total} operadore${total === 1 ? '' : 's'}</div></div>
+        </div>`);
+      stepsHtml.push(`
+        <div class="step ${d.status === 'done' ? 'done' : 'current'}">
+          <div class="dot">${d.status === 'done' ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>
+          <div class="step-info"><div class="step-title">Aprovação ${approved}/${total}</div><div class="step-when">${total === 0 ? 'Sem operadores' : (approved === total ? 'Todos aprovaram' : 'Aguardando todos confirmarem')}</div></div>
+        </div>`);
+      if (d.status === 'done') {
+        stepsHtml.push(`
+          <div class="step done">
+            <div class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="step-info"><div class="step-title">Concluída</div><div class="step-when">${fmtDate(d.finalized_at)}</div></div>
+          </div>`);
+      }
+      document.getElementById('stepsList').innerHTML = stepsHtml.join('');
 
-      // Team mini
-      document.getElementById('teamMiniCount').textContent = `${d.team.length} pessoa${d.team.length === 1 ? '' : 's'}`;
-      document.getElementById('teamMini').innerHTML = d.team.map(m => `
-        <div class="team-mini-item">
-          <div class="avatar">${m.initials}</div>
-          <div>
-            <div style="font-weight:600;">${m.name}</div>
-            <div class="role">${m.role}</div>
+      // Equipe (operadores)
+      const teamMini = document.getElementById('teamMini');
+      teamMini.innerHTML = operators.map(m => {
+        const ini = initials(m.user_name);
+        const checked = m.approved_finish ? '<span title="Aprovou finalização" style="color:var(--success); font-size:0.74rem; font-weight:700;">✓</span>' : '';
+        return `
+          <div class="team-mini-item">
+            <div class="avatar" style="${m.position_color ? `background:linear-gradient(135deg, ${m.position_color}33, ${m.position_color});` : ''}">${ini}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:600;">${m.user_name || '—'}</div>
+              <div class="role">${m.position_name || '—'}</div>
+            </div>
+            ${checked}
           </div>
-        </div>
-      `).join('');
+        `;
+      }).join('') || '<div style="color:var(--muted); font-size:0.84rem;">Sem operadores.</div>';
+      document.getElementById('teamMiniCount').textContent = `${operators.length} pessoa${operators.length === 1 ? '' : 's'}`;
 
-      // Anexos
-      document.getElementById('attachCount').textContent = `${d.attachments.length} arquivo${d.attachments.length === 1 ? '' : 's'}`;
-      document.getElementById('attachList').innerHTML = d.attachments.map(a => `
-        <div class="attach-item">
-          <div class="attach-ico ${a.kind}">${FILE_ICONS[a.kind] || FILE_ICONS.pdf}</div>
-          <div>
-            <div class="attach-name">${a.name}</div>
-            <div class="attach-info">${a.size}</div>
-          </div>
-          <button class="attach-dl" title="Baixar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
-        </div>
-      `).join('');
+      // Botão "Finalizar minha parte" só para operadores membros que ainda não aprovaram
+      const finalizeWrap = document.getElementById('finalizeWrap');
+      if (finalizeWrap) {
+        const isOp = state.me && operators.some(m => m.user_id === state.me.id);
+        const alreadyApproved = state.me && operators.some(m => m.user_id === state.me.id && m.approved_finish);
+        if (isOp && d.status !== 'done' && d.status !== 'canceled') {
+          finalizeWrap.style.display = '';
+          const btn = finalizeWrap.querySelector('button');
+          if (alreadyApproved) {
+            btn.textContent = 'Você já aprovou. Aguardando outros…';
+            btn.disabled = true;
+          } else {
+            btn.textContent = 'Finalizar minha parte';
+            btn.disabled = false;
+          }
+        } else {
+          finalizeWrap.style.display = 'none';
+        }
+      }
+
+      document.getElementById('attachList').innerHTML = '<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Em breve — anexos por demanda.</div>';
+      document.getElementById('attachCount').textContent = '0';
+    }
+
+    async function loadAll() {
+      try {
+        state.demands = await PortalAPI.listMyDemands();
+        // Carrega membros de cada demanda em paralelo (só pra mostrar categoria/equipe na lista)
+        await Promise.all(state.demands.map(async d => {
+          state.members[d.id] = await PortalAPI.getDemandMembers(d.id);
+        }));
+        if (state.demands.length > 0 && !state.currentId) state.currentId = state.demands[0].id;
+        renderTabs(); renderList(); renderChat(); renderDetails();
+        if (state.currentId) { loadMessages(state.currentId); subscribeCurrent(); }
+      } catch (e) {
+        console.error(e);
+        document.getElementById('listScroll').innerHTML =
+          `<div style="padding:24px; color:var(--danger); font-size:0.86rem;">Erro: ${e.message || e}</div>`;
+      }
+    }
+
+    async function loadMessages(demand_id) {
+      try {
+        state.messages[demand_id] = await PortalAPI.listDemandMessages(demand_id);
+        if (state.currentId === demand_id) renderChat();
+      } catch (e) { console.error(e); }
+    }
+
+    function subscribeCurrent() {
+      if (state.unsubscribe) { state.unsubscribe(); state.unsubscribe = null; }
+      if (!state.currentId) return;
+      state.unsubscribe = PortalAPI.subscribeDemand(state.currentId, {
+        onMessage: async (raw) => {
+          // Re-busca a mensagem com info do autor (raw vem da tabela cru)
+          await loadMessages(state.currentId);
+        },
+        onDemandUpdate: async (raw) => {
+          // Atualiza a demanda na lista
+          const idx = state.demands.findIndex(x => x.id === raw.id);
+          if (idx >= 0) {
+            const fresh = await PortalAPI.getDemand(raw.id);
+            if (fresh) state.demands[idx] = fresh;
+            state.members[raw.id] = await PortalAPI.getDemandMembers(raw.id);
+            renderList(); renderTabs();
+            if (state.currentId === raw.id) { renderChat(); renderDetails(); }
+          }
+        },
+      });
+    }
+
+    // ===== Composer =====
+    const composer = document.getElementById('composer');
+    composer.addEventListener('input', () => {
+      composer.style.height = 'auto';
+      composer.style.height = Math.min(composer.scrollHeight, 140) + 'px';
+    });
+    composer.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    });
+    document.querySelector('.composer-btn.send').addEventListener('click', sendMessage);
+
+    async function sendMessage() {
+      const text = composer.value.trim();
+      if (!text || !state.currentId) return;
+      try {
+        await PortalAPI.postDemandMessage(state.currentId, text);
+        composer.value = '';
+        composer.style.height = 'auto';
+        await loadMessages(state.currentId);
+      } catch (e) {
+        alert('Erro ao enviar: ' + (e.message || e));
+      }
     }
 
     // ===== Filtros =====
@@ -1211,41 +1231,161 @@
       renderList();
     });
 
-    // ===== Composer =====
-    const composer = document.getElementById('composer');
-    composer.addEventListener('input', () => {
-      composer.style.height = 'auto';
-      composer.style.height = Math.min(composer.scrollHeight, 140) + 'px';
+    // ===== Modal Nova Demanda =====
+    function buildNewDemandModal() {
+      const modal = document.createElement('div');
+      modal.id = 'newDemandModal';
+      modal.style.cssText = 'display:none; position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:200; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(2px);';
+      modal.innerHTML = `
+        <div style="background:#fff; border-radius:18px; width:100%; max-width:560px; box-shadow:var(--shadow-lg); overflow:hidden;">
+          <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-size:1.1rem; font-weight:700;">Nova demanda</h3>
+            <button type="button" id="ndClose" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:var(--muted);">×</button>
+          </div>
+          <form id="ndForm" style="padding:24px; display:flex; flex-direction:column; gap:14px; max-height:70vh; overflow-y:auto;">
+            <div>
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Título</label>
+              <input id="ndTitle" type="text" required class="search-input" style="padding-left:12px; width:100%;" placeholder="Ex: Criativos para a campanha de junho" />
+            </div>
+            <div>
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Descrição</label>
+              <textarea id="ndDesc" rows="4" class="search-input" style="padding:12px; width:100%; min-height:90px; resize:vertical;" placeholder="Conte o que precisa, o tom desejado, links de referência…"></textarea>
+            </div>
+            <div>
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Equipe responsável</label>
+              <div id="ndOperators" style="display:flex; flex-direction:column; gap:6px; max-height:200px; overflow-y:auto; border:1px solid var(--border-strong); border-radius:10px; padding:8px; background:#fafbfc;">
+                <div style="color:var(--muted); font-size:0.84rem; padding:8px;">Carregando…</div>
+              </div>
+              <small style="color:var(--muted); font-size:0.74rem;">Selecione uma ou mais pessoas pra participar do chat da demanda.</small>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+              <div>
+                <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Data de início</label>
+                <input id="ndStart" type="date" class="search-input" style="padding-left:12px; width:100%;" />
+              </div>
+              <div>
+                <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Prazo final</label>
+                <input id="ndEnd" type="date" class="search-input" style="padding-left:12px; width:100%;" />
+              </div>
+            </div>
+            <div id="ndError" style="color:var(--danger); font-size:0.82rem; display:none;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:6px;">
+              <button type="button" id="ndCancel" class="composer-btn ghost" style="padding:10px 16px; width:auto; border-radius:10px; font-weight:600; font-size:0.88rem; border:1px solid var(--border-strong); background:#fff;">Cancelar</button>
+              <button type="submit" id="ndSubmit" class="btn-primary" style="padding:10px 18px; border-radius:10px;">Criar demanda</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      return modal;
+    }
+    const newDemandModal = buildNewDemandModal();
+
+    async function openNewDemand() {
+      newDemandModal.style.display = 'flex';
+      document.getElementById('ndForm').reset();
+      document.getElementById('ndError').style.display = 'none';
+      const opsWrap = document.getElementById('ndOperators');
+      opsWrap.innerHTML = '<div style="color:var(--muted); font-size:0.84rem; padding:8px;">Carregando operadores…</div>';
+      try {
+        const ops = await PortalAPI.listOperatorsForClient();
+        if (ops.length === 0) {
+          opsWrap.innerHTML = '<div style="color:var(--muted); font-size:0.84rem; padding:8px;">Sua equipe ainda não foi montada. Fale com o admin.</div>';
+        } else {
+          opsWrap.innerHTML = ops.map(o => `
+            <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer;" onmouseover="this.style.background='#f1ebe0'" onmouseout="this.style.background='transparent'">
+              <input type="checkbox" value="${o.id}" />
+              <div class="avatar" style="width:30px;height:30px;font-size:0.66rem;${o.position_color ? `background:linear-gradient(135deg,${o.position_color}33,${o.position_color});`:''}">${initials(o.name)}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:600; font-size:0.88rem;">${o.name}</div>
+                <div style="font-size:0.72rem; color:var(--muted);">${o.position_name || 'Sem cargo'}</div>
+              </div>
+            </label>
+          `).join('');
+        }
+      } catch (e) {
+        opsWrap.innerHTML = `<div style="color:var(--danger); font-size:0.84rem; padding:8px;">${e.message || e}</div>`;
+      }
+    }
+    function closeNewDemand() { newDemandModal.style.display = 'none'; }
+
+    newDemandModal.addEventListener('click', (e) => {
+      if (e.target === newDemandModal) closeNewDemand();
     });
-    composer.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
+    document.getElementById('ndClose').addEventListener('click', closeNewDemand);
+    document.getElementById('ndCancel').addEventListener('click', closeNewDemand);
+    document.getElementById('ndForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('ndSubmit');
+      const err = document.getElementById('ndError');
+      err.style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Criando…';
+      try {
+        const title = document.getElementById('ndTitle').value.trim();
+        const description = document.getElementById('ndDesc').value.trim();
+        const operator_ids = Array.from(document.querySelectorAll('#ndOperators input[type=checkbox]:checked')).map(i => i.value);
+        const starts_at = document.getElementById('ndStart').value || null;
+        const ends_at   = document.getElementById('ndEnd').value || null;
+        if (!title) throw new Error('Informe um título.');
+        if (operator_ids.length === 0) throw new Error('Selecione pelo menos um operador.');
+        const created = await PortalAPI.createDemand({ title, description, operator_ids, starts_at, ends_at });
+        closeNewDemand();
+        await loadAll();
+        // Seleciona a nova
+        state.currentId = created.id;
+        renderList(); renderChat(); renderDetails();
+        loadMessages(created.id);
+        subscribeCurrent();
+      } catch (ex) {
+        err.style.display = 'block';
+        err.textContent = ex.message || String(ex);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Criar demanda';
       }
     });
-    document.querySelector('.composer-btn.send').addEventListener('click', sendMessage);
 
-    function sendMessage() {
-      const text = composer.value.trim();
-      if (!text) return;
-      const d = DEMANDS.find(x => x.id === state.currentId);
-      if (!d) return;
-      const today = d.messages.find(g => g.day === 'Hoje');
-      const now = new Date();
-      const time = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      const msg = { mine: true, author: 'Você', initials: 'AC', text, time };
-      if (today) today.items.push(msg);
-      else d.messages.push({ day: 'Hoje', items: [msg] });
-      composer.value = '';
-      composer.style.height = 'auto';
-      renderChat();
+    // ===== Adiciona botão "Finalizar minha parte" no painel direito =====
+    function injectFinalizeButton() {
+      const detail = document.querySelector('.detail-pane');
+      if (!detail) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'finalizeWrap';
+      wrap.className = 'detail-section';
+      wrap.style.display = 'none';
+      wrap.innerHTML = `
+        <button type="button" class="btn-primary" style="width:100%; justify-content:center; padding:12px;">
+          Finalizar minha parte
+        </button>
+        <small style="display:block; color:var(--muted); font-size:0.74rem; margin-top:8px; text-align:center;">
+          A demanda é concluída quando todos os operadores aprovam.
+        </small>
+      `;
+      detail.appendChild(wrap);
+      wrap.querySelector('button').addEventListener('click', async () => {
+        if (!state.currentId) return;
+        if (!confirm('Confirmar que sua parte está concluída?\n\nA demanda só é fechada quando todos os operadores aprovarem.')) return;
+        try {
+          const res = await PortalAPI.finalizeMyPart(state.currentId);
+          // Reflete o resultado imediato
+          state.members[state.currentId] = await PortalAPI.getDemandMembers(state.currentId);
+          const updated = await PortalAPI.getDemand(state.currentId);
+          const idx = state.demands.findIndex(x => x.id === state.currentId);
+          if (idx >= 0) state.demands[idx] = updated;
+          renderList(); renderTabs(); renderDetails();
+          if (res?.status === 'done') alert('Demanda concluída! Todos os operadores aprovaram. 🎉');
+        } catch (e) {
+          alert('Erro: ' + (e.message || e));
+        }
+      });
     }
+    injectFinalizeButton();
 
-    function fillHeader(profile) {
-      const first = (profile?.name || 'aluno').split(' ')[0];
-      const ini = (profile?.name || '?').trim().split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase();
-      document.getElementById('navAvatar').textContent = ini;
-      document.getElementById('navName').textContent = first;
+    // ===== Topbar handlers (botão Nova demanda) =====
+    function bindBtnNew() {
+      const btn = document.querySelector('.btn-primary');
+      if (btn) {
+        btn.onclick = openNewDemand;
+      }
     }
 
     function setupUserMenu(profile) {
@@ -1269,19 +1409,20 @@
       });
     }
 
-    function bindPendingActions() {
-      // Botão "Nova demanda" e link "Ver detalhes →"
-      const btnNew = document.querySelector('.btn-primary');
-      if (btnNew) {
-        btnNew.addEventListener('click', () => {
-          alert('A criação de novas demandas será liberada quando integrarmos com o ClickUp. Por enquanto, fale com sua equipe pelo chat.');
-        });
-      }
-      const linkDetails = document.getElementById('chatViewDetails');
-      if (linkDetails) {
-        linkDetails.addEventListener('click', (e) => {
+    function fillHeader(profile) {
+      const first = (profile?.name || 'aluno').split(' ')[0];
+      const ini = initials(profile?.name || '?');
+      document.getElementById('navAvatar').textContent = ini;
+      document.getElementById('navName').textContent = first;
+    }
+
+    function bindChatViewDetails() {
+      const a = document.getElementById('chatViewDetails');
+      if (a) {
+        a.addEventListener('click', (e) => {
           e.preventDefault();
-          alert('A página de detalhes completos será aberta quando ligarmos as demandas ao ClickUp.');
+          // Mobile: rola pro detail-pane se existir
+          document.querySelector('.detail-pane')?.scrollIntoView({ behavior: 'smooth' });
         });
       }
     }
@@ -1289,13 +1430,12 @@
     (async function init() {
       const profile = await PortalAPI.requireClient();
       if (!profile) return;
+      state.me = await PortalAPI.getMe();
       fillHeader(profile);
       setupUserMenu(profile);
-      bindPendingActions();
-      renderTabs();
-      renderList();
-      renderChat();
-      renderDetails();
+      bindBtnNew();
+      bindChatViewDetails();
+      await loadAll();
     })();
   </script>
 </body>
