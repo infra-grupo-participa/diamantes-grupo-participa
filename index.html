@@ -617,44 +617,6 @@
                 </div>
               </div>
               <button class="submit-button" type="submit">Entrar no ambiente</button>
-              <div style="margin-top:12px;text-align:right;">
-                <a href="#" id="forgotLink" style="color:#F29725;text-decoration:none;font-size:0.85rem;">Esqueci minha senha</a>
-              </div>
-            </form>
-          </div>
-
-          <div class="view" id="forgotView">
-            <h2>Recuperar senha</h2>
-            <p class="panel-intro">Informe o email do seu cadastro. Vamos enviar um link para você definir uma nova senha.</p>
-            <form id="forgotForm">
-              <div class="field-grid">
-                <div class="field">
-                  <label for="forgotEmail">Email</label>
-                  <input id="forgotEmail" type="email" placeholder="seuemail@dominio.com" autocomplete="email" />
-                </div>
-              </div>
-              <button class="submit-button" type="submit">Enviar link de recuperação</button>
-              <div style="margin-top:12px;text-align:right;">
-                <a href="#" id="forgotBackLink" style="color:rgba(255,255,255,0.6);text-decoration:none;font-size:0.85rem;">Voltar para login</a>
-              </div>
-            </form>
-          </div>
-
-          <div class="view" id="resetView">
-            <h2>Definir nova senha</h2>
-            <p class="panel-intro">Crie uma nova senha para sua conta. Use no mínimo 8 caracteres.</p>
-            <form id="resetForm">
-              <div class="field-grid">
-                <div class="field">
-                  <label for="resetPassword">Nova senha</label>
-                  <input id="resetPassword" type="password" placeholder="Mínimo de 8 caracteres" autocomplete="new-password" />
-                </div>
-                <div class="field">
-                  <label for="resetPasswordConfirm">Confirmar senha</label>
-                  <input id="resetPasswordConfirm" type="password" placeholder="Repita a nova senha" autocomplete="new-password" />
-                </div>
-              </div>
-              <button class="submit-button" type="submit">Salvar nova senha</button>
             </form>
           </div>
 
@@ -714,18 +676,6 @@
     </section>
   </div>
 
-  <script>
-    // CAPTURA o hash de recovery ANTES do supabase-js processar e limpar.
-    // Sem isso, race condition: supabase reseta o hash → detect a posteriori falha.
-    (function captureRecoveryEarly() {
-      try {
-        if ((window.location.hash || "").includes("type=recovery")) {
-          window.__GP_RECOVERY_FLOW = true;
-          sessionStorage.setItem("gp-recovery-flow", "1");
-        }
-      } catch (_) { /* ignore */ }
-    })();
-  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
   <script src="assets/js/supabase-config.js"></script>
   <script src="assets/js/supabase-i18n.js"></script>
@@ -793,16 +743,6 @@
         });
         document.getElementById("loginView").classList.toggle("active", tab === "login");
         document.getElementById("registerView").classList.toggle("active", tab === "register");
-        document.getElementById("forgotView").classList.remove("active");
-        document.getElementById("resetView").classList.remove("active");
-        setMessage("", "");
-      }
-
-      function showView(viewId) {
-        ["loginView", "registerView", "forgotView", "resetView"].forEach((id) => {
-          document.getElementById(id).classList.toggle("active", id === viewId);
-        });
-        document.querySelectorAll("[data-tab]").forEach((b) => b.classList.remove("active"));
         setMessage("", "");
       }
 
@@ -825,16 +765,7 @@
         waitingText.textContent = `${user.name || "Seu cadastro"} foi recebido e está em análise. Assim que o admin aprovar seu acesso, você será enviado automaticamente para o ambiente certo com o email ${user.email}.`;
       }
 
-      function isRecoveryFlow() {
-        if (window.__GP_RECOVERY_FLOW) return true;
-        try {
-          if (sessionStorage.getItem("gp-recovery-flow") === "1") return true;
-        } catch (_) {}
-        return (window.location.hash || "").includes("type=recovery");
-      }
-
       function redirectIfApproved() {
-        if (isRecoveryFlow()) return;
         const sessionUser = auth.getSessionUser();
         if (!sessionUser) return;
 
@@ -927,96 +858,6 @@
         }
       });
 
-      // Forgot password flow
-      document.getElementById("forgotLink").addEventListener("click", (event) => {
-        event.preventDefault();
-        showView("forgotView");
-        const loginEmail = document.getElementById("loginIdentifier").value.trim();
-        if (loginEmail && loginEmail.includes("@")) {
-          document.getElementById("forgotEmail").value = loginEmail;
-        }
-      });
-
-      document.getElementById("forgotBackLink").addEventListener("click", (event) => {
-        event.preventDefault();
-        showView("loginView");
-      });
-
-      document.getElementById("forgotForm").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        setMessage("", "");
-        const btn = event.target.querySelector('button[type="submit"]');
-        if (btn) btn.disabled = true;
-        try {
-          const supabase = window.getSupabaseClient();
-          const email = document.getElementById("forgotEmail").value.trim().toLowerCase();
-          if (!email || !email.includes("@")) throw new Error("Informe um email válido.");
-          const redirectTo = window.location.origin + window.location.pathname;
-          const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-          // Anti-enumeration + UX consistente: msg genérica de sucesso mesmo
-          // se Supabase rejeitar (email_address_invalid, user_not_found, etc).
-          // Erros reais (rate limit, server error) ainda mostramos.
-          if (error) {
-            const code = (error.code || error.error_code || '').toLowerCase();
-            const benign = ['email_address_invalid', 'user_not_found', 'over_email_send_rate_limit'].includes(code);
-            if (!benign && /(rate|server|network|fetch)/i.test(error.message || '')) {
-              throw error;
-            }
-            // Fall-through para mensagem de sucesso genérica
-          }
-          setMessage("Pronto! Se o email existir, você vai receber um link em instantes. Confira sua caixa de entrada e o spam.", "success");
-        } catch (error) {
-          setMessage(window.GP_I18N.translateAuthError(error), "error");
-        } finally {
-          if (btn) btn.disabled = false;
-        }
-      });
-
-      // Reset password (após clicar no link do email)
-      document.getElementById("resetForm").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        setMessage("", "");
-        const btn = event.target.querySelector('button[type="submit"]');
-        if (btn) btn.disabled = true;
-        try {
-          const supabase = window.getSupabaseClient();
-          const newPassword = document.getElementById("resetPassword").value;
-          const confirm = document.getElementById("resetPasswordConfirm").value;
-          if (newPassword.length < 8) throw new Error("A senha precisa ter no mínimo 8 caracteres.");
-          if (newPassword !== confirm) throw new Error("As senhas não coincidem.");
-          const { error } = await supabase.auth.updateUser({ password: newPassword });
-          if (error) throw error;
-          setMessage("Senha atualizada! Redirecionando...", "success");
-          try { sessionStorage.removeItem("gp-recovery-flow"); } catch (_) {}
-          window.__GP_RECOVERY_FLOW = false;
-          await auth.logout();
-          setTimeout(() => {
-            window.location.replace(window.location.origin + window.location.pathname);
-          }, 1500);
-        } catch (error) {
-          setMessage(window.GP_I18N.translateAuthError(error), "error");
-        } finally {
-          if (btn) btn.disabled = false;
-        }
-      });
-
-      // Detecta link de recovery: usa flag capturada antes do supabase processar
-      (function detectRecoveryLink() {
-        if (isRecoveryFlow()) {
-          showView("resetView");
-        }
-      })();
-
-      // Listener pra evento PASSWORD_RECOVERY (quando supabase processa o hash)
-      try {
-        const supabase = window.getSupabaseClient();
-        supabase.auth.onAuthStateChange((event) => {
-          if (event === "PASSWORD_RECOVERY") {
-            showView("resetView");
-          }
-        });
-      } catch (_) { /* ignore */ }
-
       document.getElementById("waitingBackButton").addEventListener("click", async () => {
         await auth.clearSession();
         sessionPill.classList.remove("show");
@@ -1028,13 +869,7 @@
       registerDocumentValue.addEventListener("input", syncRegisterDocumentField);
 
       showAuth();
-      // Em recovery flow, NÃO ativar login — preservar resetView mostrado pelo
-      // detectRecoveryLink IIFE acima.
-      if (isRecoveryFlow()) {
-        showView("resetView");
-      } else {
-        setActiveTab("login");
-      }
+      setActiveTab("login");
       syncRegisterDocumentField();
 
       try {
