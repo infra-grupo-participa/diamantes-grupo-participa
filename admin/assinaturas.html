@@ -82,11 +82,11 @@
 
     /* KPIs (5 cards no topo) */
     .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
-    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm); }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm); }
     .kpi-icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
     .kpi-icon svg { width: 20px; height: 20px; }
     .kpi-label { font-size: 0.74rem; color: var(--muted); font-weight: 500; margin-bottom: 2px; }
-    .kpi-value { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+    .kpi-value { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
     .kpi-trend { font-size: 0.7rem; margin-top: 3px; font-weight: 500; }
     .kpi-trend.up { color: var(--success); }
     .kpi-trend.down { color: var(--danger); }
@@ -104,8 +104,8 @@
 
     .table-wrap { overflow-x: auto; }
     table.subs-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-    .subs-table thead th { text-align: left; padding: 12px 24px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; color: var(--muted); background: #fafbfc; border-bottom: 1px solid var(--border); }
-    .subs-table tbody td { padding: 14px 24px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .subs-table thead th { text-align: left; padding: 10px 20px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; color: var(--muted); background: #fafbfc; border-bottom: 1px solid var(--border); }
+    .subs-table tbody td { padding: 12px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .subs-table tbody tr:last-child td { border-bottom: none; }
     .subs-table tbody tr:hover { background: #fafbfc; }
 
@@ -172,6 +172,14 @@
     .service-bar-fill.pink   { background: #ec4899; }
     .service-bar-fill.yellow { background: #eab308; }
     .service-bar-fill.orange { background: var(--accent); }
+
+    /* Mini-stats grid inside MRR card */
+    .mrr-mini-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .mrr-mini-stat { display: flex; flex-direction: column; gap: 2px; }
+    .mrr-mini-label { font-size: 0.7rem; color: var(--muted); font-weight: 500; }
+    .mrr-mini-value { font-size: 0.9rem; font-weight: 700; }
+    .mrr-mini-value.neg { color: var(--danger); }
+    .mrr-mini-value.pos { color: var(--success); }
 
     /* Próximos vencimentos */
     .due-list { display: flex; flex-direction: column; gap: 10px; }
@@ -344,7 +352,6 @@
               <thead>
                 <tr>
                   <th>Aluno</th>
-                  <th>Serviços ativos</th>
                   <th>Valor mensal</th>
                   <th title="Calculado com base na data de início do contrato">Próxima cobrança</th>
                   <th>Pagamento</th>
@@ -374,27 +381,7 @@
       <!-- Coluna 2: Painel financeiro -->
       <aside class="finance-panel">
         <div class="panel-card">
-          <h3 class="panel-card-title">Resumo financeiro <span class="meta" id="summaryMonth">—</span></h3>
-          <div class="summary-row">
-            <span class="summary-label">MRR (mensal recorrente)</span>
-            <span class="summary-value pos" id="summaryMrr">—</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">A receber</span>
-            <span class="summary-value" id="summaryDue">—</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Inadimplência</span>
-            <span class="summary-value neg" id="summaryLate">—</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Ticket médio</span>
-            <span class="summary-value" id="summaryAvg">—</span>
-          </div>
-        </div>
-
-        <div class="panel-card">
-          <h3 class="panel-card-title">Receita recorrente (MRR) <span class="meta">6 meses</span></h3>
+          <h3 class="panel-card-title">Receita recorrente (MRR) <span class="meta" id="summaryMonth">—</span></h3>
           <div class="mrr-current" id="mrrCurrent">—</div>
           <div class="mrr-delta" id="mrrDelta">—</div>
           <svg class="mrr-chart" id="mrrChart" viewBox="0 0 340 110" preserveAspectRatio="none" style="margin-top:8px;">
@@ -406,6 +393,24 @@
             </defs>
           </svg>
           <div id="mrrLabels" style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--muted); margin-top:4px;"></div>
+          <div class="mrr-mini-stats">
+            <div class="mrr-mini-stat">
+              <div class="mrr-mini-label">MRR</div>
+              <div class="mrr-mini-value pos" id="summaryMrr">—</div>
+            </div>
+            <div class="mrr-mini-stat">
+              <div class="mrr-mini-label">A receber</div>
+              <div class="mrr-mini-value" id="summaryDue">—</div>
+            </div>
+            <div class="mrr-mini-stat">
+              <div class="mrr-mini-label">Inadimplência</div>
+              <div class="mrr-mini-value neg" id="summaryLate">—</div>
+            </div>
+            <div class="mrr-mini-stat">
+              <div class="mrr-mini-label">Ticket médio</div>
+              <div class="mrr-mini-value" id="summaryAvg">—</div>
+            </div>
+          </div>
         </div>
 
         <div class="panel-card">
@@ -426,7 +431,7 @@
               <select id="histClient" class="search-input" style="padding:5px 10px; font-size:0.76rem; max-width:140px;"></select>
             </div>
           </div>
-          <div id="histList" style="max-height:520px; overflow-y:auto;"></div>
+          <div id="histList" style="max-height:400px; overflow-y:auto;"></div>
           <div id="histPager" style="padding:10px 0; display:flex; gap:6px; justify-content:center;"></div>
         </div>
       </aside>
@@ -594,33 +599,13 @@
         else billingHtml = `<span style="font-weight:600;">${date}</span><div class="amount-sub">Em ${diff} dias</div>`;
       }
 
-      // Badge de acesso vencendo (quando é diferente da cobrança)
-      let accessHtml = '';
-      if (nearestAccess) {
-        const diffA = Math.ceil((nearestAccess - today) / 86400000);
-        if (diffA < 0)
-          accessHtml = `<div style="font-size:0.68rem;color:#b91c1c;margin-top:2px;">Acesso vencido</div>`;
-        else if (diffA <= 10)
-          accessHtml = `<div style="font-size:0.68rem;color:#b45309;margin-top:2px;">Acesso até ${nearestAccess.toLocaleDateString('pt-BR')}</div>`;
-      }
-
-      return billingHtml + accessHtml;
+      return billingHtml;
     }
 
     function rowHtml(sub) {
-      const svcsHtml = (sub.active_services || []).map(sv => {
-        const label = AdminAPI.canonicalServiceName(sv.service_type);
-        const color = SERVICE_COLORS[label] || 'orange';
-        const today = new Date(); today.setHours(0,0,0,0);
-        let badge = '';
-        if (sv.access_until) {
-          const due = new Date(sv.access_until);
-          const diff = Math.ceil((due - today) / 86400000);
-          if (diff < 0) badge = `<span style="font-size:0.6rem;color:#b91c1c;margin-left:3px;">vencido</span>`;
-          else if (diff <= 7) badge = `<span style="font-size:0.6rem;color:#b45309;margin-left:3px;">${diff}d</span>`;
-        }
-        return `<span style="display:inline-flex;align-items:center;background:var(--accent-soft);color:var(--accent-strong);border-radius:4px;padding:2px 7px;font-size:0.72rem;font-weight:600;margin:2px 2px 2px 0;white-space:nowrap;">${label}${badge}</span>`;
-      }).join('') || '<span style="color:var(--muted);font-size:0.78rem;">—</span>';
+      const svcsText = (sub.active_services || []).map(sv => AdminAPI.canonicalServiceName(sv.service_type)).filter(Boolean).join(', ') || sub.plan_name || '—';
+
+      const pmText = sub.payment_method === 'cc' ? 'Cartão' : sub.payment_method === 'pix' ? 'PIX' : sub.payment_method === 'boleto' ? 'Boleto' : sub.payment_method_label || (sub.payment_method ? sub.payment_method.toUpperCase() : '—');
 
       return `
         <tr data-id="${sub.id}">
@@ -629,11 +614,10 @@
               <div class="avatar">${initials(sub.client_name)}</div>
               <div>
                 <div class="user-cell-name">${sub.client_name}</div>
-                <div class="user-cell-plan">${sub.plan_name}</div>
+                <div class="user-cell-plan">${svcsText}</div>
               </div>
             </div>
           </td>
-          <td style="max-width:220px;">${svcsHtml}</td>
           <td>
             <div class="amount">${fmtBRL(sub.monthly_value)}</div>
             <div class="amount-sub">mensal</div>
@@ -642,9 +626,8 @@
           <td>
             <div class="payment-method">
               ${pmIcon(sub.payment_method)}
-              <span>${sub.payment_method === 'cc' ? 'Cartão de crédito' : sub.payment_method_label || sub.payment_method?.toUpperCase() || '—'}</span>
+              <span>${pmText}</span>
             </div>
-            ${sub.started_at ? `<div class="amount-sub">desde ${fmtDate(sub.started_at)}</div>` : ''}
           </td>
           <td>${statusBadge(sub.status)}</td>
           <td style="text-align:right;">
@@ -913,7 +896,7 @@
 
     async function load() {
       const tbody = document.getElementById('subsBody');
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
       try {
         const offset = (state.page - 1) * state.pageSize;
         const { data, count } = await AdminAPI.listSubscriptions({
@@ -921,14 +904,14 @@
         });
         state.total = count;
         if (data.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="7" style="padding:32px; text-align:center; color:var(--muted);">Nenhuma assinatura encontrada.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" style="padding:32px; text-align:center; color:var(--muted);">Nenhuma assinatura encontrada.</td></tr>`;
         } else {
           tbody.innerHTML = data.map(rowHtml).join('');
         }
         renderPagination();
         attachRowHandlers(data);
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
         console.error(e);
       }
     }
