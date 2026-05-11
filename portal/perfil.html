@@ -77,7 +77,48 @@
       border-radius: 999px;
       background: var(--surface);
       border: 1px solid var(--border);
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s;
     }
+    .user-chip:hover { border-color: var(--accent); }
+    .user-chip svg.caret { width: 14px; height: 14px; color: var(--muted); margin-left: 2px; transition: transform 0.15s; }
+    .user-chip.open svg.caret { transform: rotate(180deg); }
+    .user-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 200px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: var(--shadow-lg);
+      padding: 6px;
+      z-index: 80;
+      display: none;
+    }
+    .user-menu.open { display: block; animation: fadeMenu 0.12s ease-out; }
+    @keyframes fadeMenu { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .user-menu .um-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    .user-menu .um-name { font-weight: 700; font-size: 0.88rem; }
+    .user-menu .um-email { font-size: 0.74rem; color: var(--muted); margin-top: 2px; }
+    .user-menu a, .user-menu button {
+      width: 100%;
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px;
+      border-radius: 9px;
+      font-size: 0.86rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: left;
+    }
+    .user-menu a:hover, .user-menu button:hover { background: var(--bg-soft); color: var(--text); }
+    .user-menu button.danger:hover { background: rgba(239,68,68,0.08); color: var(--danger); }
+    .user-menu svg { width: 16px; height: 16px; flex-shrink: 0; }
     .avatar {
       width: 34px; height: 34px;
       border-radius: 50%;
@@ -396,9 +437,24 @@
       <a href="demandas.html">Demandas</a>
       <a href="perfil.html" class="active">Meus dados</a>
     </nav>
-    <div class="user-chip">
+    <div class="user-chip" id="userChip">
       <div class="avatar" id="navAvatar">AC</div>
       <div class="user-chip-name" id="navName">Ana Carolina</div>
+      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      <div class="user-menu" id="userMenu" role="menu">
+        <div class="um-section">
+          <div class="um-name" id="umName">—</div>
+          <div class="um-email" id="umEmail">—</div>
+        </div>
+        <a href="dashboard.html" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Voltar ao início
+        </a>
+        <button type="button" class="danger" id="btnLogout" role="menuitem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sair
+        </button>
+      </div>
     </div>
   </header>
 
@@ -924,15 +980,63 @@
       }
     });
 
-    // ===== Logout (botão "Sair" — adiciono no chip do header) =====
-    document.querySelector('.user-chip')?.addEventListener('click', async () => {
-      if (confirm('Sair do portal?')) await PortalAPI.logout();
-    });
+    // ===== Menu do usuário =====
+    function setupUserMenu(profile) {
+      const chip = document.getElementById('userChip');
+      const menu = document.getElementById('userMenu');
+      if (!chip || !menu) return;
+      document.getElementById('umName').textContent  = profile?.name || '—';
+      document.getElementById('umEmail').textContent = profile?.email || '—';
+      function close() { chip.classList.remove('open'); menu.classList.remove('open'); }
+      chip.addEventListener('click', (e) => {
+        if (e.target.closest('.user-menu')) return;
+        const isOpen = menu.classList.contains('open');
+        if (isOpen) close();
+        else { chip.classList.add('open'); menu.classList.add('open'); }
+      });
+      document.addEventListener('click', (e) => { if (!chip.contains(e.target)) close(); });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+      document.getElementById('btnLogout').addEventListener('click', async () => {
+        if (!confirm('Tem certeza que deseja sair?')) return;
+        try { await PortalAPI.logout(); } catch (err) { console.error(err); }
+      });
+    }
+
+    // ===== Ações que ainda não têm fluxo completo (mensagem honesta) =====
+    function bindPendingActions() {
+      // "Gerenciar sessões" — Supabase Auth não expõe lista de sessões pro client
+      document.querySelectorAll('.list-row .action a').forEach(a => {
+        const txt = (a.textContent || '').trim();
+        if (txt === 'Gerenciar sessões') {
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            alert('Por enquanto, gerencie suas sessões fazendo logout aqui no menu do usuário. Em breve esta opção mostrará todos os dispositivos conectados.');
+          });
+        } else if (txt === 'Solicitar encerramento') {
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (confirm('Tem certeza que deseja solicitar o encerramento da sua conta?\n\nNossa equipe entrará em contato para confirmar.')) {
+              alert('Solicitação registrada. Em breve nossa equipe entrará em contato pelo seu e-mail.');
+            }
+          });
+        }
+      });
+      // "Ver detalhes" do plano
+      const planLink = document.querySelector('.plan-link');
+      if (planLink) {
+        planLink.addEventListener('click', (e) => {
+          e.preventDefault();
+          alert('A página de detalhes do plano estará disponível em breve.');
+        });
+      }
+    }
 
     // ===== Init =====
     (async function init() {
       const profile = await PortalAPI.requireClient();
       if (!profile) return;
+      setupUserMenu(profile);
+      bindPendingActions();
       try {
         me = await PortalAPI.getMe();
         fillForm(me);
