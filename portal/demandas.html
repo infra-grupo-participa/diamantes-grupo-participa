@@ -781,6 +781,11 @@
     </div>
   </main>
 
+  <!-- Supabase + portal-api (guard de acesso) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="assets/portal-api.js"></script>
+
   <script>
     'use strict';
 
@@ -1178,21 +1183,22 @@
       renderChat();
     }
 
-    // Setup do slug (header)
-    function bootstrap() {
-      const slug = getSlug();
-      // Quick first-name derivation from slug
-      const first = (slug || 'aluno').split('-')[0].replace(/^./, c => c.toUpperCase());
-      const ini = first.slice(0, 2).toUpperCase();
+    function fillHeader(profile) {
+      const first = (profile?.name || 'aluno').split(' ')[0];
+      const ini = (profile?.name || '?').trim().split(/\s+/).slice(0,2).map(p=>p[0]).join('').toUpperCase();
       document.getElementById('navAvatar').textContent = ini;
       document.getElementById('navName').textContent = first;
     }
 
-    bootstrap();
-    renderTabs();
-    renderList();
-    renderChat();
-    renderDetails();
+    (async function init() {
+      const profile = await PortalAPI.requireClient();
+      if (!profile) return;
+      fillHeader(profile);
+      renderTabs();
+      renderList();
+      renderChat();
+      renderDetails();
+    })();
   </script>
 </body>
 </html>

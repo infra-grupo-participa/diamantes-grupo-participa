@@ -677,73 +677,272 @@
     </div>
   </main>
 
+  <!-- Supabase + portal-api -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="assets/portal-api.js"></script>
+
   <script>
     'use strict';
 
-    function getSlug() {
-      const q = new URLSearchParams(window.location.search).get('slug');
-      return q || 'ana-carolina';
+    function initials(name) {
+      return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+    }
+    function firstName(name) {
+      return (name || '').trim().split(/\s+/)[0] || 'aluno';
     }
 
-    function deriveFirstName(slug) {
-      return (slug || 'aluno').split('-')[0].replace(/^./, c => c.toUpperCase());
+    const els = {
+      navAvatar: document.getElementById('navAvatar'),
+      navName:   document.getElementById('navName'),
+      bigAvatar: document.getElementById('bigAvatar'),
+      avatarName: document.getElementById('avatarName'),
+      planSince: document.getElementById('planSince'),
+      savedFlag: document.getElementById('savedFlag'),
+      aboutPreview: document.getElementById('aboutPreview'),
+      fName: document.getElementById('fName'),
+      fEmail: document.getElementById('fEmail'),
+      fPhone: document.getElementById('fPhone'),
+      fRole: document.getElementById('fRole'),
+      fCompany: document.getElementById('fCompany'),
+      fLocation: document.getElementById('fLocation'),
+      fBio: document.getElementById('fBio'),
+    };
+
+    let me = null;
+    let originalValues = {};
+
+    function flashSaved(text) {
+      els.savedFlag.innerHTML =
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> ${text || 'Tudo salvo'}`;
+      els.savedFlag.classList.add('show');
+      clearTimeout(window.__savedTimer);
+      window.__savedTimer = setTimeout(() => els.savedFlag.classList.remove('show'), 2000);
+    }
+    function flashError(text) {
+      els.savedFlag.innerHTML = `<span style="color:var(--danger)">⚠ ${text}</span>`;
+      els.savedFlag.style.color = 'var(--danger)';
+      els.savedFlag.classList.add('show');
+      clearTimeout(window.__savedTimer);
+      window.__savedTimer = setTimeout(() => {
+        els.savedFlag.classList.remove('show');
+        els.savedFlag.style.color = '';
+      }, 3500);
     }
 
-    // Bootstrap do header (consistente com dashboard/demandas)
-    (function() {
-      const slug = getSlug();
-      const first = deriveFirstName(slug);
-      const ini = first.slice(0, 2).toUpperCase();
-      document.getElementById('navAvatar').textContent = ini;
-      document.getElementById('navName').textContent = first;
+    function applyAvatar(name, avatarUrl) {
+      const ini = initials(name);
+      if (avatarUrl) {
+        els.bigAvatar.style.background = `url('${avatarUrl}') center/cover no-repeat`;
+        els.bigAvatar.textContent = '';
+        els.navAvatar.style.background = `url('${avatarUrl}') center/cover no-repeat`;
+        els.navAvatar.textContent = '';
+      } else {
+        els.bigAvatar.style.background = '';
+        els.bigAvatar.textContent = ini;
+        els.navAvatar.style.background = '';
+        els.navAvatar.textContent = ini;
+      }
+      els.avatarName.textContent = name || '—';
+      els.navName.textContent = firstName(name);
+    }
+
+    function fillForm(profile) {
+      const meta = profile.metadata || {};
+      els.fName.value     = profile.name || '';
+      els.fEmail.value    = profile.email || '';
+      els.fPhone.value    = meta.phone || '';
+      els.fRole.value     = meta.job_role || '';
+      els.fCompany.value  = meta.company || '';
+      els.fLocation.value = meta.location || '';
+      els.fBio.value      = meta.bio || '';
+      els.aboutPreview.textContent = meta.bio || 'Sem descrição ainda.';
+      applyAvatar(profile.name, meta.avatar_url);
+      // Plano
+      els.planSince.textContent = profile.client_slug ? 'cliente do portal' : '—';
+      // snapshot pra "descartar"
+      originalValues = {
+        name: profile.name || '',
+        phone: meta.phone || '',
+        job_role: meta.job_role || '',
+        company: meta.company || '',
+        location: meta.location || '',
+        bio: meta.bio || '',
+      };
+    }
+
+    function fillPreferences(prefs) {
+      // 5 toggles na ordem que aparece no HTML
+      const toggles = document.querySelectorAll('.toggle-row .switch input');
+      const keys = ['notify_messages','notify_demand_update','notify_deadlines','notify_weekly_digest','notify_news'];
+      toggles.forEach((inp, i) => { inp.checked = !!prefs[keys[i]]; inp.dataset.prefKey = keys[i]; });
+
+      // 3 selects (idioma, fuso, tema) na ordem
+      const selects = document.querySelectorAll('.pref-row select');
+      if (selects[0]) { selects[0].dataset.prefKey = 'language';
+        const optMap = { 'pt-BR': 0, 'en-US': 1, 'es': 2 };
+        selects[0].selectedIndex = optMap[prefs.language] ?? 0;
+      }
+      if (selects[1]) { selects[1].dataset.prefKey = 'timezone';
+        const tzMap = {
+          'America/Sao_Paulo': 0, 'America/Manaus': 2, 'Europe/Lisbon': 3,
+        };
+        selects[1].selectedIndex = tzMap[prefs.timezone] ?? 0;
+      }
+      if (selects[2]) { selects[2].dataset.prefKey = 'theme';
+        const themeMap = { 'light': 0, 'auto': 1, 'dark': 2 };
+        selects[2].selectedIndex = themeMap[prefs.theme] ?? 0;
+      }
+    }
+
+    // Loga avatar reage ao digitar
+    els.fName.addEventListener('input', () => {
+      const url = (me?.metadata?.avatar_url) || null;
+      applyAvatar(els.fName.value, url);
+    });
+    els.fBio.addEventListener('input', () => {
+      els.aboutPreview.textContent = els.fBio.value.trim() || 'Sem descrição ainda.';
+    });
+
+    // ===== Form submit =====
+    document.getElementById('personalForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('.btn-primary');
+      btn.disabled = true; btn.textContent = 'Salvando…';
+      try {
+        await PortalAPI.updateMe({
+          name: els.fName.value.trim(),
+          metadata: {
+            phone: els.fPhone.value.trim(),
+            job_role: els.fRole.value.trim(),
+            company: els.fCompany.value.trim(),
+            location: els.fLocation.value.trim(),
+            bio: els.fBio.value.trim(),
+          },
+        });
+        me = await PortalAPI.getMe();
+        fillForm(me);
+        flashSaved('Tudo salvo');
+      } catch (err) {
+        console.error(err);
+        flashError(err.message || 'Não foi possível salvar.');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Salvar alterações';
+      }
+    });
+
+    // Descartar
+    document.querySelector('.save-row .btn-ghost').addEventListener('click', () => {
+      els.fName.value     = originalValues.name;
+      els.fPhone.value    = originalValues.phone;
+      els.fRole.value     = originalValues.job_role;
+      els.fCompany.value  = originalValues.company;
+      els.fLocation.value = originalValues.location;
+      els.fBio.value      = originalValues.bio;
+      els.aboutPreview.textContent = originalValues.bio || 'Sem descrição ainda.';
+      applyAvatar(originalValues.name, me?.metadata?.avatar_url);
+    });
+
+    // ===== Avatar upload =====
+    const avatarBtnRow = document.querySelector('.avatar-info-buttons');
+    if (avatarBtnRow) {
+      const [btnUpload, btnRemove] = avatarBtnRow.querySelectorAll('button');
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file'; fileInput.accept = 'image/*'; fileInput.style.display = 'none';
+      document.body.appendChild(fileInput);
+      btnUpload.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files?.[0]; if (!file) return;
+        btnUpload.disabled = true;
+        try {
+          const url = await PortalAPI.uploadAvatar(file);
+          me = await PortalAPI.getMe();
+          applyAvatar(me.name, url);
+          flashSaved('Foto atualizada');
+        } catch (e) {
+          flashError(e.message || 'Erro no upload.');
+        } finally {
+          btnUpload.disabled = false; fileInput.value = '';
+        }
+      });
+      btnRemove.addEventListener('click', async () => {
+        if (!confirm('Remover sua foto de exibição?')) return;
+        try {
+          await PortalAPI.removeAvatar();
+          me = await PortalAPI.getMe();
+          applyAvatar(me.name, null);
+          flashSaved('Foto removida');
+        } catch (e) {
+          flashError(e.message || 'Erro ao remover.');
+        }
+      });
+    }
+
+    // ===== Toggles =====
+    document.querySelectorAll('.toggle-row .switch input').forEach(inp => {
+      inp.addEventListener('change', async () => {
+        if (!inp.dataset.prefKey) return;
+        try {
+          await PortalAPI.setPreferences({ [inp.dataset.prefKey]: inp.checked });
+          flashSaved('Preferência salva');
+        } catch (e) {
+          inp.checked = !inp.checked;
+          flashError(e.message || 'Não foi possível salvar.');
+        }
+      });
+    });
+
+    document.querySelectorAll('.pref-row select').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        if (!sel.dataset.prefKey) return;
+        const map = {
+          language: ['pt-BR','en-US','es'],
+          timezone: ['America/Sao_Paulo','America/Sao_Paulo','America/Manaus','Europe/Lisbon'],
+          theme:    ['light','auto','dark'],
+        };
+        const v = map[sel.dataset.prefKey]?.[sel.selectedIndex];
+        if (!v) return;
+        try {
+          await PortalAPI.setPreferences({ [sel.dataset.prefKey]: v });
+          flashSaved('Preferência salva');
+        } catch (e) {
+          flashError(e.message || 'Não foi possível salvar.');
+        }
+      });
+    });
+
+    // ===== Senha =====
+    document.getElementById('btnChangePass').addEventListener('click', async (e) => {
+      e.preventDefault();
+      const novo = prompt('Digite a nova senha (mín. 8 caracteres):');
+      if (!novo) return;
+      try {
+        await PortalAPI.changePassword(novo);
+        flashSaved('Senha alterada');
+      } catch (err) {
+        flashError(err.message || 'Não foi possível alterar a senha.');
+      }
+    });
+
+    // ===== Logout (botão "Sair" — adiciono no chip do header) =====
+    document.querySelector('.user-chip')?.addEventListener('click', async () => {
+      if (confirm('Sair do portal?')) await PortalAPI.logout();
+    });
+
+    // ===== Init =====
+    (async function init() {
+      const profile = await PortalAPI.requireClient();
+      if (!profile) return;
+      try {
+        me = await PortalAPI.getMe();
+        fillForm(me);
+        const prefs = await PortalAPI.getPreferences();
+        fillPreferences(prefs);
+      } catch (e) {
+        console.error(e);
+        flashError(e.message || 'Erro ao carregar perfil.');
+      }
     })();
-
-    // Reflete nome digitado no avatar grande + nome + preview "Sobre você"
-    const fName = document.getElementById('fName');
-    const bigAv = document.getElementById('bigAvatar');
-    const avName = document.getElementById('avatarName');
-    const fBio = document.getElementById('fBio');
-    const aboutPreview = document.getElementById('aboutPreview');
-
-    function refreshAvatar() {
-      const parts = fName.value.trim().split(/\s+/).filter(Boolean);
-      const ini = (parts.slice(0, 2).map(p => p[0]).join('') || '?').toUpperCase();
-      bigAv.textContent = ini;
-      avName.textContent = fName.value || '—';
-    }
-    fName.addEventListener('input', refreshAvatar);
-
-    fBio.addEventListener('input', () => {
-      aboutPreview.textContent = fBio.value.trim() || 'Sem descrição ainda.';
-    });
-
-    // "Tudo salvo" — fica visível por 2s após salvar
-    const savedFlag = document.getElementById('savedFlag');
-    document.getElementById('personalForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      // (backend será ligado depois)
-      savedFlag.classList.add('show');
-      setTimeout(() => savedFlag.classList.remove('show'), 2200);
-    });
-
-    // Toggles — salva visualmente (sem backend ainda)
-    document.querySelectorAll('.switch input').forEach(inp => {
-      inp.addEventListener('change', () => {
-        savedFlag.classList.add('show');
-        setTimeout(() => savedFlag.classList.remove('show'), 1800);
-      });
-    });
-    document.querySelectorAll('.pref-row select').forEach(s => {
-      s.addEventListener('change', () => {
-        savedFlag.classList.add('show');
-        setTimeout(() => savedFlag.classList.remove('show'), 1800);
-      });
-    });
-
-    document.getElementById('btnChangePass').addEventListener('click', (e) => {
-      e.preventDefault();
-      alert('A troca de senha será aberta em um modal quando ligarmos ao backend.');
-    });
   </script>
 </body>
 </html>

@@ -536,144 +536,189 @@
     </div>
   </main>
 
+  <!-- Supabase + portal-api -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="assets/portal-api.js"></script>
+
   <script>
     'use strict';
 
-    // ============ MOCK por slug ============
-    // (Quando ligarmos o Supabase, substituímos por fetch real.)
-    function getSlug() {
-      const fromQuery = new URLSearchParams(window.location.search).get('slug');
-      if (fromQuery) return fromQuery;
-      const fromPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
-      if (fromPath && !fromPath.includes('/')) return fromPath;
-      return 'ana-carolina';
-    }
-
-    const MOCK_STUDENTS = {
-      'ana-carolina': {
-        name: 'Ana Carolina Silva', first: 'Ana', initials: 'AC',
-        contract: '12/06/2024',
-        team: [
-          { name: 'Juliana Costa',  role: 'Gestora de tráfego',  initials: 'JC', color: '#0ea5e9' },
-          { name: 'Rafael Mendes',  role: 'Web-Designer',         initials: 'RM', color: '#3b82f6' },
-          { name: 'Bianca Souza',   role: 'Social Media',         initials: 'BS', color: '#ec4899' },
-          { name: 'Diego Ramalho',  role: 'Editor de Vídeo',      initials: 'DR', color: '#eab308' },
-        ],
-        services: [
-          { name: 'Web-Designer',      color: '#3b82f6' },
-          { name: 'Gestor de tráfego', color: '#0ea5e9' },
-          { name: 'Social Media',      color: '#ec4899' },
-          { name: 'Editor de Vídeo',   color: '#eab308' },
-        ],
-        demands: [
-          { title: 'Landing page do novo lançamento', resp: 'Rafael', when: 'Vence em 3 dias', status: 'in_progress', icon: 'pen' },
-          { title: 'Edição do vídeo de bastidores',   resp: 'Diego',  when: 'Em revisão',       status: 'review',      icon: 'video' },
-          { title: 'Campanha de Dia das Mães',         resp: 'Juliana',when: 'Vence amanhã',     status: 'in_progress', icon: 'megaphone' },
-          { title: 'Calendário de posts — junho',     resp: 'Bianca', when: 'Vence em 5 dias', status: 'in_progress', icon: 'grid' },
-        ],
-        activity: [
-          { text: '<strong>Bianca</strong> publicou o calendário semanal de Instagram.', when: 'Há 2 horas' },
-          { text: '<strong>Diego</strong> enviou um vídeo para sua aprovação.',            when: 'Ontem, 18:42' },
-          { text: '<strong>Rafael</strong> atualizou a página de captura.',                when: 'Quinta-feira' },
-          { text: '<strong>Juliana</strong> pausou a campanha "Black May" e enviou relatório.', when: 'Quarta-feira' },
-        ],
-      },
+    // ============ Mapeamento de serviço → ícone/cor visual ============
+    const SERVICE_COLOR_MAP = {
+      'WEBDESIGNER':     '#3b82f6',
+      'DESIGNER':        '#8b5cf6',
+      'ANÚNCIOS PAGOS':  '#0ea5e9',
+      'SOCIAL MEDIA':    '#ec4899',
+      'EDIÇÃO DE VÍDEO': '#eab308',
+      'AUTOMAÇÃO':       '#f97316',
+      'HOST':            '#10b981',
+      'COPY':            '#16a34a',
+      'COPYWRITER':      '#16a34a',
+    };
+    const SERVICE_LABEL = {
+      'WEBDESIGNER':     'Web-Designer',
+      'DESIGNER':        'Designer',
+      'ANÚNCIOS PAGOS':  'Anúncios pagos',
+      'SOCIAL MEDIA':    'Social Media',
+      'EDIÇÃO DE VÍDEO': 'Edição de Vídeo',
+      'AUTOMAÇÃO':       'Automação',
+      'HOST':            'Host',
+      'COPY':            'Copy',
+      'COPYWRITER':      'Copywriter',
     };
 
-    function lookupStudent(slug) {
-      // fallback genérico para qualquer slug — em produção vem do Supabase
-      if (MOCK_STUDENTS[slug]) return MOCK_STUDENTS[slug];
-      const first = (slug || 'aluno').split('-')[0].replace(/^./, c => c.toUpperCase());
-      return {
-        ...MOCK_STUDENTS['ana-carolina'],
-        name: first + ' (preview)',
-        first: first,
-        initials: first.slice(0, 2).toUpperCase(),
-      };
+    function initials(name) {
+      return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
     }
-
-    const student = lookupStudent(getSlug());
+    function firstName(name) {
+      return (name || '').trim().split(/\s+/)[0] || 'aluno';
+    }
+    function fmtDate(s) {
+      if (!s) return null;
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleDateString('pt-BR');
+    }
+    function fmtRelative(s) {
+      if (!s) return '';
+      const d = new Date(s);
+      const diffMs = Date.now() - d.getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      const diffH = Math.floor(diffMin / 60);
+      const diffD = Math.floor(diffH / 24);
+      if (diffMin < 2) return 'Agora mesmo';
+      if (diffMin < 60) return `Há ${diffMin} minutos`;
+      if (diffH < 24)   return `Há ${diffH} hora${diffH === 1 ? '' : 's'}`;
+      if (diffD < 7)    return `Há ${diffD} dia${diffD === 1 ? '' : 's'}`;
+      return d.toLocaleDateString('pt-BR');
+    }
 
     // ============ Render ============
-    document.getElementById('navAvatar').textContent = student.initials;
-    document.getElementById('navName').textContent   = student.first;
-    document.getElementById('firstName').textContent = student.first;
-    document.getElementById('contractStart').textContent = student.contract;
-    document.getElementById('heroSub').innerHTML =
-      `Tudo certo por aqui — sua equipe está cuidando do que importa. 🌟`;
+    function render(data) {
+      const userName = data?.user?.name || '';
+      const clientName = data?.client?.display_name || userName;
+      const displayFirst = firstName(userName || clientName);
+      const ini = initials(userName || clientName);
+      const contractStart = fmtDate(data?.profile?.contractStartedAt) || '—';
 
-    // Highlight pills
-    const active = student.demands.filter(d => d.status === 'in_progress' || d.status === 'review').length;
-    const dueSoon = student.demands.filter(d => /vence/i.test(d.when) || /amanhã/i.test(d.when)).length;
-    document.getElementById('highlightTitle').innerHTML =
-      `Sua equipe está trabalhando em <strong>${active} demanda${active===1?'':'s'}</strong> e tem <strong>${dueSoon} entrega${dueSoon===1?'':'s'}</strong> previstas até o fim da semana.`;
-    document.getElementById('highlightPills').innerHTML = `
-      <span class="pill"><span class="pill-num">${student.team.length}</span> Integrantes</span>
-      <span class="pill"><span class="pill-num">${active}</span> Em andamento</span>
-      <span class="pill"><span class="pill-num">${student.services.length}</span> Serviços ativos</span>
-    `;
+      // Top nav + hero
+      document.getElementById('navAvatar').textContent = ini;
+      document.getElementById('navName').textContent   = displayFirst;
+      document.getElementById('firstName').textContent = displayFirst;
+      document.getElementById('contractStart').textContent = contractStart;
+      document.getElementById('heroSub').innerHTML =
+        `Tudo certo por aqui — sua equipe está cuidando do que importa. 🌟`;
 
-    // Equipe
-    document.getElementById('teamCount').textContent = `${student.team.length} pessoas com você`;
-    document.getElementById('teamList').innerHTML = student.team.map(m => `
-      <div class="team-item">
-        <div class="avatar" style="background:linear-gradient(135deg, ${m.color}33, ${m.color});">${m.initials}</div>
-        <div>
-          <div class="team-name">${m.name}</div>
-          <div class="team-role">${m.role}</div>
-        </div>
-        <button class="team-action" title="Mandar mensagem">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-        </button>
-      </div>
-    `).join('');
+      // Highlight pills
+      const team = data?.team || [];
+      const services = data?.services || [];
+      const activeDemands = 0; // ainda sem fonte real (Etapa D)
+      document.getElementById('highlightTitle').innerHTML =
+        team.length === 0
+          ? `Sua equipe ainda está sendo montada. Em breve te apresentamos todo mundo. ✨`
+          : `Sua equipe está pronta para te ajudar com <strong>${services.length} serviço${services.length === 1 ? '' : 's'}</strong> contratado${services.length === 1 ? '' : 's'}.`;
+      document.getElementById('highlightPills').innerHTML = `
+        <span class="pill"><span class="pill-num">${team.length}</span> Integrantes</span>
+        <span class="pill"><span class="pill-num">${services.length}</span> Serviços ativos</span>
+      `;
 
-    // Serviços
-    document.getElementById('serviceGrid').innerHTML = student.services.map(s => `
-      <div class="service-chip"><span class="dot" style="background:${s.color};"></span>${s.name}</div>
-    `).join('');
-
-    // Demandas (timeline)
-    const ICONS = {
-      pen:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
-      video:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>',
-      megaphone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 11 3 11 21 3 13 3 11"/><path d="M14 7a5 5 0 0 1 0 10"/></svg>',
-      grid:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>',
-    };
-    const STATUS_LABEL = {
-      in_progress: 'Em andamento',
-      review:      'Em revisão',
-      done:        'Concluída',
-      late:        'Atrasada',
-    };
-    document.getElementById('demandList').innerHTML = student.demands.map(d => `
-      <div class="demand">
-        <div class="demand-icon ${d.status}">${ICONS[d.icon] || ICONS.pen}</div>
-        <div class="demand-body">
-          <div class="demand-title">${d.title}</div>
-          <div class="demand-meta">
-            <span class="demand-resp">
-              <span class="mini-avatar">${d.resp[0]}</span>
-              ${d.resp}
-            </span>
-            <span>•</span>
-            <span>${d.when}</span>
+      // Equipe
+      const teamEl = document.getElementById('teamList');
+      document.getElementById('teamCount').textContent = team.length === 0
+        ? 'em formação'
+        : `${team.length} pessoa${team.length === 1 ? '' : 's'} com você`;
+      if (team.length === 0) {
+        teamEl.innerHTML = `<div style="color:var(--muted); font-size:0.86rem; padding:14px 0;">Estamos montando o time perfeito pra você. Em breve!</div>`;
+      } else {
+        teamEl.innerHTML = team.map(m => `
+          <div class="team-item">
+            <div class="avatar" style="background:linear-gradient(135deg, ${m.position_color}33, ${m.position_color});">${initials(m.user_name)}</div>
+            <div>
+              <div class="team-name">${m.user_name}</div>
+              <div class="team-role">${m.position_name || ''}</div>
+            </div>
+            <button class="team-action" title="Mandar mensagem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            </button>
           </div>
-        </div>
-        <span class="demand-tag ${d.status}">${STATUS_LABEL[d.status] || d.status}</span>
-      </div>
-    `).join('');
+        `).join('');
+      }
 
-    // Atividade
-    document.getElementById('activityList').innerHTML = student.activity.map(a => `
-      <div class="activity-item">
-        <div class="activity-dot"></div>
-        <div>
-          <div class="activity-text">${a.text}</div>
-          <div class="activity-when">${a.when}</div>
+      // Serviços
+      const svcEl = document.getElementById('serviceGrid');
+      if (services.length === 0) {
+        svcEl.innerHTML = `<div style="color:var(--muted); font-size:0.86rem; grid-column:1/-1;">Nenhum serviço ativo no momento.</div>`;
+      } else {
+        svcEl.innerHTML = services.map(s => {
+          const color = SERVICE_COLOR_MAP[s.service_type] || '#94a3b8';
+          const label = SERVICE_LABEL[s.service_type] || s.service_type;
+          return `<div class="service-chip"><span class="dot" style="background:${color};"></span>${label}</div>`;
+        }).join('');
+      }
+
+      // Demandas (placeholder honesto até Etapa D)
+      document.getElementById('demandList').innerHTML = `
+        <div style="color:var(--muted); font-size:0.9rem; padding:24px 12px; text-align:center; line-height:1.5;">
+          As demandas ativas aparecerão aqui em breve.<br>
+          <span style="font-size:0.8rem; opacity:0.8;">Estamos finalizando a conexão com o ClickUp.</span>
         </div>
-      </div>
-    `).join('');
+      `;
+
+      // Atividade recente
+      const activity = data?.activity || [];
+      const actEl = document.getElementById('activityList');
+      if (activity.length === 0) {
+        actEl.innerHTML = `<div style="color:var(--muted); font-size:0.86rem; padding:8px 0;">Sem novidades nos últimos 7 dias.</div>`;
+      } else {
+        actEl.innerHTML = activity.slice(0, 6).map(a => `
+          <div class="activity-item">
+            <div class="activity-dot"></div>
+            <div>
+              <div class="activity-text">${formatEvent(a.event, a.metadata)}</div>
+              <div class="activity-when">${fmtRelative(a.created_at)}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    function formatEvent(event, meta) {
+      meta = meta || {};
+      const map = {
+        'user.login':           'Você acessou o portal.',
+        'user.logout':          'Você encerrou a sessão.',
+        'user.password_change': 'Você alterou a senha.',
+        'profile.update':       'Atualizamos seu perfil.',
+        'service.added':        `Novo serviço adicionado: <strong>${meta.service_type || ''}</strong>.`,
+        'team.assigned':        `<strong>${meta.user_name || 'Alguém'}</strong> entrou na sua equipe.`,
+        'team.removed':         `<strong>${meta.user_name || 'Alguém'}</strong> saiu da equipe.`,
+      };
+      return map[event] || event.replace(/_/g, ' ');
+    }
+
+    function renderError(msg) {
+      document.getElementById('highlightTitle').textContent = 'Não conseguimos carregar tudo agora.';
+      document.getElementById('highlightPills').innerHTML = '';
+      document.getElementById('teamList').innerHTML = `<div style="color:var(--danger); font-size:0.86rem;">${msg}</div>`;
+      document.getElementById('demandList').innerHTML = '';
+      document.getElementById('activityList').innerHTML = '';
+      document.getElementById('serviceGrid').innerHTML = '';
+    }
+
+    // ============ Init ============
+    (async function init() {
+      const profile = await PortalAPI.requireClient();
+      if (!profile) return;
+
+      try {
+        const dash = await PortalAPI.getDashboard();
+        render(dash);
+      } catch (e) {
+        console.error(e);
+        renderError(e.message || 'Erro inesperado.');
+      }
+    })();
   </script>
 </body>
 </html>
