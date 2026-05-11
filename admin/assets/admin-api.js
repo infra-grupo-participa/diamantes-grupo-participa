@@ -570,6 +570,40 @@
     return new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   }
 
+  async function listPurchasesHistory({ limit = 50, offset = 0, month = '', clientSlug = '' } = {}) {
+    let q = client()
+      .schema('portal')
+      .from('hotmart_purchases')
+      .select('transaction_code, buyer_email, offer_code, service_name, amount, status, payment_type, installments_total, installment_number, charged_at, client_slug', { count: 'exact' })
+      .order('charged_at', { ascending: false });
+    if (month)      q = q.like('charged_at', `${month}%`);
+    if (clientSlug) q = q.eq('client_slug', clientSlug);
+    q = q.range(offset, offset + limit - 1);
+    const { data, count, error } = await q;
+    if (error) throw error;
+    return { data: data || [], count: count || 0 };
+  }
+
+  async function getPurchaseMonthlyStats() {
+    const { data, error } = await client()
+      .schema('portal')
+      .from('hotmart_purchases')
+      .select('charged_at, amount, status, payment_type, service_name, client_slug')
+      .in('status', ['approved', 'complete']);
+    if (error) throw error;
+    const byMonth = {};
+    (data || []).forEach(p => {
+      const m = (p.charged_at || '').slice(0, 7);
+      if (!m) return;
+      if (!byMonth[m]) byMonth[m] = { month: m, total: 0, count: 0, bySetor: {} };
+      byMonth[m].total += Number(p.amount || 0);
+      byMonth[m].count++;
+      const setor = canonicalServiceName(p.service_name || '');
+      byMonth[m].bySetor[setor] = (byMonth[m].bySetor[setor] || 0) + Number(p.amount || 0);
+    });
+    return Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
+  }
+
   // =============================================================
   // DEMANDAS (Kanban admin — Etapa D3)
   // =============================================================
@@ -819,6 +853,8 @@
     listClientsForSubscription,
     exportSubscriptionsCsv,
     exportPurchasesCsv,
+    listPurchasesHistory,
+    getPurchaseMonthlyStats,
     // Demandas
     listAllDemands,
     getDemandFullDetails,

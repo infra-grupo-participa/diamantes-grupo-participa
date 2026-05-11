@@ -414,8 +414,20 @@
         </div>
 
         <div class="panel-card">
-          <h3 class="panel-card-title">Próximos vencimentos <span class="meta">7 dias</span></h3>
-          <div class="due-list" id="dueList"></div>
+          <h3 class="panel-card-title">Receita por mês</h3>
+          <div id="monthlyBars"></div>
+        </div>
+
+        <div class="panel-card" style="padding-bottom:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <h3 class="panel-card-title" style="margin:0;">Histórico de cobranças</h3>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <select id="histMonth" class="search-input" style="padding:5px 10px; font-size:0.76rem; max-width:130px;"></select>
+              <select id="histClient" class="search-input" style="padding:5px 10px; font-size:0.76rem; max-width:140px;"></select>
+            </div>
+          </div>
+          <div id="histList" style="max-height:520px; overflow-y:auto;"></div>
+          <div id="histPager" style="padding:10px 0; display:flex; gap:6px; justify-content:center;"></div>
         </div>
       </aside>
     </main>
@@ -630,8 +642,9 @@
           <td>
             <div class="payment-method">
               ${pmIcon(sub.payment_method)}
-              ${sub.payment_method_label || sub.payment_method.toUpperCase()}
+              <span>${sub.payment_method === 'cc' ? 'Cartão de crédito' : sub.payment_method_label || sub.payment_method?.toUpperCase() || '—'}</span>
             </div>
+            ${sub.started_at ? `<div class="amount-sub">desde ${fmtDate(sub.started_at)}</div>` : ''}
           </td>
           <td>${statusBadge(sub.status)}</td>
           <td style="text-align:right;">
@@ -706,8 +719,8 @@
         await renderMrrSparkline(s.mrr);
         // Serviços contratados
         await renderServiceBars();
-        // Próximos vencimentos
-        renderDueList(s.dueSoon);
+        // Receita por mês
+        await renderMonthlyBars();
       } catch (e) {
         console.error(e);
       }
@@ -771,31 +784,131 @@
       }).join('');
     }
 
-    function renderDueList(items) {
-      const el = document.getElementById('dueList');
-      if (!items || items.length === 0) {
-        el.innerHTML = '<div style="color:var(--muted); font-size:0.84rem;">Sem vencimentos nos próximos 7 dias.</div>';
+    // ===== Receita por mês (barras) =====
+    async function renderMonthlyBars() {
+      const stats = await AdminAPI.getPurchaseMonthlyStats();
+      const el = document.getElementById('monthlyBars');
+      if (!stats.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.84rem;">Sem dados.</div>'; return; }
+      const max = Math.max(...stats.map(m => m.total), 1);
+      el.innerHTML = stats.map(m => {
+        const pct = Math.round((m.total / max) * 100);
+        const [y, mo] = m.month.split('-');
+        const label = new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+        return `
+          <div class="service-bar-item">
+            <div class="service-bar-head">
+              <span class="service-bar-name">${label}</span>
+              <span class="service-bar-count">${fmtBRL(m.total)} · ${m.count} cobr.</span>
+            </div>
+            <div class="service-bar"><div class="service-bar-fill orange" style="width:${pct}%"></div></div>
+          </div>`;
+      }).join('');
+    }
+
+    // ===== Histórico de cobranças =====
+    const histState = { page: 1, pageSize: 15, month: '', client: '' };
+
+    function pmLabel(type) {
+      const map = {
+        CREDIT_CARD: { icon: '💳', label: 'Cartão de crédito' },
+        BILLET:      { icon: '📄', label: 'Boleto' },
+        PIX:         { icon: '⚡', label: 'PIX' },
+        PAYPAL:      { icon: '🅿', label: 'PayPal' },
+      };
+      return map[type] || { icon: '💰', label: type || '—' };
+    }
+
+    function statusPurchaseBadge(s) {
+      const map = {
+        approved:   { bg: '#dcfce7', color: '#15803d', txt: 'Aprovado' },
+        complete:   { bg: '#dcfce7', color: '#15803d', txt: 'Completo' },
+        canceled:   { bg: '#f1f5f9', color: '#64748b', txt: 'Cancelado' },
+        refunded:   { bg: '#fef3c7', color: '#92400e', txt: 'Reembolsado' },
+        chargeback: { bg: '#fee2e2', color: '#b91c1c', txt: 'Chargeback' },
+      };
+      const b = map[s] || { bg: '#f1f5f9', color: '#64748b', txt: s };
+      return `<span style="background:${b.bg};color:${b.color};border-radius:5px;padding:2px 7px;font-size:0.7rem;font-weight:700;white-space:nowrap;">${b.txt}</span>`;
+    }
+
+    async function renderHistList() {
+      const el = document.getElementById('histList');
+      el.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:0.84rem;">Carregando…</div>';
+      const offset = (histState.page - 1) * histState.pageSize;
+      const { data, count } = await AdminAPI.listPurchasesHistory({
+        limit: histState.pageSize, offset,
+        month: histState.month, clientSlug: histState.client,
+      });
+
+      if (!data.length) {
+        el.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:0.84rem;">Nenhuma cobrança encontrada.</div>';
+        document.getElementById('histPager').innerHTML = '';
         return;
       }
-      const today = new Date(); today.setHours(0,0,0,0);
-      el.innerHTML = items.map(s => {
-        const due = new Date(s.next_billing_date);
-        const diff = Math.ceil((due - today) / (1000*60*60*24));
-        const whenLabel = diff === 0 ? 'Hoje' : diff === 1 ? 'Amanhã' : `Em ${diff} dias`;
+
+      el.innerHTML = data.map(p => {
+        const pm = pmLabel(p.payment_type);
+        const setor = AdminAPI.canonicalServiceName(p.service_name || '');
+        const scolor = SERVICE_COLORS[setor] || 'orange';
+        const date = fmtDate(p.charged_at);
+        const instLabel = (p.installments_total > 1)
+          ? `<span style="font-size:0.68rem;color:var(--muted);">${p.installment_number||1}/${p.installments_total}x</span>`
+          : '';
         return `
-          <div class="due-item">
-            <div class="avatar">${initials(s.client_name)}</div>
-            <div>
-              <div class="due-name">${s.client_name}</div>
-              <div class="due-when">${s.plan_name}</div>
+          <div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="font-size:1.35rem;line-height:1;padding-top:2px;">${pm.icon}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <span style="font-weight:600;font-size:0.84rem;">${p.buyer_email}</span>
+                ${statusPurchaseBadge(p.status)}
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;">
+                <span style="font-size:0.75rem;color:var(--muted);">${pm.label}</span>
+                <span style="font-size:0.75rem;color:var(--muted);">·</span>
+                <span class="service-bar-fill ${scolor}" style="display:inline-block;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:600;color:#fff;">${setor}</span>
+                ${instLabel}
+              </div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">${date} · ${p.transaction_code}</div>
             </div>
-            <div>
-              <div class="due-amount">${fmtBRL(s.monthly_value)}</div>
-              <span class="due-amount-when">${whenLabel}</span>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-weight:700;font-size:0.9rem;">${fmtBRL(p.amount)}</div>
             </div>
-          </div>
-        `;
+          </div>`;
       }).join('');
+
+      // Paginação simples
+      const totalPages = Math.ceil(count / histState.pageSize);
+      const pager = document.getElementById('histPager');
+      if (totalPages <= 1) { pager.innerHTML = ''; return; }
+      pager.innerHTML = `
+        <button class="page-btn" ${histState.page <= 1 ? 'disabled' : ''} onclick="histNav(-1)">‹</button>
+        <span style="font-size:0.78rem;color:var(--muted);padding:0 6px;">${histState.page}/${totalPages}</span>
+        <button class="page-btn" ${histState.page >= totalPages ? 'disabled' : ''} onclick="histNav(1)">›</button>`;
+    }
+
+    window.histNav = function(dir) {
+      histState.page += dir;
+      renderHistList();
+    };
+
+    async function initHistFilters() {
+      // Meses disponíveis
+      const stats = await AdminAPI.getPurchaseMonthlyStats();
+      const selMonth = document.getElementById('histMonth');
+      selMonth.innerHTML = '<option value="">Todos os meses</option>' +
+        stats.slice().reverse().map(m => {
+          const [y, mo] = m.month.split('-');
+          const label = new Date(Number(y), Number(mo)-1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+          return `<option value="${m.month}">${label}</option>`;
+        }).join('');
+
+      // Clientes
+      const subs = await AdminAPI.listSubscriptions({ limit: 200, offset: 0 });
+      const selClient = document.getElementById('histClient');
+      selClient.innerHTML = '<option value="">Todos os alunos</option>' +
+        (subs.data || []).map(s => `<option value="${s.client_slug}">${s.client_name}</option>`).join('');
+
+      selMonth.addEventListener('change', () => { histState.month = selMonth.value; histState.page = 1; renderHistList(); });
+      selClient.addEventListener('change', () => { histState.client = selClient.value; histState.page = 1; renderHistList(); });
     }
 
     async function load() {
@@ -976,6 +1089,9 @@
       if (!profile) return;
       await fillSession(profile);
       await Promise.all([load(), loadStats()]);
+      // Histórico de cobranças (independente)
+      await initHistFilters();
+      renderHistList();
     })();
   </script>
 </body>
