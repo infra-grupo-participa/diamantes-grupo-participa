@@ -167,30 +167,57 @@ jobs:
           echo "===Artifact contents==="
           ls -la "$DEST/" | head -30
 
+      - name: Detectar diretório raiz real do FTP
+        id: ftp-root
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+        run: |
+          set -e
+          CREDS="${FTP_USER}:${FTP_PASS}"
+
+          # Pega o PWD (diretório onde o user entra automaticamente)
+          # Hostinger normalmente entra na raiz do home; public_html é uma pasta filha.
+          # Estratégia: lista raiz "/" e checa se public_html existe como subpasta.
+          # Se sim, FTP_ROOT="public_html/". Senão, FTP_ROOT="" (já está dentro).
+          echo "=== Listagem da raiz absoluta (/) ==="
+          ROOT_LISTING=$(curl -sS --user "$CREDS" "ftp://${FTP_HOST}/" || true)
+          echo "$ROOT_LISTING"
+
+          if echo "$ROOT_LISTING" | grep -q "public_html"; then
+            FTP_ROOT="public_html/"
+            echo "Detectado: user entra em / e public_html/ é filha → upload em ${FTP_ROOT}"
+          else
+            FTP_ROOT=""
+            echo "Detectado: user já entra dentro de public_html → upload em raiz do user"
+          fi
+
+          echo "ftp_root=${FTP_ROOT}" >> "$GITHUB_OUTPUT"
+
       - name: Upload via curl FTP (preserve runtime files)
         env:
           FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
           FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
           FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          FTP_PATH: ${{ secrets.HOSTINGER_FTP_PATH }}
+          FTP_ROOT: ${{ steps.ftp-root.outputs.ftp_root }}
         run: |
           set -e
-          # FTP_PATH típico: /public_html/
-          FTP_PATH="${FTP_PATH%/}/"
           CREDS="${FTP_USER}:${FTP_PASS}"
 
-          # Lista todos arquivos do artifact, exclui paths protegidos / não-deployáveis
+          # FTP_ROOT é relativo ao PWD do user FTP — sem barra inicial.
+          # Se vazio, sobe direto na raiz do user (que já é public_html).
+          # Se "public_html/", sobe dentro dessa pasta filha.
+
           cd deploy-artifact
 
-          # Cria dirs primeiro (curl FTP precisa do dir existir antes de PUT)
-          # Usa --ftp-create-dirs no PUT, que cria implicitamente.
+          echo "=== Iniciando upload em FTP_ROOT='${FTP_ROOT}' ==="
 
           UPLOADED=0
           SKIPPED=0
           FAILED=0
           while IFS= read -r f; do
             rel="${f#./}"
-            # Excludes (preserva files de runtime + dirs de dev)
             case "$rel" in
               .git/*|.git|node_modules/*|node_modules) SKIPPED=$((SKIPPED+1)); continue ;;
               tests/*|tests|docs/*|docs|tmp/*|tmp|.github/*|.github) SKIPPED=$((SKIPPED+1)); continue ;;
@@ -199,9 +226,8 @@ jobs:
               api/storage/rate-limits.json|api/data/clickup-api-key.txt) SKIPPED=$((SKIPPED+1)); continue ;;
             esac
 
-            # URL-encode espaços e caracteres especiais no path remoto
             rel_enc=$(printf '%s' "$rel" | sed 's/ /%20/g')
-            target="ftp://${FTP_HOST}${FTP_PATH}${rel_enc}"
+            target="ftp://${FTP_HOST}/${FTP_ROOT}${rel_enc}"
             code=$(curl -sS --ftp-create-dirs --user "$CREDS" -T "$f" "$target" -w "%{http_code}" -o /dev/null --max-time 60 || echo "ERR")
             if [ "$code" = "226" ] || [ "$code" = "0" ] || [ "$code" = "" ]; then
               UPLOADED=$((UPLOADED+1))
@@ -214,6 +240,27 @@ jobs:
           echo ""
           echo "Uploaded: $UPLOADED  Skipped: $SKIPPED  Failed: $FAILED"
           [ $FAILED -eq 0 ] || { echo "::error::$FAILED upload(s) falharam"; exit 1; }
+
+      - name: Verificar destino final no FTP
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          FTP_ROOT: ${{ steps.ftp-root.outputs.ftp_root }}
+        run: |
+          set -e
+          CREDS="${FTP_USER}:${FTP_PASS}"
+          echo "=== Conteúdo final de /${FTP_ROOT} ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/${FTP_ROOT}" || true
+
+          # Sanity check: não pode ter public_html/ DENTRO de public_html/
+          if [ "$FTP_ROOT" = "public_html/" ]; then
+            INNER=$(curl -sS --user "$CREDS" "ftp://${FTP_HOST}/${FTP_ROOT}" | grep -c "public_html" || true)
+            if [ "$INNER" -gt 0 ]; then
+              echo "::error::Detectado public_html/ dentro de public_html/ — bug de path!"
+              exit 1
+            fi
+          fi
 
       - name: Smoke — login page
         run: |
