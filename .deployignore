@@ -39,3 +39,8 @@ CLAUDE.md
 # Templates e exemplos que não devem ir pra prod
 .env.example
 .deployignore
+
+# Quality gate — arquivos de controle local
+.quality/
+.quality-baseline.json
+.quality-history.json
