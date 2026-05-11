@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assinaturas — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --sidebar-bg: #ffffff;
+      --border: #eef0f4;
+      --border-strong: #e3e6ec;
+      --text: #0f172a;
+      --text-secondary: #475569;
+      --muted: #94a3b8;
+      --accent: #F29725;
+      --accent-soft: #fff4e3;
+      --accent-strong: #d97e0f;
+      --success: #16a34a;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+
+      --kpi-blue: #eaf2ff;
+      --kpi-blue-ico: #3b82f6;
+      --kpi-purple: #f1ecff;
+      --kpi-purple-ico: #8b5cf6;
+      --kpi-green: #e7f7ee;
+      --kpi-green-ico: #16a34a;
+      --kpi-yellow: #fff4d6;
+      --kpi-yellow-ico: #eab308;
+      --kpi-pink: #ffe9ee;
+      --kpi-pink-ico: #ec4899;
+      --kpi-red: #fee2e2;
+      --kpi-red-ico: #ef4444;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; font-size: 14px; }
+    button { font-family: inherit; cursor: pointer; }
+    input, select { font-family: inherit; }
+
+    .app-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+
+    /* SIDEBAR */
+    .sidebar { background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 16px; gap: 20px; position: sticky; top: 0; height: 100vh; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px; }
+    .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); display: grid; place-items: center; color: #fff; }
+    .brand-name { font-weight: 700; font-size: 1rem; }
+    .nav-section-label { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 0 12px; margin-bottom: 6px; }
+    .nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; color: var(--text-secondary); text-decoration: none; font-weight: 500; font-size: 0.9rem; transition: background 0.15s, color 0.15s; border: none; background: transparent; width: 100%; text-align: left; }
+    .nav-item:hover { background: var(--bg); color: var(--text); }
+    .nav-item.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; }
+    .nav-item .ico { width: 18px; height: 18px; flex-shrink: 0; }
+    .sidebar-footer { border-top: 1px solid var(--border); padding-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .user-pill { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #fcd9a5, var(--accent)); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 0.78rem; flex-shrink: 0; }
+    .user-pill-info { display: flex; flex-direction: column; min-width: 0; }
+    .user-pill-name { font-weight: 600; font-size: 0.85rem; color: var(--text); }
+    .user-pill-role { font-size: 0.72rem; color: var(--muted); }
+    .logout-button { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: none; background: transparent; color: var(--text-secondary); font-size: 0.85rem; font-weight: 500; }
+    .logout-button:hover { background: var(--bg); color: var(--danger); }
+
+    /* MAIN */
+    .main { padding: 32px 40px 48px; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
+    .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; grid-column: 1 / -1; }
+    .page-title { margin: 0 0 6px; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    .page-subtitle { margin: 0; color: var(--text-secondary); font-size: 0.92rem; }
+    .page-actions { display: flex; gap: 10px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; border: 1px solid transparent; transition: background 0.15s; }
+    .btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+    .btn-ghost:hover { background: var(--bg); }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(242, 151, 37, 0.28); }
+    .btn-primary:hover { background: var(--accent-strong); }
+
+    /* KPIs (5 cards no topo) */
+    .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; display: flex; align-items: center; gap: 12px; box-shadow: var(--shadow-sm); }
+    .kpi-icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
+    .kpi-icon svg { width: 20px; height: 20px; }
+    .kpi-label { font-size: 0.74rem; color: var(--muted); font-weight: 500; margin-bottom: 2px; }
+    .kpi-value { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+    .kpi-trend { font-size: 0.7rem; margin-top: 3px; font-weight: 500; }
+    .kpi-trend.up { color: var(--success); }
+    .kpi-trend.down { color: var(--danger); }
+
+    /* TABELA */
+    .table-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: var(--shadow-sm); }
+    .table-head-bar { padding: 20px 24px 14px; display: flex; flex-direction: column; gap: 14px; }
+    .table-head-title h2 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 700; }
+    .table-head-title p { margin: 0; color: var(--muted); font-size: 0.83rem; }
+    .table-controls { display: flex; gap: 10px; align-items: center; }
+    .search-input-wrap { flex: 1; max-width: 360px; position: relative; }
+    .search-input-wrap svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); width: 16px; height: 16px; }
+    .search-input { width: 100%; padding: 10px 12px 10px 36px; border: 1px solid var(--border-strong); border-radius: 10px; font-size: 0.88rem; background: var(--surface); color: var(--text); }
+    .search-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16); }
+
+    .table-wrap { overflow-x: auto; }
+    table.subs-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .subs-table thead th { text-align: left; padding: 12px 24px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; color: var(--muted); background: #fafbfc; border-bottom: 1px solid var(--border); }
+    .subs-table tbody td { padding: 14px 24px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .subs-table tbody tr:last-child td { border-bottom: none; }
+    .subs-table tbody tr:hover { background: #fafbfc; }
+
+    .user-cell { display: flex; align-items: center; gap: 12px; }
+    .user-cell .avatar { width: 34px; height: 34px; font-size: 0.74rem; }
+    .user-cell-name { font-weight: 600; }
+    .user-cell-plan { font-size: 0.72rem; color: var(--muted); }
+
+    .amount { font-weight: 700; }
+    .amount-sub { font-size: 0.72rem; color: var(--muted); font-weight: 500; }
+
+    .payment-method { display: inline-flex; align-items: center; gap: 8px; font-size: 0.83rem; }
+    .pm-icon { width: 26px; height: 18px; border-radius: 4px; background: linear-gradient(135deg, #475569, #1e293b); display: grid; place-items: center; color: #fff; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.04em; }
+    .pm-icon.boleto { background: linear-gradient(135deg, #0ea5e9, #0369a1); }
+    .pm-icon.pix    { background: linear-gradient(135deg, #16a34a, #14532d); }
+    .pm-icon.cc     { background: linear-gradient(135deg, #6366f1, #312e81); }
+
+    .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 0.74rem; font-weight: 600; }
+    .badge-green { background: #e7f7ee; color: #15803d; }
+    .badge-yellow { background: #fef3c7; color: #b45309; }
+    .badge-red { background: #fee2e2; color: #b91c1c; }
+    .badge-gray { background: #e2e8f0; color: #475569; }
+
+    .icon-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-secondary); display: grid; place-items: center; transition: background 0.15s; }
+    .icon-btn:hover { background: var(--bg); }
+    .icon-btn svg { width: 15px; height: 15px; }
+
+    .pagination { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px; border-top: 1px solid var(--border); font-size: 0.84rem; color: var(--text-secondary); flex-wrap: wrap; gap: 10px; }
+    .page-nav { display: flex; gap: 4px; }
+    .page-btn { min-width: 32px; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-secondary); font-size: 0.84rem; font-weight: 500; }
+    .page-btn:hover { background: var(--bg); }
+    .page-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    /* PAINEL FINANCEIRO LATERAL */
+    .finance-panel { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; }
+    .panel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px; box-shadow: var(--shadow-sm); }
+    .panel-card-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); margin: 0 0 14px; display: flex; justify-content: space-between; align-items: center; }
+    .panel-card-title .meta { font-size: 0.74rem; color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+    /* Resumo financeiro */
+    .summary-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-label { font-size: 0.82rem; color: var(--text-secondary); }
+    .summary-value { font-size: 1rem; font-weight: 700; }
+    .summary-value.neg { color: var(--danger); }
+    .summary-value.pos { color: var(--success); }
+
+    /* Gráfico MRR */
+    .mrr-chart { width: 100%; height: 110px; }
+    .mrr-current { font-size: 1.35rem; font-weight: 700; margin-bottom: 2px; }
+    .mrr-delta { font-size: 0.78rem; color: var(--success); font-weight: 600; }
+
+    /* Serviços contratados (barras) */
+    .service-bar-item { margin-bottom: 12px; }
+    .service-bar-item:last-child { margin-bottom: 0; }
+    .service-bar-head { display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 4px; }
+    .service-bar-name { font-weight: 600; }
+    .service-bar-count { color: var(--muted); }
+    .service-bar { height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+    .service-bar-fill { height: 100%; border-radius: 999px; }
+    .service-bar-fill.purple { background: #8b5cf6; }
+    .service-bar-fill.blue   { background: #3b82f6; }
+    .service-bar-fill.green  { background: #16a34a; }
+    .service-bar-fill.pink   { background: #ec4899; }
+    .service-bar-fill.yellow { background: #eab308; }
+    .service-bar-fill.orange { background: var(--accent); }
+
+    /* Próximos vencimentos */
+    .due-list { display: flex; flex-direction: column; gap: 10px; }
+    .due-item { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 0; }
+    .due-item .avatar { width: 30px; height: 30px; font-size: 0.7rem; }
+    .due-name { font-size: 0.84rem; font-weight: 600; line-height: 1.2; }
+    .due-when { font-size: 0.72rem; color: var(--muted); }
+    .due-amount { font-size: 0.82rem; font-weight: 700; text-align: right; }
+    .due-amount-when { display: block; font-size: 0.7rem; color: var(--muted); font-weight: 500; margin-top: 2px; }
+
+    @media (max-width: 1280px) {
+      .main { grid-template-columns: 1fr; }
+      .finance-panel { position: static; max-height: none; }
+      .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 900px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .main { padding: 20px; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+        </div>
+        <div class="brand-name">Diamantes</div>
+      </div>
+
+      <div>
+        <div class="nav-section-label">Geral</div>
+        <nav class="nav">
+          <a href="index.html" class="nav-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Funcionários
+          </a>
+          <a href="alunos-diamantes.html" class="nav-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+            Alunos Diamantes
+          </a>
+          <a href="assinaturas.html" class="nav-item active">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Assinaturas
+          </a>
+        </nav>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="user-pill">
+          <div class="avatar">AD</div>
+          <div class="user-pill-info">
+            <div class="user-pill-name">Administrador</div>
+            <div class="user-pill-role">admin@diamantes</div>
+          </div>
+        </div>
+        <button class="logout-button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sair do admin
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Assinaturas</h1>
+          <p class="page-subtitle">Acompanhe os assinantes, pagamentos e receitas recorrentes.</p>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar planilha
+          </button>
+          <button class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nova assinatura
+          </button>
+        </div>
+      </div>
+
+      <!-- Coluna 1: KPIs + tabela -->
+      <div style="display:flex; flex-direction:column; gap:20px; min-width:0;">
+        <!-- KPIs -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: var(--kpi-blue); color: var(--kpi-blue-ico);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div>
+              <div class="kpi-label">Receita recorrente (MRR)</div>
+              <div class="kpi-value">R$ 95.420,00</div>
+              <div class="kpi-trend up">+12% vs mês anterior</div>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: var(--kpi-purple); color: var(--kpi-purple-ico);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div>
+            <div>
+              <div class="kpi-label">Assinantes ativos</div>
+              <div class="kpi-value">29</div>
+              <div class="kpi-trend up">+3 este mês</div>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: var(--kpi-red); color: var(--kpi-red-ico);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+              <div class="kpi-label">Inadimplentes</div>
+              <div class="kpi-value">5</div>
+              <div class="kpi-trend down">+1 esta semana</div>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: var(--kpi-yellow); color: var(--kpi-yellow-ico);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div class="kpi-label">Pendentes</div>
+              <div class="kpi-value">2</div>
+              <div class="kpi-trend">aguardando pagto.</div>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: var(--kpi-green); color: var(--kpi-green-ico);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div>
+              <div class="kpi-label">Taxa de retenção</div>
+              <div class="kpi-value">92%</div>
+              <div class="kpi-trend up">+2 pp</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabela -->
+        <div class="table-card">
+          <div class="table-head-bar">
+            <div class="table-head-title">
+              <h2>Lista de assinaturas</h2>
+              <p>Visualize cada aluno, plano, pagamento e status atual.</p>
+            </div>
+            <div class="table-controls">
+              <div class="search-input-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input class="search-input" type="text" placeholder="Buscar por aluno, plano ou status" />
+              </div>
+              <button class="btn btn-ghost">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                Filtros
+              </button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="subs-table">
+              <thead>
+                <tr>
+                  <th>Aluno</th>
+                  <th>Valor mensal</th>
+                  <th>Próxima cobrança</th>
+                  <th>Pagamento</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="subsBody"></tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <span>Mostrando <strong>1–8</strong> de <strong>29</strong> assinaturas</span>
+            <div class="page-nav">
+              <button class="page-btn" disabled>‹</button>
+              <button class="page-btn active">1</button>
+              <button class="page-btn">2</button>
+              <button class="page-btn">3</button>
+              <button class="page-btn">4</button>
+              <button class="page-btn">›</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coluna 2: Painel financeiro -->
+      <aside class="finance-panel">
+        <!-- Resumo financeiro -->
+        <div class="panel-card">
+          <h3 class="panel-card-title">Resumo financeiro <span class="meta">Maio/2026</span></h3>
+          <div class="summary-row">
+            <span class="summary-label">Faturado no mês</span>
+            <span class="summary-value pos">R$ 87.130,00</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">A receber</span>
+            <span class="summary-value">R$ 8.290,00</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Inadimplência</span>
+            <span class="summary-value neg">R$ 4.520,00</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Ticket médio</span>
+            <span class="summary-value">R$ 3.290,00</span>
+          </div>
+        </div>
+
+        <!-- MRR chart -->
+        <div class="panel-card">
+          <h3 class="panel-card-title">Receita recorrente (MRR) <span class="meta">6 meses</span></h3>
+          <div class="mrr-current">R$ 95.420,00</div>
+          <div class="mrr-delta">↑ +12% nos últimos 30 dias</div>
+          <svg class="mrr-chart" viewBox="0 0 340 110" preserveAspectRatio="none" style="margin-top:8px;">
+            <defs>
+              <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#F29725" stop-opacity="0.35"/>
+                <stop offset="100%" stop-color="#F29725" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <!-- Linha de grid -->
+            <line x1="0" y1="30"  x2="340" y2="30"  stroke="#eef0f4" stroke-width="1"/>
+            <line x1="0" y1="60"  x2="340" y2="60"  stroke="#eef0f4" stroke-width="1"/>
+            <line x1="0" y1="90"  x2="340" y2="90"  stroke="#eef0f4" stroke-width="1"/>
+
+            <!-- Área -->
+            <path d="M0,85 L57,72 L113,60 L170,55 L227,42 L283,30 L340,18 L340,110 L0,110 Z" fill="url(#mrrGrad)"/>
+            <!-- Linha -->
+            <path d="M0,85 L57,72 L113,60 L170,55 L227,42 L283,30 L340,18" fill="none" stroke="#F29725" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- Pontos -->
+            <circle cx="0"   cy="85" r="3" fill="#F29725"/>
+            <circle cx="57"  cy="72" r="3" fill="#F29725"/>
+            <circle cx="113" cy="60" r="3" fill="#F29725"/>
+            <circle cx="170" cy="55" r="3" fill="#F29725"/>
+            <circle cx="227" cy="42" r="3" fill="#F29725"/>
+            <circle cx="283" cy="30" r="3" fill="#F29725"/>
+            <circle cx="340" cy="18" r="4" fill="#F29725" stroke="#fff" stroke-width="2"/>
+          </svg>
+          <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--muted); margin-top:4px;">
+            <span>Dez</span><span>Jan</span><span>Fev</span><span>Mar</span><span>Abr</span><span>Mai</span>
+          </div>
+        </div>
+
+        <!-- Serviços mais contratados -->
+        <div class="panel-card">
+          <h3 class="panel-card-title">Serviços mais contratados</h3>
+          <div id="serviceBars"></div>
+        </div>
+
+        <!-- Próximos vencimentos -->
+        <div class="panel-card">
+          <h3 class="panel-card-title">Próximos vencimentos <span class="meta">5 dias</span></h3>
+          <div class="due-list" id="dueList"></div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    // ============ MOCK ============
+    const PLANS = [
+      { name: 'Diamante Pro',  monthly: 4990 },
+      { name: 'Diamante Plus', monthly: 3490 },
+      { name: 'Diamante Start',monthly: 1990 },
+      { name: 'Diamante Elite',monthly: 7990 },
+    ];
+
+    const STATUS_OPTS = [
+      { code: 'paid',     label: 'Em dia',    cls: 'badge-green'  },
+      { code: 'late',     label: 'Atrasado',  cls: 'badge-red'    },
+      { code: 'pending',  label: 'Pendente',  cls: 'badge-yellow' },
+      { code: 'canceled', label: 'Cancelado', cls: 'badge-gray'   },
+    ];
+
+    const PAYMENT_OPTS = [
+      { code: 'cc',     label: 'Cartão **** 4823', cls: 'cc'    },
+      { code: 'cc',     label: 'Cartão **** 7710', cls: 'cc'    },
+      { code: 'boleto', label: 'Boleto bancário',  cls: 'boleto'},
+      { code: 'pix',    label: 'PIX recorrente',   cls: 'pix'   },
+    ];
+
+    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function pick(arr) { return arr[rand(0, arr.length - 1)]; }
+    function initials(name) { return name.split(' ').slice(0,2).map(p => p[0]).join('').toUpperCase(); }
+    function fmtBRL(n) { return 'R$ ' + n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.'); }
+    function fmtDate(d) {
+      const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} (${days[d.getDay()]})`;
+    }
+
+    function makeSub(name) {
+      const plan = pick(PLANS);
+      // 70% em dia, 15% atrasado, 10% pendente, 5% cancelado
+      const r = Math.random();
+      const status = r < 0.7 ? STATUS_OPTS[0]
+                   : r < 0.85 ? STATUS_OPTS[1]
+                   : r < 0.95 ? STATUS_OPTS[2]
+                              : STATUS_OPTS[3];
+      const pay = pick(PAYMENT_OPTS);
+      const due = new Date();
+      due.setDate(due.getDate() + rand(-6, 22));
+      return { name, plan, status, pay, due };
+    }
+
+    const SUBS = [
+      makeSub('Ana Carolina Silva'),
+      makeSub('Bruno Cardoso'),
+      makeSub('Camila Lima'),
+      makeSub('Diego Ramalho'),
+      makeSub('Fernanda Martins'),
+      makeSub('João Batista'),
+      makeSub('Larissa Mello'),
+      makeSub('Marcus Paiva'),
+    ];
+
+    // ============ RENDER TABELA ============
+    function rowHtml(s) {
+      const dueText = (() => {
+        const diff = Math.ceil((s.due - new Date()) / (1000*60*60*24));
+        const date = fmtDate(s.due);
+        if (diff < 0) return `<span style="color:var(--danger); font-weight:600;">Vencido</span><div class="amount-sub">${date}</div>`;
+        if (diff === 0) return `<span style="color:var(--danger); font-weight:600;">Hoje</span><div class="amount-sub">${date}</div>`;
+        if (diff <= 5) return `<span style="color:var(--warning); font-weight:600;">Em ${diff} dia${diff>1?'s':''}</span><div class="amount-sub">${date}</div>`;
+        return `<span style="font-weight:600;">${date}</span><div class="amount-sub">Em ${diff} dias</div>`;
+      })();
+      const pmIcon = s.pay.cls === 'cc' ? 'CC' : s.pay.cls === 'pix' ? 'PIX' : 'BB';
+      return `
+        <tr>
+          <td>
+            <div class="user-cell">
+              <div class="avatar">${initials(s.name)}</div>
+              <div>
+                <div class="user-cell-name">${s.name}</div>
+                <div class="user-cell-plan">${s.plan.name}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="amount">${fmtBRL(s.plan.monthly)}</div>
+            <div class="amount-sub">mensal</div>
+          </td>
+          <td>${dueText}</td>
+          <td>
+            <div class="payment-method">
+              <span class="pm-icon ${s.pay.cls}">${pmIcon}</span>
+              ${s.pay.label}
+            </div>
+          </td>
+          <td><span class="badge ${s.status.cls}">${s.status.label}</span></td>
+          <td style="text-align:right;">
+            <button class="icon-btn" title="Detalhes">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+    document.getElementById('subsBody').innerHTML = SUBS.map(rowHtml).join('');
+
+    // ============ SERVIÇOS MAIS CONTRATADOS ============
+    const SERVICES = [
+      { name: 'Design',         count: 24, max: 29, color: 'purple' },
+      { name: 'Mídia paga',     count: 21, max: 29, color: 'pink'   },
+      { name: 'Métricas',       count: 18, max: 29, color: 'blue'   },
+      { name: 'Copywriting',    count: 16, max: 29, color: 'green'  },
+      { name: 'Edição de vídeo',count: 12, max: 29, color: 'yellow' },
+      { name: 'Estratégia',     count:  9, max: 29, color: 'orange' },
+    ];
+    document.getElementById('serviceBars').innerHTML = SERVICES.map(s => {
+      const pct = Math.round((s.count / s.max) * 100);
+      return `
+        <div class="service-bar-item">
+          <div class="service-bar-head">
+            <span class="service-bar-name">${s.name}</span>
+            <span class="service-bar-count">${s.count} contratos</span>
+          </div>
+          <div class="service-bar"><div class="service-bar-fill ${s.color}" style="width:${pct}%"></div></div>
+        </div>
+      `;
+    }).join('');
+
+    // ============ PRÓXIMOS VENCIMENTOS ============
+    const due = SUBS
+      .filter(s => s.status.code !== 'canceled')
+      .map(s => ({ ...s, diff: Math.ceil((s.due - new Date()) / (1000*60*60*24)) }))
+      .filter(s => s.diff >= 0 && s.diff <= 7)
+      .sort((a, b) => a.diff - b.diff)
+      .slice(0, 5);
+
+    document.getElementById('dueList').innerHTML = due.length ? due.map(s => {
+      const whenLabel = s.diff === 0 ? 'Hoje' : s.diff === 1 ? 'Amanhã' : `Em ${s.diff} dias`;
+      return `
+        <div class="due-item">
+          <div class="avatar">${initials(s.name)}</div>
+          <div>
+            <div class="due-name">${s.name}</div>
+            <div class="due-when">${s.plan.name}</div>
+          </div>
+          <div>
+            <div class="due-amount">${fmtBRL(s.plan.monthly)}</div>
+            <span class="due-amount-when">${whenLabel}</span>
+          </div>
+        </div>
+      `;
+    }).join('') : '<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Sem vencimentos nos próximos 7 dias.</div>';
+  </script>
+</body>
+</html>
