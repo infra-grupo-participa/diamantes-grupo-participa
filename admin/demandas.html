@@ -233,6 +233,110 @@
     .status-btn.danger { color:var(--danger); }
     .status-btn.danger:hover { background:#fee2e2; }
 
+    /* ========== TOGGLE de visualização ========== */
+    .view-toggle {
+      display:inline-flex;
+      background:var(--surface);
+      border:1px solid var(--border-strong);
+      border-radius:10px;
+      padding:3px;
+      gap:2px;
+    }
+    .view-toggle button {
+      padding:8px 14px;
+      border:none;
+      background:transparent;
+      border-radius:8px;
+      font-size:0.84rem;
+      font-weight:600;
+      color:var(--text-secondary);
+      display:inline-flex; align-items:center; gap:6px;
+      transition:background 0.15s, color 0.15s;
+    }
+    .view-toggle button:hover { background:var(--bg); color:var(--text); }
+    .view-toggle button.active { background:var(--text); color:#fff; }
+    .view-toggle svg { width:14px; height:14px; }
+
+    /* ========== VIEW: Por aluno ========== */
+    #studentsView { display:none; flex-direction:column; gap:14px; }
+    #studentsView.active { display:flex; }
+    #kanbanView.hidden { display:none; }
+
+    .student-block {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow:var(--shadow-sm);
+    }
+    .student-head {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:14px 18px;
+      gap:14px;
+      cursor:pointer;
+      transition:background 0.15s;
+    }
+    .student-head:hover { background:var(--bg); }
+    .student-head-left { display:flex; align-items:center; gap:12px; min-width:0; flex:1; }
+    .student-head .avatar { width:38px; height:38px; font-size:0.78rem; }
+    .student-name { font-weight:700; font-size:0.96rem; }
+    .student-meta { font-size:0.74rem; color:var(--muted); margin-top:2px; }
+    .student-head-right {
+      display:flex; align-items:center; gap:8px;
+    }
+    .student-counter {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:3px 10px;
+      border-radius:999px;
+      font-size:0.72rem; font-weight:700;
+      background:var(--bg);
+      color:var(--text-secondary);
+    }
+    .student-counter.late { background:#fee2e2; color:#b91c1c; }
+    .student-counter.review { background:#ffe9ee; color:#be185d; }
+    .student-counter.prog { background:#fff4d6; color:#b45309; }
+    .student-counter.done { background:#e7f7ee; color:#15803d; }
+
+    .student-caret {
+      width:24px; height:24px;
+      display:grid; place-items:center;
+      color:var(--muted);
+      transition:transform 0.18s;
+    }
+    .student-block.collapsed .student-caret { transform:rotate(-90deg); }
+    .student-caret svg { width:16px; height:16px; }
+
+    .student-body {
+      padding:6px 14px 14px;
+      border-top:1px solid var(--border);
+      display:grid;
+      grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+      gap:10px;
+    }
+    .student-block.collapsed .student-body { display:none; }
+    .student-body .empty {
+      padding:18px;
+      color:var(--muted); font-size:0.84rem;
+      text-align:center;
+      grid-column: 1 / -1;
+    }
+
+    /* Cards menores quando agrupados por aluno (reaproveita .kcard mas mais compacto) */
+    .student-body .kcard { padding:10px 12px; }
+    .student-body .kcard .title { font-size:0.88rem; }
+    .student-body .kcard .client { display:none; }
+    .student-body .kcard .badge-mini {
+      display:inline-flex; align-items:center;
+      padding:2px 8px; border-radius:999px;
+      font-size:0.66rem; font-weight:700;
+      margin-bottom:6px;
+    }
+    .student-body .kcard .badge-mini.open    { background:#dbeafe; color:#1d4ed8; }
+    .student-body .kcard .badge-mini.prog    { background:#fff4d6; color:#b45309; }
+    .student-body .kcard .badge-mini.review  { background:#ffe9ee; color:#be185d; }
+    .student-body .kcard .badge-mini.done    { background:#e7f7ee; color:#15803d; }
+    .student-body .kcard .badge-mini.cancel  { background:#e2e8f0; color:#475569; }
+
     @media (max-width: 900px) {
       .app-shell { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; }
@@ -343,7 +447,7 @@
         </div>
       </div>
 
-      <!-- Filtros -->
+      <!-- Filtros + toggle de visão -->
       <div class="filters">
         <div class="search-input-wrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -352,14 +456,27 @@
         <select class="select-pill" id="clientFilter">
           <option value="all">Cliente: Todos</option>
         </select>
-        <button class="btn btn-ghost" id="btnRefresh" title="Atualizar">
+        <div class="view-toggle" role="tablist">
+          <button type="button" data-view="kanban" class="active" title="Visão Kanban por status">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="11"/></svg>
+            Por status
+          </button>
+          <button type="button" data-view="students" title="Visão agrupada por aluno">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Por aluno
+          </button>
+        </div>
+        <button class="btn btn-ghost" id="btnRefresh" title="Atualizar" style="margin-left:auto;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
           Atualizar
         </button>
       </div>
 
-      <!-- Kanban -->
-      <div class="kanban" id="kanban">
+      <!-- View: por aluno (start hidden) -->
+      <div id="studentsView"></div>
+
+      <!-- View: Kanban -->
+      <div class="kanban" id="kanbanView">
         <div class="kcol kcol-open">
           <div class="kcol-head">
             <div class="kcol-title"><span class="kcol-dot"></span>Aberta</div>
@@ -493,7 +610,12 @@
       membersById: {},        // demand_id → members
       realtimeUnsub: null,
       currentDetailId: null,
+      view: 'kanban',         // 'kanban' | 'students'
+      collapsedStudents: new Set(JSON.parse(localStorage.getItem('admin_demands_collapsed') || '[]')),
     };
+    function persistCollapsed() {
+      try { localStorage.setItem('admin_demands_collapsed', JSON.stringify([...state.collapsedStudents])); } catch (_) {}
+    }
 
     async function loadAll() {
       try {
@@ -528,7 +650,7 @@
         }
         state.usersById = usersById;
 
-        renderKanban();
+        applyView();
       } catch (e) {
         console.error(e);
         toast('Erro ao carregar demandas: ' + (e.message || e), 'error');
@@ -584,7 +706,7 @@
       const list = state.demands;
       const map = { open: [], in_progress: [], review: [], done: [] };
       list.forEach(d => {
-        if (d.status === 'canceled') return; // não renderiza canceladas no quadro principal
+        if (d.status === 'canceled') return;
         if (map[d.status]) map[d.status].push(d);
       });
       document.getElementById('colOpen').innerHTML   = map.open.length   ? map.open.map(cardHtml).join('')   : '<div class="empty">Nada por aqui.</div>';
@@ -597,9 +719,156 @@
       document.getElementById('cntReview').textContent = map.review.length;
       document.getElementById('cntDone').textContent   = map.done.length;
 
-      document.querySelectorAll('.kcard').forEach(el => {
+      document.querySelectorAll('#kanbanView .kcard').forEach(el => {
         el.addEventListener('click', () => openDetail(el.dataset.id));
       });
+    }
+
+    function studentCardHtml(d) {
+      const due = dueLabel(d);
+      const dueObj = typeof due === 'string' ? { text: due, cls: '' } : due;
+      const members = state.membersById[d.id] || [];
+      const ops = members.filter(m => m.role === 'operator');
+      const usersById = state.usersById || {};
+      const visible = ops.slice(0, 3);
+      const moreCount = ops.length - visible.length;
+      const avatars = visible.map(m => {
+        const u = usersById[m.user_id] || {};
+        return `<div class="avatar" title="${escapeHtml(u.name || '—')}">${initials(u.name || '?')}</div>`;
+      }).join('') + (moreCount > 0 ? `<div class="more">+${moreCount}</div>` : '');
+      const badgeCls = d.status === 'open' ? 'open'
+                   : d.status === 'in_progress' ? 'prog'
+                   : d.status === 'review' ? 'review'
+                   : d.status === 'done' ? 'done' : 'cancel';
+      const badgeTxt = STATUS_BADGE[d.status]?.label || d.status;
+      return `
+        <div class="kcard" data-id="${d.id}">
+          <span class="badge-mini ${badgeCls}">${badgeTxt}</span>
+          <div class="title">${escapeHtml(d.title || 'Sem título')}</div>
+          <div class="meta-row">
+            <div class="avatars">${avatars || '<span style="font-size:0.7rem; color:var(--muted);">sem equipe</span>'}</div>
+            <span class="due ${dueObj.cls}">${dueObj.text}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderStudentsView() {
+      // Agrupa por client_slug. Cliente sem demanda também aparece pra dar visão completa
+      // quando o filtro é "todos". Quando filtra cliente, mostra só esse.
+      const allClients = state.clientsForView || [];
+      const byClient = {};
+      state.demands.forEach(d => {
+        const k = d.client_slug;
+        if (!byClient[k]) byClient[k] = [];
+        byClient[k].push(d);
+      });
+
+      // Quando há filtro de cliente, só esse aparece
+      let clients = allClients;
+      if (state.filter.clientSlug && state.filter.clientSlug !== 'all') {
+        clients = clients.filter(c => c.slug === state.filter.clientSlug);
+      }
+      // Ordena: primeiro com mais demandas ativas (open/in_progress/review), depois alfabético
+      clients = [...clients].sort((a, b) => {
+        const da = (byClient[a.slug] || []).filter(d => d.status !== 'done' && d.status !== 'canceled').length;
+        const db = (byClient[b.slug] || []).filter(d => d.status !== 'done' && d.status !== 'canceled').length;
+        if (db !== da) return db - da;
+        return (a.display_name || a.slug).localeCompare(b.display_name || b.slug);
+      });
+
+      // Se houver demandas de cliente que não está em allClients (improvável mas defensivo)
+      Object.keys(byClient).forEach(slug => {
+        if (!clients.some(c => c.slug === slug)) {
+          clients.push({ slug, display_name: byClient[slug][0]?.client_name || slug });
+        }
+      });
+
+      // Se busca, filtra clientes que tenham pelo menos uma demanda casando
+      if (state.filter.search?.trim()) {
+        clients = clients.filter(c => (byClient[c.slug] || []).length > 0);
+      }
+
+      const html = clients.map(c => {
+        const demands = byClient[c.slug] || [];
+        if (demands.length === 0 && state.filter.search?.trim()) return ''; // já filtrado
+        const open = demands.filter(d => d.status === 'open').length;
+        const prog = demands.filter(d => d.status === 'in_progress').length;
+        const review = demands.filter(d => d.status === 'review').length;
+        const done = demands.filter(d => d.status === 'done').length;
+        const isCollapsed = state.collapsedStudents.has(c.slug);
+        // Demandas "ativas" (não-canceladas) ordenadas: review > in_progress > open > done
+        const order = { review:0, in_progress:1, open:2, done:3, canceled:4 };
+        const sorted = [...demands]
+          .filter(d => d.status !== 'canceled')
+          .sort((a,b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+
+        const counters = [];
+        if (review > 0) counters.push(`<span class="student-counter review">${review} em revisão</span>`);
+        if (prog > 0)   counters.push(`<span class="student-counter prog">${prog} em andamento</span>`);
+        if (open > 0)   counters.push(`<span class="student-counter">${open} abertas</span>`);
+        if (done > 0)   counters.push(`<span class="student-counter done">${done} concluídas</span>`);
+        if (counters.length === 0) counters.push(`<span class="student-counter">Sem demandas</span>`);
+
+        return `
+          <div class="student-block ${isCollapsed ? 'collapsed' : ''}" data-slug="${c.slug}">
+            <div class="student-head">
+              <div class="student-head-left">
+                <div class="avatar">${initials(c.display_name || c.slug)}</div>
+                <div>
+                  <div class="student-name">${escapeHtml(c.display_name || c.slug)}</div>
+                  <div class="student-meta">${demands.length} demanda${demands.length === 1 ? '' : 's'} no total</div>
+                </div>
+              </div>
+              <div class="student-head-right">
+                ${counters.join('')}
+                <div class="student-caret">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </div>
+            </div>
+            <div class="student-body">
+              ${sorted.length > 0 ? sorted.map(studentCardHtml).join('') : '<div class="empty">Sem demandas ativas.</div>'}
+            </div>
+          </div>
+        `;
+      }).filter(Boolean).join('');
+
+      const wrap = document.getElementById('studentsView');
+      wrap.innerHTML = html || '<div style="padding:40px; text-align:center; color:var(--muted);">Nenhum aluno encontrado.</div>';
+
+      // Toggle expandir/colapsar
+      wrap.querySelectorAll('.student-head').forEach(head => {
+        head.addEventListener('click', (e) => {
+          if (e.target.closest('.kcard')) return;
+          const block = head.closest('.student-block');
+          const slug = block.dataset.slug;
+          block.classList.toggle('collapsed');
+          if (block.classList.contains('collapsed')) state.collapsedStudents.add(slug);
+          else state.collapsedStudents.delete(slug);
+          persistCollapsed();
+        });
+      });
+      // Click em card abre detalhe
+      wrap.querySelectorAll('.kcard').forEach(el => {
+        el.addEventListener('click', (e) => { e.stopPropagation(); openDetail(el.dataset.id); });
+      });
+    }
+
+    function applyView() {
+      const kanban = document.getElementById('kanbanView');
+      const students = document.getElementById('studentsView');
+      const buttons = document.querySelectorAll('.view-toggle button');
+      buttons.forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
+      if (state.view === 'students') {
+        kanban.classList.add('hidden');
+        students.classList.add('active');
+        renderStudentsView();
+      } else {
+        kanban.classList.remove('hidden');
+        students.classList.remove('active');
+        renderKanban();
+      }
     }
 
     async function openDetail(id) {
@@ -744,16 +1013,32 @@
     async function fillClientFilter() {
       try {
         const clients = await AdminAPI.listClientsSimple();
+        state.clientsForView = clients || [];
         const sel = document.getElementById('clientFilter');
         sel.innerHTML = '<option value="all">Cliente: Todos</option>' +
           clients.map(c => `<option value="${c.slug}">${escapeHtml(c.display_name || c.slug)}</option>`).join('');
       } catch (e) { console.error(e); }
     }
 
+    // Ligar o toggle de visão
+    document.querySelectorAll('.view-toggle button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (state.view === btn.dataset.view) return;
+        state.view = btn.dataset.view;
+        try { localStorage.setItem('admin_demands_view', state.view); } catch (_) {}
+        applyView();
+      });
+    });
+
     (async function init() {
       const profile = await AdminAPI.requireAdmin();
       if (!profile) return;
       await fillSession(profile);
+      // Restaura preferência de visão
+      try {
+        const saved = localStorage.getItem('admin_demands_view');
+        if (saved === 'students' || saved === 'kanban') state.view = saved;
+      } catch (_) {}
       await fillClientFilter();
       await loadAll();
       setupRealtime();
