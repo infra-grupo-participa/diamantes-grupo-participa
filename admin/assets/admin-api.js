@@ -511,24 +511,59 @@
   // GUARD: redireciona se não-admin
   // =============================================================
 
-  function showAuthOverlay() {
-    if (document.getElementById('__authOverlay')) return;
-    const ov = document.createElement('div');
-    ov.id = '__authOverlay';
-    ov.style.cssText = 'position:fixed;inset:0;background:#0f172a;z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Inter,sans-serif;font-size:0.9rem;';
-    ov.innerHTML = '<div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.18);border-top-color:#F29725;border-radius:50%;margin:0 auto 14px;animation:spin 0.8s linear infinite;"></div>Verificando acesso…</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
-    document.body.appendChild(ov);
+  // Overlay sutil (tema claro) que só aparece se a verificação demorar mais
+  // de 250ms — evita o flash em navegações rápidas com sessão já em cache.
+  let __overlayTimer = null;
+  function scheduleAuthOverlay() {
+    __overlayTimer = setTimeout(() => {
+      if (document.getElementById('__authOverlay')) return;
+      const ov = document.createElement('div');
+      ov.id = '__authOverlay';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(247,248,250,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;color:#475569;font-family:Inter,sans-serif;font-size:0.9rem;backdrop-filter:blur(2px);';
+      ov.innerHTML = '<div style="text-align:center;"><div style="width:28px;height:28px;border:3px solid rgba(15,23,42,0.10);border-top-color:#F29725;border-radius:50%;margin:0 auto 12px;animation:__sp 0.8s linear infinite;"></div>Verificando acesso…</div><style>@keyframes __sp{to{transform:rotate(360deg)}}</style>';
+      document.body.appendChild(ov);
+    }, 250);
   }
-  function hideAuthOverlay() {
+  function cancelAuthOverlay() {
+    if (__overlayTimer) { clearTimeout(__overlayTimer); __overlayTimer = null; }
     const ov = document.getElementById('__authOverlay');
     if (ov) ov.remove();
   }
 
+  // Cache em sessionStorage: se já validamos como admin nesta sessão de browser,
+  // confiamos por 5 min — evita roundtrip a cada troca de aba.
+  const CACHE_KEY = '__gpAdminProfile';
+  const CACHE_TTL_MS = 5 * 60 * 1000;
+  function readCachedProfile() {
+    try {
+      const raw = sessionStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (!obj?.at || Date.now() - obj.at > CACHE_TTL_MS) return null;
+      return obj.profile;
+    } catch { return null; }
+  }
+  function writeCachedProfile(profile) {
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), profile })); } catch (_) {}
+  }
+  function clearCachedProfile() {
+    try { sessionStorage.removeItem(CACHE_KEY); } catch (_) {}
+  }
+
   async function requireAdmin() {
-    showAuthOverlay();
+    // Caminho rápido: já validamos como admin neste tab há pouco
+    const cached = readCachedProfile();
+    if (cached && cached.role === 'admin' && cached.status === 'approved') {
+      // Revalida no Supabase em background (sem bloquear UI)
+      validateInBackground();
+      return cached;
+    }
+
+    scheduleAuthOverlay();
     const supabase = client();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      clearCachedProfile();
       window.location.replace('/');
       return null;
     }
@@ -538,11 +573,13 @@
       .eq('auth_user_id', session.user.id)
       .maybeSingle();
     if (error || !profile) {
+      clearCachedProfile();
+      cancelAuthOverlay();
       window.location.replace('/');
       return null;
     }
     if (profile.role !== 'admin' || profile.status !== 'approved') {
-      // Cliente ou operador autenticado: manda pro lugar certo
+      clearCachedProfile();
       if (profile.role === 'user' && profile.status === 'approved') {
         window.location.replace('/');
       } else {
@@ -551,11 +588,36 @@
       }
       return null;
     }
-    hideAuthOverlay();
+    cancelAuthOverlay();
+    writeCachedProfile(profile);
     return profile;
   }
 
+  async function validateInBackground() {
+    try {
+      const supabase = client();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        clearCachedProfile();
+        window.location.replace('/');
+        return;
+      }
+      const { data: profile } = await supabase
+        .from('users')
+        .select('id, role, status, name, email')
+        .eq('auth_user_id', session.user.id)
+        .maybeSingle();
+      if (!profile || profile.role !== 'admin' || profile.status !== 'approved') {
+        clearCachedProfile();
+        window.location.replace('/');
+        return;
+      }
+      writeCachedProfile(profile);
+    } catch (_) { /* network blip — ignora, cache continua válido */ }
+  }
+
   async function logout() {
+    clearCachedProfile();
     await client().auth.signOut();
     window.location.replace('/');
   }
