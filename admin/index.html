@@ -398,22 +398,27 @@
 
     .users-table thead th {
       text-align: left;
-      padding: 12px 24px;
-      font-size: 0.72rem;
+      padding: 12px 18px;
+      font-size: 0.7rem;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       font-weight: 600;
       color: var(--muted);
-      background: #fafbfc;
+      background: transparent;
       border-bottom: 1px solid var(--border);
+      white-space: nowrap;
     }
+    .users-table thead th:first-child { padding-left: 24px; }
+    .users-table thead th:last-child  { padding-right: 24px; }
 
     .users-table tbody td {
-      padding: 14px 24px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--border);
       color: var(--text);
       vertical-align: middle;
     }
+    .users-table tbody td:first-child { padding-left: 24px; }
+    .users-table tbody td:last-child  { padding-right: 24px; }
 
     .users-table tbody tr:last-child td { border-bottom: none; }
     .users-table tbody tr:hover { background: #fafbfc; }
@@ -423,23 +428,81 @@
       align-items: center;
       gap: 12px;
     }
-    .user-cell .avatar { width: 34px; height: 34px; font-size: 0.74rem; }
-    .user-cell-info { display: flex; flex-direction: column; }
-    .user-cell-name { font-weight: 600; color: var(--text); }
-    .user-cell-id { font-size: 0.72rem; color: var(--muted); }
+    .user-cell .avatar { width: 36px; height: 36px; font-size: 0.78rem; }
+    .user-cell-info { display: flex; flex-direction: column; min-width: 0; }
+    .user-cell-name { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .user-cell-id { font-size: 0.7rem; color: var(--muted); margin-top: 1px; }
 
+    /* Role pill — fundo sólido com cor do cargo + texto branco/cargo escuro */
+    .role-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .role-pill.admin {
+      background: linear-gradient(135deg, #fef3c7, #fff4d6);
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+    .role-pill.operator {
+      color: #fff;
+    }
+    .role-pill .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.85);
+      flex-shrink: 0;
+    }
+    .role-pill.admin .dot { background: var(--accent-strong); }
+
+    /* Avaliação */
     .rating {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+      white-space: nowrap;
     }
     .stars { display: inline-flex; gap: 1px; color: var(--warning); }
     .stars svg { width: 13px; height: 13px; }
     .rating-value {
-      font-weight: 600;
+      font-weight: 700;
       color: var(--text);
       font-size: 0.84rem;
     }
+
+    /* Alunos atendidos — pill numérica */
+    .count-pill {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 28px; height: 26px;
+      padding: 0 10px;
+      border-radius: 8px;
+      background: var(--bg);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.84rem;
+      border: 1px solid var(--border-strong);
+    }
+    .count-pill.zero { color: var(--muted); }
+
+    /* Status com dot */
+    .status-cell {
+      display: inline-flex; align-items: center; gap: 7px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .status-cell .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+    .status-cell.approved .dot { background: var(--success); box-shadow: 0 0 0 3px rgba(22,163,74,0.18); }
+    .status-cell.disabled .dot { background: var(--warning); box-shadow: 0 0 0 3px rgba(245,158,11,0.18); }
+    .status-cell.rejected .dot { background: var(--danger);  box-shadow: 0 0 0 3px rgba(239,68,68,0.18); }
+    .status-cell.pending  .dot { background: var(--kpi-blue-ico); box-shadow: 0 0 0 3px rgba(59,130,246,0.18); }
 
     .tasks-cell {
       display: flex;
@@ -479,23 +542,28 @@
     .progress-fill.low { background: var(--danger); }
 
     .row-actions {
-      display: flex;
-      gap: 6px;
+      display: inline-flex;
+      gap: 4px;
     }
     .icon-btn {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 8px;
-      border: 1px solid var(--border-strong);
-      background: var(--surface);
-      color: var(--text-secondary);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
       display: grid;
       place-items: center;
-      transition: background 0.15s, color 0.15s;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
-    .icon-btn:hover { background: var(--bg); color: var(--text); }
-    .icon-btn.danger:hover { background: #fee2e2; color: var(--danger); border-color: #fecaca; }
-    .icon-btn svg { width: 15px; height: 15px; }
+    .users-table tbody tr:hover .icon-btn {
+      border-color: var(--border-strong);
+      background: var(--surface);
+      color: var(--text-secondary);
+    }
+    .icon-btn:hover { background: var(--bg) !important; color: var(--text) !important; }
+    .icon-btn.danger:hover { background: #fee2e2 !important; color: var(--danger) !important; border-color: #fecaca !important; }
+    .icon-btn svg { width: 14px; height: 14px; }
 
     /* ============================== PAGINATION ============================== */
 
@@ -507,12 +575,17 @@
       border-top: 1px solid var(--border);
       font-size: 0.84rem;
       color: var(--text-secondary);
+      flex-wrap: wrap;
+      gap: 12px;
     }
+    .pagination > * { flex-shrink: 0; }
+    #pgInfo { white-space: nowrap; }
 
     .page-size-wrap {
       display: flex;
       align-items: center;
       gap: 10px;
+      white-space: nowrap;
     }
     .page-size-wrap select {
       padding: 6px 10px;
@@ -714,9 +787,9 @@
                 <th>Email</th>
                 <th>Função / Cargo</th>
                 <th>Avaliação geral</th>
-                <th>Alunos atendidos</th>
+                <th style="text-align:center;">Alunos</th>
                 <th>Status</th>
-                <th style="text-align:right;">Ação</th>
+                <th style="text-align:right;">Ações</th>
               </tr>
             </thead>
             <tbody id="usersTableBody"></tbody>
@@ -817,15 +890,15 @@
       return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     }
 
-    function badge(status) {
+    function statusCell(status) {
       const map = {
-        approved: { cls: 'badge-green',  txt: 'Ativo' },
-        disabled: { cls: 'badge-yellow', txt: 'Desabilitado' },
-        rejected: { cls: 'badge-red',    txt: 'Rejeitado' },
-        pending:  { cls: 'badge-blue',   txt: 'Pendente' },
+        approved: { cls: 'approved', txt: 'Ativo' },
+        disabled: { cls: 'disabled', txt: 'Desabilitado' },
+        rejected: { cls: 'rejected', txt: 'Rejeitado' },
+        pending:  { cls: 'pending',  txt: 'Pendente' },
       };
-      const b = map[status] || { cls: 'badge-yellow', txt: status || '—' };
-      return `<span class="badge ${b.cls}">${b.txt}</span>`;
+      const b = map[status] || { cls: 'pending', txt: status || '—' };
+      return `<span class="status-cell ${b.cls}"><span class="dot"></span>${b.txt}</span>`;
     }
 
     function starsHtml(rating) {
@@ -842,14 +915,14 @@
 
     function roleBadge(role, position_name, position_color) {
       if (role === 'admin') {
-        return `<span class="badge badge-blue">Admin</span>`;
+        return `<span class="role-pill admin"><span class="dot"></span>Admin</span>`;
       }
       if (role === 'operator') {
         const color = position_color || '#94a3b8';
         const name = position_name || 'Sem cargo';
-        return `<span class="badge" style="background:${color}1a; color:${color};">${name}</span>`;
+        return `<span class="role-pill operator" style="background:${color};"><span class="dot"></span>${name}</span>`;
       }
-      return `<span class="badge badge-yellow">${role || '—'}</span>`;
+      return `<span class="role-pill admin">${role || '—'}</span>`;
     }
 
     function toast(message, kind = 'success') {
@@ -877,8 +950,8 @@
           <td><span style="color:var(--text-secondary)">${u.email || '—'}</span></td>
           <td>${roleBadge(u.role, u.position_name, u.position_color)}</td>
           <td>${starsHtml(u.rating_avg)}</td>
-          <td><span style="font-weight:600;">${u.students_count ?? 0}</span></td>
-          <td>${badge(u.status)}</td>
+          <td style="text-align:center;"><span class="count-pill ${(u.students_count ?? 0) === 0 ? 'zero' : ''}">${u.students_count ?? 0}</span></td>
+          <td>${statusCell(u.status)}</td>
           <td style="text-align:right;">
             <div class="row-actions" style="justify-content:flex-end;">
               <button class="icon-btn" data-action="edit" title="Editar">
