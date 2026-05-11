@@ -486,11 +486,7 @@
     "commit": "c30533bd4c917946fc44940f553d5862389a22c3"
   },
   {
-<<<<<<< HEAD
-    "at": "2026-05-11T19:53:35.249Z",
-=======
     "at": "2026-05-11T19:53:40.816Z",
->>>>>>> 32e741e (chore(quality): recalibra baseline — files_over_500_loc 8→10 (estado real do repo))
     "metrics": {
       "lint_errors": 0,
       "lint_warnings": 0,
@@ -505,10 +501,6 @@
       "bytes_public": 317308,
       "test_coverage": 0
     },
-<<<<<<< HEAD
     "commit": "9d9823ee628fceb351eb8cbcb3b3600efc106b05"
-=======
-    "commit": null
->>>>>>> 32e741e (chore(quality): recalibra baseline — files_over_500_loc 8→10 (estado real do repo))
   }
 ]
