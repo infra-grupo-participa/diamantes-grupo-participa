@@ -354,10 +354,178 @@
   }
 
   // =============================================================
+  // ASSINATURAS (portal.subscriptions + view v_subscriptions)
+  // =============================================================
+
+  async function listSubscriptions({ search = '', status = 'all', limit = 25, offset = 0 } = {}) {
+    let q = client()
+      .from('v_subscriptions')
+      .select('*', { count: 'exact' })
+      .order('client_name', { ascending: true });
+
+    if (status && status !== 'all') q = q.eq('status', status);
+    if (search && search.trim()) {
+      const s = search.trim().replace(/[%_]/g, '');
+      q = q.or(`client_name.ilike.%${s}%,client_slug.ilike.%${s}%,owner_email.ilike.%${s}%,plan_name.ilike.%${s}%`);
+    }
+    q = q.range(offset, offset + limit - 1);
+
+    const { data, count, error } = await q;
+    if (error) throw error;
+    return { data: data || [], count: count || 0 };
+  }
+
+  async function getSubscriptionStats() {
+    const supabase = client();
+    const [paid, late, pending, canceled, sumPaid, dueSoon] = await Promise.all([
+      supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'paid'),
+      supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'late'),
+      supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'canceled'),
+      supabase.from('subscriptions').select('monthly_value').neq('status', 'canceled'),
+      supabase.from('v_subscriptions').select('*').gte('next_billing_date', new Date().toISOString().slice(0,10))
+        .lte('next_billing_date', new Date(Date.now() + 7*24*60*60*1000).toISOString().slice(0,10))
+        .neq('status', 'canceled')
+        .order('next_billing_date', { ascending: true }).limit(8),
+    ]);
+
+    const mrr = (sumPaid.data || []).reduce((s, r) => s + Number(r.monthly_value || 0), 0);
+    const active = (paid.count || 0) + (pending.count || 0) + (late.count || 0);
+    const retention = active === 0 ? 0 : Math.round(((paid.count || 0) / active) * 100);
+
+    return {
+      mrr,
+      active,
+      paid: paid.count || 0,
+      late: late.count || 0,
+      pending: pending.count || 0,
+      canceled: canceled.count || 0,
+      retention,
+      dueSoon: dueSoon.data || [],
+    };
+  }
+
+  async function getMrrSparkline() {
+    // Histórico simples: usa created_at de cada subscription para inferir crescimento por mês (últimos 6 meses)
+    const { data } = await client()
+      .from('subscriptions').select('monthly_value, started_at, created_at, status');
+    if (!data) return [];
+    const now = new Date();
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const next = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      const sum = data
+        .filter(s => s.status !== 'canceled')
+        .filter(s => {
+          const ref = s.started_at ? new Date(s.started_at) : new Date(s.created_at);
+          return ref < next;
+        })
+        .reduce((s, r) => s + Number(r.monthly_value || 0), 0);
+      months.push({
+        label: d.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''),
+        value: sum,
+      });
+    }
+    return months;
+  }
+
+  async function getServicesByType() {
+    // Contagem de serviços ativos agrupados por tipo (para o card lateral)
+    const { data, error } = await client()
+      .from('services').select('service_type, status').eq('status', 'active');
+    if (error) throw error;
+    const counts = {};
+    (data || []).forEach(s => {
+      counts[s.service_type] = (counts[s.service_type] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  async function createSubscription(payload) {
+    const required = ['client_slug', 'plan_name', 'monthly_value'];
+    for (const k of required) if (payload[k] === undefined || payload[k] === '') throw new Error(`${k} obrigatório.`);
+    const { data, error } = await client().from('subscriptions').insert({
+      client_slug:          payload.client_slug,
+      plan_name:            payload.plan_name,
+      monthly_value:        Number(payload.monthly_value) || 0,
+      next_billing_date:    payload.next_billing_date || null,
+      payment_method:       payload.payment_method || 'pix',
+      payment_method_label: payload.payment_method_label || null,
+      status:               payload.status || 'paid',
+      started_at:           payload.started_at || null,
+      notes:                payload.notes || null,
+    }).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function updateSubscription(id, patch) {
+    if (!id) throw new Error('id obrigatório');
+    const allowed = ['plan_name', 'monthly_value', 'next_billing_date', 'payment_method', 'payment_method_label', 'status', 'started_at', 'notes'];
+    const clean = {};
+    for (const k of allowed) if (patch[k] !== undefined) clean[k] = patch[k];
+    if (clean.monthly_value !== undefined) clean.monthly_value = Number(clean.monthly_value) || 0;
+    clean.updated_at = new Date().toISOString();
+    const { data, error } = await client().from('subscriptions').update(clean).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteSubscription(id) {
+    if (!id) throw new Error('id obrigatório');
+    const { error } = await client().from('subscriptions').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+
+  async function listClientsForSubscription() {
+    // Clientes que ainda não têm subscription
+    const supabase = client();
+    const [clients, subs] = await Promise.all([
+      supabase.from('clients').select('slug, display_name').order('display_name'),
+      supabase.from('subscriptions').select('client_slug'),
+    ]);
+    const has = new Set((subs.data || []).map(s => s.client_slug));
+    return (clients.data || []).filter(c => !has.has(c.slug));
+  }
+
+  async function exportSubscriptionsCsv() {
+    const { data } = await listSubscriptions({ limit: 1000, offset: 0 });
+    const header = ['Aluno', 'Email', 'Plano', 'Valor mensal', 'Próxima cobrança', 'Forma de pagamento', 'Status', 'Início'];
+    const rows = data.map(s => [
+      s.client_name, s.owner_email || '',
+      s.plan_name, Number(s.monthly_value).toFixed(2).replace('.', ','),
+      s.next_billing_date || '',
+      s.payment_method_label || s.payment_method || '',
+      s.status,
+      s.started_at || '',
+    ]);
+    const csv = [header, ...rows].map(r => r.map(csvEscape).join(';')).join('\n');
+    return new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  }
+
+  // =============================================================
   // GUARD: redireciona se não-admin
   // =============================================================
 
+  function showAuthOverlay() {
+    if (document.getElementById('__authOverlay')) return;
+    const ov = document.createElement('div');
+    ov.id = '__authOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:#0f172a;z-index:9999;display:flex;align-items:center;justify-content:center;color:#fff;font-family:Inter,sans-serif;font-size:0.9rem;';
+    ov.innerHTML = '<div style="text-align:center;"><div style="width:32px;height:32px;border:3px solid rgba(255,255,255,0.18);border-top-color:#F29725;border-radius:50%;margin:0 auto 14px;animation:spin 0.8s linear infinite;"></div>Verificando acesso…</div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(ov);
+  }
+  function hideAuthOverlay() {
+    const ov = document.getElementById('__authOverlay');
+    if (ov) ov.remove();
+  }
+
   async function requireAdmin() {
+    showAuthOverlay();
     const supabase = client();
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -369,10 +537,21 @@
       .select('id, role, status, name, email')
       .eq('auth_user_id', session.user.id)
       .maybeSingle();
-    if (error || !profile || profile.role !== 'admin' || profile.status !== 'approved') {
+    if (error || !profile) {
       window.location.replace('/');
       return null;
     }
+    if (profile.role !== 'admin' || profile.status !== 'approved') {
+      // Cliente ou operador autenticado: manda pro lugar certo
+      if (profile.role === 'user' && profile.status === 'approved') {
+        window.location.replace('/');
+      } else {
+        await supabase.auth.signOut();
+        window.location.replace('/');
+      }
+      return null;
+    }
+    hideAuthOverlay();
     return profile;
   }
 
@@ -411,6 +590,16 @@
     assignTeamMember,
     removeTeamMember,
     listOperators,
+    // Assinaturas
+    listSubscriptions,
+    getSubscriptionStats,
+    getMrrSparkline,
+    getServicesByType,
+    createSubscription,
+    updateSubscription,
+    deleteSubscription,
+    listClientsForSubscription,
+    exportSubscriptionsCsv,
     // Utils
     downloadBlob,
     requireAdmin,
