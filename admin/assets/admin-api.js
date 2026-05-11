@@ -204,6 +204,156 @@
   }
 
   // =============================================================
+  // ALUNOS DIAMANTES (portal.clients + v_students + team_assignments + services)
+  // =============================================================
+
+  async function listStudents({ search = '', billingStatus = 'all', limit = 25, offset = 0 } = {}) {
+    let q = client()
+      .from('v_students')
+      .select('*', { count: 'exact' })
+      .order('name', { ascending: true });
+
+    if (billingStatus && billingStatus !== 'all') {
+      q = q.eq('billing_status', billingStatus);
+    }
+    if (search && search.trim()) {
+      const s = search.trim().replace(/[%_]/g, '');
+      q = q.or(`name.ilike.%${s}%,slug.ilike.%${s}%,owner_email.ilike.%${s}%`);
+    }
+    q = q.range(offset, offset + limit - 1);
+
+    const { data, count, error } = await q;
+    if (error) throw error;
+    return { data: data || [], count: count || 0 };
+  }
+
+  async function getStudent(slug) {
+    if (!slug) throw new Error('slug obrigatório');
+    const { data, error } = await client()
+      .from('v_students').select('*').eq('slug', slug).maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function getStudentTeam(slug) {
+    if (!slug) throw new Error('slug obrigatório');
+    const { data, error } = await client().rpc('get_student_team', { p_slug: slug });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getStudentServices(slug) {
+    const { data, error } = await client()
+      .from('services')
+      .select('id, service_type, status, metadata, created_at')
+      .eq('client_slug', slug)
+      .order('service_type', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getStudentStats() {
+    const supabase = client();
+    const [total, active, paused, withTeam] = await Promise.all([
+      supabase.from('v_students').select('slug', { count: 'exact', head: true }),
+      supabase.from('v_students').select('slug', { count: 'exact', head: true }).eq('billing_status', 'current'),
+      supabase.from('v_students').select('slug', { count: 'exact', head: true }).neq('billing_status', 'current'),
+      supabase.from('v_students').select('slug', { count: 'exact', head: true }).gt('team_count', 0),
+    ]);
+    return {
+      total:    total.count    || 0,
+      active:   active.count   || 0,
+      paused:   paused.count   || 0,
+      withTeam: withTeam.count || 0,
+    };
+  }
+
+  async function createStudent({ slug, display_name, primary_color = '#F29725' }) {
+    if (!slug || !display_name) throw new Error('slug e nome são obrigatórios.');
+    if (!/^[a-z0-9-]+$/.test(slug)) throw new Error('slug deve conter só letras minúsculas, números e hífen.');
+    const supabase = client();
+    const { data, error } = await supabase
+      .from('clients')
+      .insert({ slug, display_name, cliente_name_var: display_name, primary_color })
+      .select().single();
+    if (error) throw error;
+    // Cria o profile vazio em paralelo (best-effort)
+    await supabase.from('client_profiles').insert({ client_slug: slug, data: { billingStatus: 'current' } });
+    return data;
+  }
+
+  async function updateStudent(slug, patch) {
+    if (!slug) throw new Error('slug obrigatório');
+    const allowed = ['display_name', 'primary_color'];
+    const clean = {};
+    for (const k of allowed) if (patch[k] !== undefined) clean[k] = patch[k];
+    clean.updated_at = new Date().toISOString();
+    const { data, error } = await client()
+      .from('clients').update(clean).eq('slug', slug).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function deleteStudent(slug) {
+    if (!slug) throw new Error('slug obrigatório');
+    // Deleta o cliente — team_assignments e services caem em cascata via FK
+    const { error } = await client().from('clients').delete().eq('slug', slug);
+    if (error) throw error;
+    return true;
+  }
+
+  // =============================================================
+  // EQUIPE (team_assignments)
+  // =============================================================
+
+  async function assignTeamMember({ client_slug, user_id, position_id, notes = '' }) {
+    if (!client_slug || !user_id || !position_id) throw new Error('client_slug, user_id e position_id são obrigatórios.');
+    const supabase = client();
+    const { data: profile } = await supabase.from('users')
+      .select('id').eq('auth_user_id', (await supabase.auth.getSession()).data.session?.user.id).maybeSingle();
+    const { data, error } = await supabase.from('team_assignments').insert({
+      client_slug, user_id, position_id, notes, assigned_by: profile?.id || null,
+    }).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function removeTeamMember(assignment_id) {
+    if (!assignment_id) throw new Error('assignment_id obrigatório');
+    const { error } = await client().from('team_assignments').delete().eq('id', assignment_id);
+    if (error) throw error;
+    return true;
+  }
+
+  // Listar operadores disponíveis pra atribuir como equipe (para o dropdown)
+  async function listOperators() {
+    const { data, error } = await client()
+      .from('users')
+      .select('id, name, email, position_id')
+      .eq('role', 'operator')
+      .eq('status', 'approved')
+      .order('name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function exportStudentsCsv() {
+    const { data } = await listStudents({ limit: 1000, offset: 0 });
+    const header = ['Slug', 'Nome', 'Email do dono', 'Status', 'Início contrato', 'Avaliação média', 'Avaliações', 'Serviços', 'Equipe'];
+    const rows = data.map(s => [
+      s.slug, s.name, s.owner_email || '',
+      s.billing_status || '',
+      s.contract_started_at || '',
+      s.rating_avg ?? '0.00',
+      s.ratings_count ?? 0,
+      s.services_count ?? 0,
+      s.team_count ?? 0,
+    ]);
+    const csv = [header, ...rows].map(r => r.map(csvEscape).join(';')).join('\n');
+    return new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  }
+
+  // =============================================================
   // GUARD: redireciona se não-admin
   // =============================================================
 
@@ -236,6 +386,7 @@
   // =============================================================
 
   window.AdminAPI = {
+    // Funcionários
     listEmployees,
     createEmployee,
     updateEmployee,
@@ -246,6 +397,21 @@
     getEmployeeStats,
     exportEmployeesCsv,
     listPositions,
+    // Alunos Diamantes
+    listStudents,
+    getStudent,
+    getStudentTeam,
+    getStudentServices,
+    getStudentStats,
+    createStudent,
+    updateStudent,
+    deleteStudent,
+    exportStudentsCsv,
+    // Equipe
+    assignTeamMember,
+    removeTeamMember,
+    listOperators,
+    // Utils
     downloadBlob,
     requireAdmin,
     logout,

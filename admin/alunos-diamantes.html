@@ -431,11 +431,11 @@
           <p class="page-subtitle">Acompanhe os clientes vinculados às suas equipes.</p>
         </div>
         <div class="page-actions">
-          <button class="btn btn-ghost">
+          <button class="btn btn-ghost" id="btnExport">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Exportar planilha
           </button>
-          <button class="btn btn-primary">
+          <button class="btn btn-primary" id="btnNew">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Criar aluno
           </button>
@@ -444,7 +444,6 @@
 
       <!-- Coluna 1: KPIs + tabela -->
       <div style="display:flex; flex-direction:column; gap:20px; min-width:0;">
-        <!-- KPIs -->
         <div class="kpi-grid">
           <div class="kpi-card">
             <div class="kpi-icon" style="background: var(--kpi-blue); color: var(--kpi-blue-ico);">
@@ -452,25 +451,34 @@
             </div>
             <div>
               <div class="kpi-label">Total de alunos</div>
-              <div class="kpi-value">1.248</div>
+              <div class="kpi-value" id="kpiTotal">—</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: var(--kpi-green); color: var(--kpi-green-ico);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div>
+              <div class="kpi-label">Em dia (current)</div>
+              <div class="kpi-value" id="kpiActive">—</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon" style="background: var(--kpi-yellow); color: var(--kpi-yellow-ico);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div class="kpi-label">Outros status</div>
+              <div class="kpi-value" id="kpiPaused">—</div>
             </div>
           </div>
           <div class="kpi-card">
             <div class="kpi-icon" style="background: var(--kpi-purple); color: var(--kpi-purple-ico);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </div>
             <div>
-              <div class="kpi-label">Ativos no plano Diamante</div>
-              <div class="kpi-value">29</div>
-            </div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-icon" style="background: var(--kpi-pink); color: var(--kpi-pink-ico);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-            </div>
-            <div>
-              <div class="kpi-label">Cancelados / Inativos</div>
-              <div class="kpi-value">12</div>
+              <div class="kpi-label">Com equipe atribuída</div>
+              <div class="kpi-value" id="kpiWithTeam">—</div>
             </div>
           </div>
         </div>
@@ -485,12 +493,12 @@
             <div class="table-controls">
               <div class="search-input-wrap">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input class="search-input" type="text" placeholder="Buscar por nome, email ou documento" />
+                <input class="search-input" id="searchInput" type="text" placeholder="Buscar por nome, slug ou email" />
               </div>
-              <button class="btn btn-ghost">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-                Filtros
-              </button>
+              <select class="search-input" id="billingFilter" style="max-width:200px; padding-left:12px;">
+                <option value="all">Status: Todos</option>
+                <option value="current">Em dia</option>
+              </select>
             </div>
           </div>
 
@@ -499,7 +507,9 @@
               <thead>
                 <tr>
                   <th>Aluno</th>
-                  <th>Email</th>
+                  <th>Email do dono</th>
+                  <th>Equipe</th>
+                  <th>Serviços</th>
                   <th>Status</th>
                   <th style="text-align:right;">Ação</th>
                 </tr>
@@ -509,15 +519,16 @@
           </div>
 
           <div class="pagination">
-            <span>Mostrando <strong>1–8</strong> de <strong>29</strong> alunos</span>
-            <div class="page-nav">
-              <button class="page-btn" disabled>‹</button>
-              <button class="page-btn active">1</button>
-              <button class="page-btn">2</button>
-              <button class="page-btn">3</button>
-              <button class="page-btn">4</button>
-              <button class="page-btn">›</button>
+            <span id="pgInfo">Carregando…</span>
+            <div class="page-size-wrap">
+              <span>Itens por página</span>
+              <select id="pgSize">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+              </select>
             </div>
+            <div class="page-nav" id="pageNav"></div>
           </div>
         </div>
       </div>
@@ -544,29 +555,33 @@
 
         <div class="detail-stats">
           <div class="detail-stat">
-            <div class="detail-stat-value" id="statTeam">4</div>
+            <div class="detail-stat-value" id="statTeam">0</div>
             <div class="detail-stat-label">Equipe</div>
           </div>
           <div class="detail-stat">
-            <div class="detail-stat-value" id="statServices">4</div>
+            <div class="detail-stat-value" id="statServices">0</div>
             <div class="detail-stat-label">Serviços</div>
           </div>
           <div class="detail-stat">
-            <div class="detail-stat-value" id="statOpen">8</div>
-            <div class="detail-stat-label">Em aberto</div>
+            <div class="detail-stat-value" id="statRatings">0</div>
+            <div class="detail-stat-label">Avaliações</div>
           </div>
           <div class="detail-stat">
-            <div class="detail-stat-value" id="statDone">28</div>
-            <div class="detail-stat-label">Concluídas</div>
+            <div class="detail-stat-value" id="statContract">—</div>
+            <div class="detail-stat-label">Contrato</div>
           </div>
         </div>
 
         <div class="detail-section">
           <h4 class="detail-section-title">
             Integrantes da equipe
-            <span class="count" id="teamCount">4 pessoas</span>
+            <span class="count" id="teamCount">—</span>
           </h4>
           <div class="team-list" id="teamList"></div>
+          <button type="button" class="btn btn-ghost" id="btnAddTeam" style="width:100%; margin-top:10px; justify-content:center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Adicionar integrante
+          </button>
         </div>
 
         <div class="detail-section">
@@ -575,35 +590,34 @@
         </div>
 
         <div class="detail-section">
-          <h4 class="detail-section-title">
-            Demandas em aberto
-            <span class="count" id="demandsCount">5 demandas</span>
-          </h4>
-          <div class="demand-list" id="demandList"></div>
+          <h4 class="detail-section-title">Demandas em aberto <span class="count">via ClickUp (futuro)</span></h4>
+          <div style="color: var(--muted); font-size: 0.84rem; padding: 8px 0;">
+            As demandas serão exibidas quando integrarmos com o ClickUp.
+          </div>
         </div>
 
         <div class="detail-section">
-          <h4 class="detail-section-title">Métricas da equipe</h4>
+          <h4 class="detail-section-title">Métricas</h4>
           <div class="team-metrics">
             <div class="metric-card">
               <div class="metric-label">Avaliação média</div>
-              <div class="metric-value" id="metricRating">4,65</div>
-              <div class="metric-bar"><div class="metric-bar-fill green" style="width:93%"></div></div>
+              <div class="metric-value" id="metricRating">—</div>
+              <div class="metric-bar"><div class="metric-bar-fill green" id="metricRatingBar" style="width:0%"></div></div>
             </div>
             <div class="metric-card">
-              <div class="metric-label">Demandas no prazo</div>
-              <div class="metric-value" id="metricOnTime">92%</div>
-              <div class="metric-bar"><div class="metric-bar-fill green" style="width:92%"></div></div>
+              <div class="metric-label">Avaliações totais</div>
+              <div class="metric-value" id="metricRatings">—</div>
+              <div class="metric-bar"><div class="metric-bar-fill" style="width:0%"></div></div>
             </div>
             <div class="metric-card">
-              <div class="metric-label">SLA médio</div>
-              <div class="metric-value" id="metricSla">2,1 dias</div>
-              <div class="metric-bar"><div class="metric-bar-fill" style="width:70%"></div></div>
+              <div class="metric-label">Serviços ativos</div>
+              <div class="metric-value" id="metricServices">—</div>
+              <div class="metric-bar"><div class="metric-bar-fill green" id="metricServicesBar" style="width:0%"></div></div>
             </div>
             <div class="metric-card">
-              <div class="metric-label">Satisfação</div>
-              <div class="metric-value" id="metricSatisfaction">96%</div>
-              <div class="metric-bar"><div class="metric-bar-fill green" style="width:96%"></div></div>
+              <div class="metric-label">Integrantes</div>
+              <div class="metric-value" id="metricTeam">—</div>
+              <div class="metric-bar"><div class="metric-bar-fill" id="metricTeamBar" style="width:0%"></div></div>
             </div>
           </div>
         </div>
@@ -611,121 +625,133 @@
     </main>
   </div>
 
+  <!-- ============ MODAL: Criar/Editar aluno ============ -->
+  <div id="studentModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:100; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; width:100%; max-width:480px; box-shadow:0 24px 48px rgba(15,23,42,0.20); overflow:hidden;">
+      <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="studentModalTitle" style="margin:0; font-size:1.1rem; font-weight:700;">Criar aluno</h3>
+        <button type="button" id="studentModalClose" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:var(--muted);">×</button>
+      </div>
+      <form id="studentForm" style="padding:24px;">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Nome de exibição</label>
+            <input id="studentName" type="text" required class="search-input" style="padding-left:12px;" />
+          </div>
+          <div id="studentSlugWrap">
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Slug (URL única)</label>
+            <input id="studentSlug" type="text" required pattern="[a-z0-9-]+" class="search-input" style="padding-left:12px;" placeholder="nome-do-aluno" />
+            <small style="color:var(--muted); font-size:0.74rem;">Letras minúsculas, números e hífen. Não pode ser alterado depois.</small>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Cor primária</label>
+            <input id="studentColor" type="color" value="#F29725" style="width:60px; height:36px; border:1px solid var(--border-strong); border-radius:8px; cursor:pointer;" />
+          </div>
+        </div>
+        <div id="studentError" style="color:var(--danger); font-size:0.82rem; margin-top:12px; display:none;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+          <button type="button" class="btn btn-ghost" id="studentModalCancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="studentSubmit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: Adicionar integrante ============ -->
+  <div id="teamModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:101; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; width:100%; max-width:480px; box-shadow:0 24px 48px rgba(15,23,42,0.20); overflow:hidden;">
+      <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="margin:0; font-size:1.1rem; font-weight:700;">Adicionar integrante</h3>
+        <button type="button" id="teamModalClose" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:var(--muted);">×</button>
+      </div>
+      <form id="teamForm" style="padding:24px;">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Operador</label>
+            <select id="teamUser" class="search-input" style="padding-left:12px;" required>
+              <option value="">— selecione —</option>
+            </select>
+            <small style="color:var(--muted); font-size:0.74rem;">Apenas operadores aprovados aparecem aqui.</small>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Cargo na equipe deste aluno</label>
+            <select id="teamPosition" class="search-input" style="padding-left:12px;" required>
+              <option value="">— selecione —</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Notas (opcional)</label>
+            <input id="teamNotes" type="text" class="search-input" style="padding-left:12px;" />
+          </div>
+        </div>
+        <div id="teamError" style="color:var(--danger); font-size:0.82rem; margin-top:12px; display:none;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+          <button type="button" class="btn btn-ghost" id="teamModalCancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="teamSubmit">Adicionar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" style="position:fixed; bottom:24px; right:24px; z-index:200; display:none; padding:14px 18px; border-radius:12px; box-shadow:0 12px 28px rgba(0,0,0,0.18); font-weight:600; font-size:0.88rem;"></div>
+
+  <!-- Supabase + módulos -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="assets/admin-api.js"></script>
+
   <script>
-    // ============ MOCK DATA ============
-    const SERVICES = [
-      { key: 'design',     name: 'Design',         className: 'design' },
-      { key: 'midia',      name: 'Mídia paga',     className: 'midia' },
-      { key: 'metrica',    name: 'Métricas',       className: 'metrica' },
-      { key: 'copy',       name: 'Copywriting',    className: 'copy' },
-      { key: 'video',      name: 'Vídeo & edição', className: 'video' },
-      { key: 'estrategia', name: 'Estratégia',     className: 'estrategia' },
-    ];
+    'use strict';
 
-    const TEAM_BY_ROLE = [
-      { role: 'Designer',         names: ['Ana Souza', 'Luís Pereira', 'Marcos Vinicius'] },
-      { role: 'Tráfego',          names: ['Bruno Lima', 'Henrique Rocha', 'Tamiris Reis'] },
-      { role: 'Métricas',         names: ['Eva Oliveira', 'Roberto Cardoso'] },
-      { role: 'Copywriter',       names: ['Carla Mendes', 'Douglas Pereira'] },
-      { role: 'Edição de vídeo',  names: ['Giulia Fernandes', 'Felipe Tavares'] },
-      { role: 'Gestor de conta',  names: ['Fernanda Costa', 'Patricia Almeida'] },
-    ];
+    const state = {
+      page: 1, pageSize: 25, search: '', billingStatus: 'all',
+      total: 0, currentSlug: null, editingSlug: null,
+      positions: [], operators: [],
+    };
 
-    const DEMAND_TITLES = [
-      'Criação de criativo para campanha de inverno',
-      'Relatório semanal de performance',
-      'Revisão de copy para lançamento',
-      'Edição do vídeo institucional v3',
-      'Auditoria de pixel e tags',
-      'Apresentação de resultados mensais',
-      'Reunião de alinhamento estratégico',
-      'Aprovação de peças para Instagram',
-      'Briefing de nova landing page',
-      'Análise de funil de vendas',
-    ];
+    const SERVICE_COLOR_MAP = {
+      'DESIGNER':         { cls: 'design',     label: 'Designer' },
+      'WEBDESIGNER':      { cls: 'design',     label: 'Web-Designer' },
+      'ANÚNCIOS PAGOS':   { cls: 'midia',      label: 'Anúncios pagos' },
+      'SOCIAL MEDIA':     { cls: 'midia',      label: 'Social media' },
+      'COPY':             { cls: 'copy',       label: 'Copy' },
+      'COPYWRITER':       { cls: 'copy',       label: 'Copywriter' },
+      'EDIÇÃO DE VÍDEO':  { cls: 'video',      label: 'Edição de vídeo' },
+      'AUTOMAÇÃO':        { cls: 'estrategia', label: 'Automação' },
+      'HOST':             { cls: 'metrica',    label: 'Host' },
+    };
 
-    const STATUSES = [
-      { code: 'progress', label: 'Em andamento' },
-      { code: 'review',   label: 'Em revisão' },
-      { code: 'late',     label: 'Atrasada' },
-      { code: 'done',     label: 'Concluída' },
-    ];
-
-    function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-    function pickN(arr, n) { return [...arr].sort(() => 0.5 - Math.random()).slice(0, n); }
-    function initials(name) { return name.split(' ').slice(0,2).map(p => p[0]).join('').toUpperCase(); }
-
-    function buildAluno(name, email) {
-      const services = pickN(SERVICES, rand(3, 5));
-      // Monta equipe baseada nos serviços (pega 1 pessoa de role correlato por serviço)
-      const team = services.map(s => {
-        const roleMap = {
-          design: 'Designer', midia: 'Tráfego', metrica: 'Métricas',
-          copy: 'Copywriter', video: 'Edição de vídeo', estrategia: 'Gestor de conta',
-        };
-        const targetRole = roleMap[s.key];
-        const bucket = TEAM_BY_ROLE.find(r => r.role === targetRole);
-        const memberName = bucket.names[rand(0, bucket.names.length - 1)];
-        return {
-          name: memberName,
-          role: targetRole,
-          rating: (4.0 + Math.random() * 1.0).toFixed(2),
-        };
-      });
-
-      const demandsCount = rand(3, 6);
-      const demands = Array.from({ length: demandsCount }, () => {
-        const responsible = team[rand(0, team.length - 1)];
-        const daysOffset = rand(-4, 12);
-        const due = new Date();
-        due.setDate(due.getDate() + daysOffset);
-        const isLate = daysOffset < 0;
-        const isDone = !isLate && Math.random() < 0.25;
-        const status = isDone ? STATUSES[3] : isLate ? STATUSES[2] : STATUSES[rand(0, 1)];
-        return {
-          title: DEMAND_TITLES[rand(0, DEMAND_TITLES.length - 1)],
-          responsible: responsible.name,
-          due,
-          status,
-        };
-      });
-
-      const rating = (4.4 + Math.random() * 0.6).toFixed(2);
-      const planDate = new Date();
-      planDate.setMonth(planDate.getMonth() - rand(2, 18));
-
-      return {
-        name, email,
-        rating: parseFloat(rating),
-        plan: 'Diamante desde ' + planDate.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' }),
-        services,
-        team,
-        demands,
-        stats: {
-          open: demands.filter(d => d.status.code !== 'done').length,
-          done: rand(20, 60),
-          onTime: rand(85, 99),
-          sla: (1.5 + Math.random() * 2).toFixed(1),
-          satisfaction: rand(88, 99),
-          teamRatingAvg: (team.reduce((a, b) => a + parseFloat(b.rating), 0) / team.length).toFixed(2),
-        },
-      };
+    function initials(name) {
+      return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
     }
-
-    const MOCK_ALUNOS = [
-      buildAluno('Ana Carolina Silva',     'ana.carolina@empresa.com.br'),
-      buildAluno('Bruno Cardoso',          'bruno.cardoso@empresa.com.br'),
-      buildAluno('Carla Mendonça',         'carla.mendonca@empresa.com.br'),
-      buildAluno('Diego Ramalho',          'diego.ramalho@empresa.com.br'),
-      buildAluno('Erika Mello',            'erika.mello@empresa.com.br'),
-      buildAluno('Fernanda Martins',       'fernanda.martins@empresa.com.br'),
-      buildAluno('Gabriel Souza',          'gabriel.souza@empresa.com.br'),
-      buildAluno('Marcus Paiva',           'marcus.paiva@empresa.com.br'),
-    ];
-
-    // ============ RENDER LISTA ============
+    function fmtDateBR(s) {
+      if (!s) return '—';
+      const d = new Date(s);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('pt-BR');
+    }
+    function billingBadge(s) {
+      const map = {
+        current: { cls: 'badge-green',  txt: 'Em dia' },
+        late:    { cls: 'badge-red',    txt: 'Atrasado' },
+        paused:  { cls: 'badge-yellow', txt: 'Pausado' },
+      };
+      const b = map[s] || { cls: 'badge-yellow', txt: s || 'Sem status' };
+      return `<span class="badge ${b.cls}">${b.txt}</span>`;
+    }
+    function toast(message, kind = 'success') {
+      const el = document.getElementById('toast');
+      el.style.background = kind === 'error' ? '#fee2e2' : kind === 'warning' ? '#fef3c7' : '#dcfce7';
+      el.style.color = kind === 'error' ? '#991b1b' : kind === 'warning' ? '#92400e' : '#166534';
+      el.textContent = message;
+      el.style.display = 'block';
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
     function starsHtml(rating) {
-      const full = Math.round(rating);
+      const r = parseFloat(rating) || 0;
+      const full = Math.round(r);
       let html = '';
       for (let i = 1; i <= 5; i++) {
         const filled = i <= full;
@@ -734,136 +760,414 @@
       return html;
     }
 
-    function rowHtml(a, idx) {
-      const status = a.stats.open > 4 ? { cls: 'badge-yellow', txt: 'Atenção' }
-                   : a.stats.open > 0 ? { cls: 'badge-green',  txt: 'Ativo' }
-                                      : { cls: 'badge-blue',   txt: 'Atualizado' };
+    function rowHtml(s) {
       return `
-        <tr data-idx="${idx}">
+        <tr data-slug="${s.slug}">
           <td>
             <div class="user-cell">
-              <div class="avatar">${initials(a.name)}</div>
+              <div class="avatar">${initials(s.name)}</div>
               <div>
-                <div class="user-cell-name">${a.name}</div>
-                <div class="user-cell-id">ID #${1000 + idx}</div>
+                <div class="user-cell-name">${s.name || s.slug}</div>
+                <div class="user-cell-id">${s.slug}</div>
               </div>
             </div>
           </td>
-          <td><span style="color:var(--text-secondary)">${a.email}</span></td>
-          <td><span class="badge ${status.cls}">${status.txt}</span></td>
+          <td><span style="color:var(--text-secondary)">${s.owner_email || '—'}</span></td>
+          <td><strong>${s.team_count ?? 0}</strong></td>
+          <td><strong>${s.services_count ?? 0}</strong></td>
+          <td>${billingBadge(s.billing_status)}</td>
           <td style="text-align:right;">
-            <button class="icon-btn" title="Ver detalhes">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-            </button>
+            <div class="row-actions" style="justify-content:flex-end; display:flex; gap:6px;">
+              <button class="icon-btn" data-action="edit" title="Editar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+              </button>
+              <button class="icon-btn danger" data-action="delete" title="Excluir">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+              </button>
+            </div>
           </td>
         </tr>
       `;
     }
 
-    document.getElementById('alunosBody').innerHTML = MOCK_ALUNOS.map(rowHtml).join('');
+    function renderPagination() {
+      const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+      const cur = state.page;
+      const nav = document.getElementById('pageNav');
+      const btns = [];
+      btns.push(`<button class="page-btn" data-pg="prev" ${cur <= 1 ? 'disabled' : ''}>‹</button>`);
+      const start = Math.max(1, cur - 2);
+      const end = Math.min(totalPages, start + 4);
+      for (let i = start; i <= end; i++) {
+        btns.push(`<button class="page-btn ${i === cur ? 'active' : ''}" data-pg="${i}">${i}</button>`);
+      }
+      btns.push(`<button class="page-btn" data-pg="next" ${cur >= totalPages ? 'disabled' : ''}>›</button>`);
+      nav.innerHTML = btns.join('');
 
-    // ============ PAINEL DE DETALHE ============
-    const main = document.getElementById('main');
-    const panel = document.getElementById('detailPanel');
+      const first = state.total === 0 ? 0 : (cur - 1) * state.pageSize + 1;
+      const last  = Math.min(cur * state.pageSize, state.total);
+      document.getElementById('pgInfo').innerHTML =
+        `Mostrando <strong>${first}–${last}</strong> de <strong>${state.total}</strong> alunos`;
 
-    function openDetail(idx) {
-      const a = MOCK_ALUNOS[idx];
+      nav.querySelectorAll('[data-pg]').forEach(b => {
+        b.addEventListener('click', () => {
+          const v = b.dataset.pg;
+          if (v === 'prev' && cur > 1) state.page = cur - 1;
+          else if (v === 'next' && cur < totalPages) state.page = cur + 1;
+          else if (/^\d+$/.test(v)) state.page = parseInt(v, 10);
+          load();
+        });
+      });
+    }
 
-      document.getElementById('detailAvatar').textContent = initials(a.name);
-      document.getElementById('detailName').textContent = a.name;
-      document.getElementById('detailEmail').textContent = a.email;
-      document.getElementById('detailStars').innerHTML = starsHtml(a.rating);
-      document.getElementById('detailRating').textContent = a.rating.toFixed(2);
-      document.getElementById('detailPlan').textContent = a.plan;
+    async function loadStats() {
+      try {
+        const s = await AdminAPI.getStudentStats();
+        document.getElementById('kpiTotal').textContent    = s.total;
+        document.getElementById('kpiActive').textContent   = s.active;
+        document.getElementById('kpiPaused').textContent   = s.paused;
+        document.getElementById('kpiWithTeam').textContent = s.withTeam;
+      } catch (e) {
+        console.error(e);
+      }
+    }
 
-      document.getElementById('statTeam').textContent = a.team.length;
-      document.getElementById('statServices').textContent = a.services.length;
-      document.getElementById('statOpen').textContent = a.stats.open;
-      document.getElementById('statDone').textContent = a.stats.done;
+    async function load() {
+      const tbody = document.getElementById('alunosBody');
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
+      try {
+        const offset = (state.page - 1) * state.pageSize;
+        const { data, count } = await AdminAPI.listStudents({
+          search: state.search, billingStatus: state.billingStatus,
+          limit: state.pageSize, offset,
+        });
+        state.total = count;
+        if (data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="padding:32px; text-align:center; color:var(--muted);">Nenhum aluno encontrado.</td></tr>`;
+        } else {
+          tbody.innerHTML = data.map(rowHtml).join('');
+        }
+        renderPagination();
+        attachRowHandlers(data);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        console.error(e);
+      }
+    }
 
-      // Equipe
-      document.getElementById('teamCount').textContent = `${a.team.length} pessoa${a.team.length === 1 ? '' : 's'}`;
-      document.getElementById('teamList').innerHTML = a.team.map(m => `
-        <div class="team-item">
-          <div class="avatar">${initials(m.name)}</div>
-          <div class="team-info">
-            <div class="team-name">${m.name}</div>
-            <div class="team-role">${m.role}</div>
-          </div>
-          <div class="team-rating">
-            <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            ${m.rating}
-          </div>
-        </div>
-      `).join('');
+    function attachRowHandlers(data) {
+      const bySlug = Object.fromEntries(data.map(s => [s.slug, s]));
+      document.querySelectorAll('.alunos-table tbody tr[data-slug]').forEach(tr => {
+        const slug = tr.dataset.slug;
+        const s = bySlug[slug];
+        tr.addEventListener('click', (e) => {
+          if (e.target.closest('[data-action]')) return;
+          openDetail(s);
+        });
+        tr.querySelector('[data-action="edit"]').addEventListener('click', (e) => { e.stopPropagation(); openEditModal(s); });
+        tr.querySelector('[data-action="delete"]').addEventListener('click', (e) => { e.stopPropagation(); confirmDelete(s); });
+      });
+    }
 
-      // Serviços
-      document.getElementById('serviceGrid').innerHTML = a.services.map(s => `
-        <div class="service-chip ${s.className}"><span class="dot"></span>${s.name}</div>
-      `).join('');
-
-      // Demandas
-      const openDemands = a.demands.filter(d => d.status.code !== 'done');
-      document.getElementById('demandsCount').textContent = `${openDemands.length} demanda${openDemands.length === 1 ? '' : 's'}`;
-      document.getElementById('demandList').innerHTML = openDemands.map(d => {
-        const dayDiff = Math.ceil((d.due - new Date()) / (1000 * 60 * 60 * 24));
-        const prazoText = dayDiff < 0 ? `Atrasado há ${Math.abs(dayDiff)} dia(s)`
-                        : dayDiff === 0 ? 'Vence hoje'
-                        : `Vence em ${dayDiff} dia(s)`;
-        const itemClass = d.status.code === 'late' ? 'late' : d.status.code === 'done' ? 'done' : '';
-        return `
-          <div class="demand-item ${itemClass}">
-            <div class="demand-title">${d.title}</div>
-            <span class="demand-status ${d.status.code}">${d.status.label}</span>
-            <div class="demand-meta">
-              <span class="responsible">
-                <span class="avatar-mini">${initials(d.responsible)}</span>
-                ${d.responsible.split(' ')[0]}
-              </span>
-              <span>•</span>
-              <span>${prazoText}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+    // ===== Detalhe =====
+    async function openDetail(s) {
+      state.currentSlug = s.slug;
+      document.getElementById('detailAvatar').textContent = initials(s.name);
+      document.getElementById('detailName').textContent   = s.name || s.slug;
+      document.getElementById('detailEmail').textContent  = s.owner_email || s.slug;
+      document.getElementById('detailStars').innerHTML    = starsHtml(s.rating_avg);
+      document.getElementById('detailRating').textContent = (parseFloat(s.rating_avg) || 0).toFixed(2).replace('.', ',');
+      document.getElementById('detailPlan').textContent   = s.contract_started_at ? `Desde ${fmtDateBR(s.contract_started_at)}` : (s.billing_status || '—');
+      document.getElementById('statTeam').textContent     = s.team_count ?? 0;
+      document.getElementById('statServices').textContent = s.services_count ?? 0;
+      document.getElementById('statRatings').textContent  = s.ratings_count ?? 0;
+      document.getElementById('statContract').textContent = s.contract_started_at ? fmtDateBR(s.contract_started_at) : '—';
 
       // Métricas
-      document.getElementById('metricRating').textContent = a.stats.teamRatingAvg.replace('.', ',');
-      document.getElementById('metricOnTime').textContent = a.stats.onTime + '%';
-      document.getElementById('metricSla').textContent = a.stats.sla.replace('.', ',') + ' dias';
-      document.getElementById('metricSatisfaction').textContent = a.stats.satisfaction + '%';
+      const ratingPct = ((parseFloat(s.rating_avg) || 0) / 5) * 100;
+      document.getElementById('metricRating').textContent = (parseFloat(s.rating_avg) || 0).toFixed(2).replace('.', ',');
+      document.getElementById('metricRatingBar').style.width = ratingPct + '%';
+      document.getElementById('metricRatings').textContent = s.ratings_count ?? 0;
+      document.getElementById('metricServices').textContent = s.services_count ?? 0;
+      document.getElementById('metricServicesBar').style.width = Math.min(100, (s.services_count || 0) * 14) + '%';
+      document.getElementById('metricTeam').textContent = s.team_count ?? 0;
+      document.getElementById('metricTeamBar').style.width = Math.min(100, (s.team_count || 0) * 20) + '%';
 
-      // Marca linha selecionada
-      document.querySelectorAll('.alunos-table tbody tr').forEach(tr => tr.classList.remove('selected'));
-      const row = document.querySelector(`.alunos-table tbody tr[data-idx="${idx}"]`);
-      if (row) row.classList.add('selected');
+      // Equipe e serviços em paralelo
+      document.getElementById('teamList').innerHTML = '<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Carregando…</div>';
+      document.getElementById('serviceGrid').innerHTML = '<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Carregando…</div>';
 
-      // Abre painel
-      main.classList.add('with-detail');
-      panel.classList.add('open');
+      document.getElementById('detailPanel').classList.add('open');
+      document.getElementById('main').classList.add('with-detail');
+      document.querySelectorAll('.alunos-table tbody tr').forEach(tr => tr.classList.toggle('selected', tr.dataset.slug === s.slug));
+
+      try {
+        const [team, services] = await Promise.all([
+          AdminAPI.getStudentTeam(s.slug),
+          AdminAPI.getStudentServices(s.slug),
+        ]);
+        renderTeam(team);
+        renderServices(services);
+      } catch (e) {
+        console.error(e);
+        toast('Erro ao carregar detalhes: ' + (e.message || e), 'error');
+      }
+    }
+
+    function renderTeam(team) {
+      const el = document.getElementById('teamList');
+      document.getElementById('teamCount').textContent = `${team.length} pessoa${team.length === 1 ? '' : 's'}`;
+      if (team.length === 0) {
+        el.innerHTML = `<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Nenhum integrante atribuído ainda.</div>`;
+        return;
+      }
+      el.innerHTML = team.map(m => `
+        <div class="team-item" data-assignment="${m.assignment_id}">
+          <div class="avatar">${initials(m.user_name)}</div>
+          <div class="team-info">
+            <div class="team-name">${m.user_name}</div>
+            <div class="team-role" style="color:${m.position_color || 'var(--muted)'}; font-weight:600;">${m.position_name}</div>
+          </div>
+          <button class="icon-btn danger" data-action="remove-team" title="Remover">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      `).join('');
+      el.querySelectorAll('[data-action="remove-team"]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const assignmentId = btn.closest('[data-assignment]').dataset.assignment;
+          if (!confirm('Remover este integrante da equipe?')) return;
+          try {
+            await AdminAPI.removeTeamMember(assignmentId);
+            toast('Integrante removido.');
+            await refreshCurrent();
+          } catch (ex) {
+            toast('Erro: ' + (ex.message || ex), 'error');
+          }
+        });
+      });
+    }
+
+    function renderServices(services) {
+      const el = document.getElementById('serviceGrid');
+      const active = services.filter(s => s.status === 'active');
+      if (active.length === 0) {
+        el.innerHTML = `<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Nenhum serviço ativo.</div>`;
+        return;
+      }
+      el.innerHTML = active.map(s => {
+        const meta = SERVICE_COLOR_MAP[s.service_type] || { cls: 'estrategia', label: s.service_type };
+        return `<div class="service-chip ${meta.cls}"><span class="dot"></span>${meta.label}</div>`;
+      }).join('');
+    }
+
+    async function refreshCurrent() {
+      if (!state.currentSlug) return;
+      const s = await AdminAPI.getStudent(state.currentSlug);
+      if (s) openDetail(s);
+      await Promise.all([load(), loadStats()]);
     }
 
     function closeDetail() {
-      panel.classList.remove('open');
-      main.classList.remove('with-detail');
+      state.currentSlug = null;
+      document.getElementById('detailPanel').classList.remove('open');
+      document.getElementById('main').classList.remove('with-detail');
       document.querySelectorAll('.alunos-table tbody tr').forEach(tr => tr.classList.remove('selected'));
     }
 
-    document.getElementById('alunosBody').addEventListener('click', (e) => {
-      const tr = e.target.closest('tr[data-idx]');
-      if (!tr) return;
-      openDetail(parseInt(tr.dataset.idx, 10));
+    // ===== Modal Aluno =====
+    function openCreateModal() {
+      state.editingSlug = null;
+      document.getElementById('studentModalTitle').textContent = 'Criar aluno';
+      document.getElementById('studentSlugWrap').style.display = '';
+      document.getElementById('studentForm').reset();
+      document.getElementById('studentColor').value = '#F29725';
+      document.getElementById('studentError').style.display = 'none';
+      document.getElementById('studentModal').style.display = 'flex';
+      document.getElementById('studentName').focus();
+    }
+    function openEditModal(s) {
+      state.editingSlug = s.slug;
+      document.getElementById('studentModalTitle').textContent = 'Editar aluno';
+      document.getElementById('studentSlugWrap').style.display = 'none';
+      document.getElementById('studentName').value = s.name || '';
+      document.getElementById('studentSlug').value = s.slug;
+      document.getElementById('studentColor').value = s.primary_color || '#F29725';
+      document.getElementById('studentError').style.display = 'none';
+      document.getElementById('studentModal').style.display = 'flex';
+    }
+    function closeStudentModal() { document.getElementById('studentModal').style.display = 'none'; }
+
+    document.getElementById('btnNew').addEventListener('click', openCreateModal);
+    document.getElementById('studentModalClose').addEventListener('click', closeStudentModal);
+    document.getElementById('studentModalCancel').addEventListener('click', closeStudentModal);
+    document.getElementById('studentModal').addEventListener('click', (e) => {
+      if (e.target.id === 'studentModal') closeStudentModal();
     });
 
-    document.getElementById('detailClose').addEventListener('click', closeDetail);
+    document.getElementById('studentForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('studentSubmit');
+      const err = document.getElementById('studentError');
+      err.style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Salvando…';
+      try {
+        const display_name  = document.getElementById('studentName').value.trim();
+        const primary_color = document.getElementById('studentColor').value;
+        if (state.editingSlug) {
+          await AdminAPI.updateStudent(state.editingSlug, { display_name, primary_color });
+          toast('Aluno atualizado.');
+        } else {
+          const slug = document.getElementById('studentSlug').value.trim().toLowerCase();
+          await AdminAPI.createStudent({ slug, display_name, primary_color });
+          toast('Aluno criado.');
+        }
+        closeStudentModal();
+        await Promise.all([load(), loadStats()]);
+      } catch (ex) {
+        err.style.display = 'block';
+        err.textContent = ex.message || String(ex);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Salvar';
+      }
+    });
 
-    // Esc fecha
+    async function confirmDelete(s) {
+      const ok = prompt(
+        `ATENÇÃO: isso vai excluir DEFINITIVAMENTE o aluno "${s.name}" e todos os dados vinculados (equipe, serviços, perfil).\n` +
+        `Esta ação não pode ser desfeita.\n\n` +
+        `Para confirmar, digite EXCLUIR (em maiúsculas):`
+      );
+      if (ok !== 'EXCLUIR') {
+        if (ok !== null) toast('Texto incorreto. Exclusão cancelada.', 'warning');
+        return;
+      }
+      try {
+        await AdminAPI.deleteStudent(s.slug);
+        toast(`${s.name} foi excluído.`);
+        closeDetail();
+        await Promise.all([load(), loadStats()]);
+      } catch (e) {
+        toast('Erro ao excluir: ' + (e.message || e), 'error');
+      }
+    }
+
+    // ===== Modal Equipe =====
+    function openTeamModal() {
+      if (!state.currentSlug) return;
+      // Popula selects
+      const userSel = document.getElementById('teamUser');
+      const posSel  = document.getElementById('teamPosition');
+      userSel.innerHTML = '<option value="">— selecione —</option>' +
+        state.operators.map(o => `<option value="${o.id}" data-position="${o.position_id || ''}">${o.name} (${o.email})</option>`).join('');
+      posSel.innerHTML = '<option value="">— selecione —</option>' +
+        state.positions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      // Auto-pré-seleciona cargo do operador escolhido
+      userSel.addEventListener('change', () => {
+        const opt = userSel.options[userSel.selectedIndex];
+        const pos = opt?.dataset?.position;
+        if (pos && !posSel.value) posSel.value = pos;
+      });
+      document.getElementById('teamForm').reset();
+      document.getElementById('teamError').style.display = 'none';
+      document.getElementById('teamModal').style.display = 'flex';
+    }
+    function closeTeamModal() { document.getElementById('teamModal').style.display = 'none'; }
+
+    document.getElementById('btnAddTeam').addEventListener('click', openTeamModal);
+    document.getElementById('teamModalClose').addEventListener('click', closeTeamModal);
+    document.getElementById('teamModalCancel').addEventListener('click', closeTeamModal);
+    document.getElementById('teamModal').addEventListener('click', (e) => {
+      if (e.target.id === 'teamModal') closeTeamModal();
+    });
+
+    document.getElementById('teamForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('teamSubmit');
+      const err = document.getElementById('teamError');
+      err.style.display = 'none';
+      btn.disabled = true; btn.textContent = 'Adicionando…';
+      try {
+        await AdminAPI.assignTeamMember({
+          client_slug: state.currentSlug,
+          user_id: document.getElementById('teamUser').value,
+          position_id: document.getElementById('teamPosition').value,
+          notes: document.getElementById('teamNotes').value.trim(),
+        });
+        toast('Integrante adicionado.');
+        closeTeamModal();
+        await refreshCurrent();
+      } catch (ex) {
+        err.style.display = 'block';
+        err.textContent = ex.message || String(ex);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Adicionar';
+      }
+    });
+
+    // ===== Filtros =====
+    let searchTimer = null;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        state.search = e.target.value;
+        state.page = 1;
+        load();
+      }, 280);
+    });
+    document.getElementById('billingFilter').addEventListener('change', (e) => {
+      state.billingStatus = e.target.value;
+      state.page = 1;
+      load();
+    });
+    document.getElementById('pgSize').addEventListener('change', (e) => {
+      state.pageSize = parseInt(e.target.value, 10) || 25;
+      state.page = 1;
+      load();
+    });
+
+    // ===== Export =====
+    document.getElementById('btnExport').addEventListener('click', async () => {
+      try {
+        const blob = await AdminAPI.exportStudentsCsv();
+        AdminAPI.downloadBlob(blob, `alunos-diamantes-${new Date().toISOString().slice(0,10)}.csv`);
+      } catch (e) {
+        toast('Erro ao exportar: ' + (e.message || e), 'error');
+      }
+    });
+
+    // ===== Detail panel close =====
+    document.getElementById('detailClose').addEventListener('click', closeDetail);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeDetail();
     });
 
-    // Abre o primeiro por padrão
-    openDetail(0);
+    // ===== Logout =====
+    document.querySelector('.logout-button').addEventListener('click', async () => {
+      await AdminAPI.logout();
+    });
+
+    async function fillSession(profile) {
+      if (!profile) return;
+      document.querySelector('.user-pill-name').textContent = profile.name || 'Administrador';
+      document.querySelector('.user-pill-role').textContent = profile.email || '';
+      document.querySelector('.user-pill .avatar').textContent = initials(profile.name || profile.email);
+    }
+
+    // ===== Init =====
+    (async function init() {
+      const profile = await AdminAPI.requireAdmin();
+      if (!profile) return;
+      await fillSession(profile);
+      const [positions, operators] = await Promise.all([
+        AdminAPI.listPositions(),
+        AdminAPI.listOperators(),
+      ]);
+      state.positions = positions;
+      state.operators = operators;
+      await Promise.all([load(), loadStats()]);
+    })();
   </script>
 </body>
 </html>
