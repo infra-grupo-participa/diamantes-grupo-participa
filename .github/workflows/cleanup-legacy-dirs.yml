@@ -1,0 +1,29 @@
+name: Cleanup dirs vazios legados (temporário)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: [self-hosted, windows-self-hosted]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: RMD raiz
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+        run: |
+          set +e
+          CREDS="${FTP_USER}:${FTP_PASS}"
+          BASE="ftp://${FTP_HOST}"
+          for d in "backend" "chatbot" "calculadora do inventario" "google-apps-script"; do
+            echo "RMD /$d"
+            curl -sS --user "$CREDS" "${BASE}/" -Q "RMD ${d}" -o /dev/null
+            echo "  exit=$?"
+          done
+          set -e
+          echo "=== Raiz final ==="
+          curl -sS --user "$CREDS" "${BASE}/" | grep -E "backend|chatbot|calculadora|google-apps-script" || echo "  ✅ raiz limpa"
