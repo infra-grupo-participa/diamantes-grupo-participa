@@ -64,9 +64,14 @@ jobs:
           CREDS="${FTP_USER}:${FTP_PASS}"
 
           echo "Upload admin/index.html (novo, $(wc -c < admin/index.html) bytes)"
-          curl -v --ftp-create-dirs --user "$CREDS" -T admin/index.html \
+          curl -sS --ftp-create-dirs --user "$CREDS" -T admin/index.html \
             "ftp://${FTP_HOST}${FTP_PATH}admin/index.html" \
-            -w "HTTP: %{http_code}  size_upload: %{size_upload}\n" -o /dev/null --max-time 60 2>&1 | tail -20
+            -w "HTTP: %{http_code}  size_upload: %{size_upload}\n" -o /dev/null --max-time 60
+
+          echo "Upload admin/.htaccess (no-cache)"
+          curl -sS --ftp-create-dirs --user "$CREDS" -T admin/.htaccess \
+            "ftp://${FTP_HOST}${FTP_PATH}admin/.htaccess" \
+            -w "HTTP: %{http_code}  size_upload: %{size_upload}\n" -o /dev/null --max-time 60
 
           echo "Upload admin/_legacy/index.html"
           curl -sS --ftp-create-dirs --user "$CREDS" -T admin/_legacy/index.html \
