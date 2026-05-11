@@ -715,17 +715,22 @@
       servicesBySlug: {},
     };
 
+    // Mapa baseado no nome canônico (saída de canonicalServiceName)
     const SERVICE_COLOR_MAP = {
-      'DESIGNER':         { cls: 'design',     label: 'Designer' },
-      'WEBDESIGNER':      { cls: 'design',     label: 'Web-Designer' },
-      'ANÚNCIOS PAGOS':   { cls: 'midia',      label: 'Anúncios pagos' },
-      'SOCIAL MEDIA':     { cls: 'midia',      label: 'Social media' },
-      'COPY':             { cls: 'copy',       label: 'Copy' },
-      'COPYWRITER':       { cls: 'copy',       label: 'Copywriter' },
-      'EDIÇÃO DE VÍDEO':  { cls: 'video',      label: 'Edição de vídeo' },
-      'AUTOMAÇÃO':        { cls: 'estrategia', label: 'Automação' },
-      'HOST':             { cls: 'metrica',    label: 'Host' },
+      'Tráfego':                  { cls: 'midia',      label: 'Tráfego' },
+      'Gestão de Redes Sociais':  { cls: 'midia',      label: 'Redes Sociais' },
+      'Web Designer':             { cls: 'design',     label: 'Web Designer' },
+      'Design Gráfico':           { cls: 'design',     label: 'Design Gráfico' },
+      'Edição de Vídeo':          { cls: 'video',      label: 'Edição de Vídeo' },
+      'Gestor de Disparos':       { cls: 'estrategia', label: 'Gestor de Disparos' },
+      'Copywriter':               { cls: 'copy',       label: 'Copywriter' },
+      'Hospedagem':               { cls: 'metrica',    label: 'Hospedagem' },
     };
+
+    function serviceChipMeta(rawType) {
+      const canonical = AdminAPI.canonicalServiceName(rawType);
+      return SERVICE_COLOR_MAP[canonical] || { cls: 'estrategia', label: canonical };
+    }
 
     function initials(name) {
       return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
@@ -774,7 +779,7 @@
         const today = new Date(); today.setHours(0,0,0,0);
         const due = new Date(nearest.access_until);
         const diff = Math.ceil((due - today) / (1000*60*60*24));
-        const label = nearest.service_type;
+        const label = AdminAPI.canonicalServiceName(nearest.service_type);
         if (diff < 0) {
           dueBadge = `<div style="font-size:0.7rem;color:#b91c1c;margin-top:2px;">⚠ ${label} vencido</div>`;
         } else if (diff <= 7) {
@@ -988,7 +993,7 @@
         return da - db;
       });
       el.innerHTML = sorted.map(s => {
-        const meta = SERVICE_COLOR_MAP[s.service_type] || { cls: 'estrategia', label: s.service_type };
+        const meta = serviceChipMeta(s.service_type);
         let dueBadge = '';
         if (s.access_until) {
           const due = new Date(s.access_until);
@@ -1123,13 +1128,14 @@
       // Monta optgroups por serviço ativo — filtra posições que correspondem ao serviço
       if (activeServices.length > 0) {
         const groups = activeServices.map(svc => {
-          const svcNameLower = (svc.service_type || '').toLowerCase();
+          const canonical = AdminAPI.canonicalServiceName(svc.service_type);
+          const canonLower = canonical.toLowerCase();
           const matching = state.positions.filter(p =>
-            p.name.toLowerCase().includes(svcNameLower) ||
-            svcNameLower.includes(p.name.toLowerCase())
+            p.name.toLowerCase().includes(canonLower) ||
+            canonLower.includes(p.name.toLowerCase())
           );
           const opts = matching.length > 0 ? matching : state.positions;
-          return `<optgroup label="${svc.service_type}">` +
+          return `<optgroup label="${canonical}">` +
             opts.map(p => `<option value="${p.id}">${p.name}</option>`).join('') +
             `</optgroup>`;
         });

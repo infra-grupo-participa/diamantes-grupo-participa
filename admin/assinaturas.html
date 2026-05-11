@@ -252,9 +252,13 @@
           <p class="page-subtitle">Acompanhe os assinantes, pagamentos e receitas recorrentes.</p>
         </div>
         <div class="page-actions">
+          <button class="btn btn-ghost" id="btnExportPurchases">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Exportar compras Hotmart
+          </button>
           <button class="btn btn-ghost" id="btnExport">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Exportar planilha
+            Exportar assinaturas
           </button>
           <button class="btn btn-primary" id="btnNew">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -340,6 +344,7 @@
               <thead>
                 <tr>
                   <th>Aluno</th>
+                  <th>Serviços ativos</th>
                   <th>Valor mensal</th>
                   <th>Próxima cobrança</th>
                   <th>Pagamento</th>
@@ -503,13 +508,16 @@
       total: 0, editingId: null,
     };
 
+    // Mapa por nome canônico (saída de AdminAPI.canonicalServiceName)
     const SERVICE_COLORS = {
-      'DESIGNER': 'purple', 'WEBDESIGNER': 'blue',
-      'ANÚNCIOS PAGOS': 'pink', 'SOCIAL MEDIA': 'pink',
-      'COPY': 'green', 'COPYWRITER': 'green',
-      'EDIÇÃO DE VÍDEO': 'yellow',
-      'AUTOMAÇÃO': 'orange',
-      'HOST': 'blue',
+      'Tráfego':                 'pink',
+      'Gestão de Redes Sociais': 'pink',
+      'Web Designer':            'blue',
+      'Design Gráfico':          'purple',
+      'Edição de Vídeo':         'yellow',
+      'Gestor de Disparos':      'orange',
+      'Copywriter':              'green',
+      'Hospedagem':              'blue',
     };
 
     function initials(name) {
@@ -564,6 +572,20 @@
     }
 
     function rowHtml(sub) {
+      const svcsHtml = (sub.active_services || []).map(sv => {
+        const label = AdminAPI.canonicalServiceName(sv.service_type);
+        const color = SERVICE_COLORS[label] || 'orange';
+        const today = new Date(); today.setHours(0,0,0,0);
+        let badge = '';
+        if (sv.access_until) {
+          const due = new Date(sv.access_until);
+          const diff = Math.ceil((due - today) / 86400000);
+          if (diff < 0) badge = `<span style="font-size:0.6rem;color:#b91c1c;margin-left:3px;">vencido</span>`;
+          else if (diff <= 7) badge = `<span style="font-size:0.6rem;color:#b45309;margin-left:3px;">${diff}d</span>`;
+        }
+        return `<span style="display:inline-flex;align-items:center;background:var(--accent-light);color:var(--accent-strong);border-radius:4px;padding:2px 7px;font-size:0.72rem;font-weight:600;margin:2px 2px 2px 0;white-space:nowrap;">${label}${badge}</span>`;
+      }).join('') || '<span style="color:var(--muted);font-size:0.78rem;">—</span>';
+
       return `
         <tr data-id="${sub.id}">
           <td>
@@ -575,6 +597,7 @@
               </div>
             </div>
           </td>
+          <td style="max-width:220px;">${svcsHtml}</td>
           <td>
             <div class="amount">${fmtBRL(sub.monthly_value)}</div>
             <div class="amount-sub">mensal</div>
@@ -891,7 +914,17 @@
       state.pageSize = parseInt(e.target.value, 10) || 25; state.page = 1; load();
     });
 
-    // ===== Export =====
+    // ===== Export compras Hotmart =====
+    document.getElementById('btnExportPurchases').addEventListener('click', async () => {
+      try {
+        const blob = await AdminAPI.exportPurchasesCsv();
+        AdminAPI.downloadBlob(blob, `compras-hotmart-${new Date().toISOString().slice(0,10)}.csv`);
+      } catch (e) {
+        toast('Erro ao exportar: ' + (e.message || e), 'error');
+      }
+    });
+
+    // ===== Export assinaturas =====
     document.getElementById('btnExport').addEventListener('click', async () => {
       try {
         const blob = await AdminAPI.exportSubscriptionsCsv();

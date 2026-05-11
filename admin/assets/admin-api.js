@@ -531,6 +531,46 @@
     return new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   }
 
+  async function exportPurchasesCsv() {
+    const { data, error } = await client()
+      .schema('portal')
+      .from('hotmart_purchases')
+      .select('transaction_code, buyer_email, offer_code, service_name, amount, status, payment_type, installments_total, installment_number, charged_at, client_slug')
+      .order('charged_at', { ascending: false })
+      .limit(2000);
+    if (error) throw error;
+
+    const header = [
+      'Código Transação', 'Email Comprador', 'Código Oferta', 'Serviço',
+      'Valor (R$)', 'Status', 'Tipo Pagamento', 'Total Parcelas', 'Nº Parcela',
+      'Data Compra', 'Aluno (slug)', 'Vencimento',
+    ];
+
+    const rows = (data || []).map(p => {
+      const charged = p.charged_at ? new Date(p.charged_at) : null;
+      const accessUntil = charged
+        ? new Date(new Date(charged.getFullYear(), charged.getMonth() + 1, 18))
+        : null;
+      return [
+        p.transaction_code,
+        p.buyer_email,
+        p.offer_code || '',
+        canonicalServiceName(p.service_name || ''),
+        Number(p.amount || 0).toFixed(2).replace('.', ','),
+        p.status,
+        p.payment_type || '',
+        p.installments_total || 1,
+        p.installment_number || 1,
+        charged ? charged.toLocaleDateString('pt-BR') : '',
+        p.client_slug || '',
+        accessUntil ? accessUntil.toLocaleDateString('pt-BR') : '',
+      ];
+    });
+
+    const csv = [header, ...rows].map(r => r.map(csvEscape).join(';')).join('\n');
+    return new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  }
+
   // =============================================================
   // DEMANDAS (Kanban admin — Etapa D3)
   // =============================================================
@@ -779,6 +819,7 @@
     deleteSubscription,
     listClientsForSubscription,
     exportSubscriptionsCsv,
+    exportPurchasesCsv,
     // Demandas
     listAllDemands,
     getDemandFullDetails,
