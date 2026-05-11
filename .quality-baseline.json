@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-11T17:15:46.324Z",
+  "generated_at": "2026-05-11T17:29:13.974Z",
   "tolerance_percent": 10,
   "metrics": {
     "lint_errors": 0,
@@ -9,7 +9,7 @@
     "complexity_avg": 0,
     "duplication_percent": 0,
     "duplication_clones": 0,
-    "loc_total": 11587,
+    "loc_total": 12715,
     "files_over_500_loc": 8,
     "secrets_found": 0,
     "bytes_public": 387174,
