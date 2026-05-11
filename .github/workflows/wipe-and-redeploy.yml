@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TARGET_URL: 'https://diamantes.grupoparticipa.app.br/servico/'
+  TARGET_URL: 'https://diamantes.grupoparticipa.app.br/'
 
 defaults:
   run:
@@ -56,7 +56,11 @@ jobs:
           set -e
           FTP_PATH="${FTP_PATH%/}/"
           CREDS="${FTP_USER}:${FTP_PASS}"
-          echo "=== Conteúdo de ${FTP_PATH} antes do wipe ==="
+          echo "=== FTP_PATH configurado: ${FTP_PATH} ==="
+          echo "=== Listagem da raiz do user FTP (/) ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}/" || true
+          echo ""
+          echo "=== Listagem de ${FTP_PATH} ==="
           curl -sS --user "$CREDS" "ftp://${FTP_HOST}${FTP_PATH}" || true
 
       - name: WIPE — apagar recursivamente todo o conteúdo
@@ -152,7 +156,7 @@ jobs:
           SetEnv GP_SUPABASE_SCHEMA "portal"
           SetEnv GP_STORAGE_DRIVER "json"
           SetEnv GP_PORTALS_SOURCE "json"
-          SetEnv GP_APP_BASE_URL "https://diamantes.grupoparticipa.app.br/servico"
+          SetEnv GP_APP_BASE_URL "https://diamantes.grupoparticipa.app.br"
           SetEnv GP_MAIL_FROM_EMAIL "${GP_MAIL_FROM_EMAIL}"
           SetEnv GP_MAIL_FROM_NAME "${GP_MAIL_FROM_NAME}"
           SetEnv GP_COOKIE_SECURE "true"
@@ -164,11 +168,11 @@ jobs:
 
           <IfModule mod_rewrite.c>
               RewriteEngine On
-              RewriteBase /servico/
+              RewriteBase /
 
               RewriteRule ^\$ index.html [L]
 
-              RewriteCond %{REQUEST_URI} !^/servico/(api|admin|assets|portal|chatbot|backend|src|vendor|tests|docs|tmp|infra)(/|\$)
+              RewriteCond %{REQUEST_URI} !^/(api|admin|assets|portal|chatbot|backend|src|vendor|tests|docs|tmp|infra)(/|\$)
               RewriteRule ^([a-z][a-z0-9-]+)/?\$ portal/?slug=\$1 [L,R=302]
           </IfModule>
 
