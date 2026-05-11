@@ -1,0 +1,87 @@
+name: Cleanup admin folder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Limpar /admin/ remoto e re-subir novo
+    runs-on: [self-hosted, windows-self-hosted]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Listar arquivos remotos em /admin/
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          FTP_PATH: ${{ secrets.HOSTINGER_FTP_PATH }}
+        run: |
+          set -e
+          FTP_PATH="${FTP_PATH%/}/"
+          CREDS="${FTP_USER}:${FTP_PASS}"
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}${FTP_PATH}admin/" --list-only > /tmp/admin-files.txt || true
+          echo "=== Arquivos remotos em /admin/ ==="
+          cat /tmp/admin-files.txt
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}${FTP_PATH}admin/_legacy/" --list-only > /tmp/legacy-files.txt || true
+          echo "=== Arquivos remotos em /admin/_legacy/ ==="
+          cat /tmp/legacy-files.txt || echo "(vazio ou não existe)"
+
+      - name: Deletar arquivos antigos em /admin/
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          FTP_PATH: ${{ secrets.HOSTINGER_FTP_PATH }}
+        run: |
+          set -e
+          FTP_PATH="${FTP_PATH%/}/"
+          CREDS="${FTP_USER}:${FTP_PASS}"
+
+          for f in index.html .htaccess; do
+            echo "Deletando admin/$f"
+            curl -sS --user "$CREDS" "ftp://${FTP_HOST}${FTP_PATH}admin/" -Q "DELE admin/$f" -o /dev/null || echo "  (não existia ou erro)"
+          done
+
+      - name: Upload novo admin/index.html
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          FTP_PATH: ${{ secrets.HOSTINGER_FTP_PATH }}
+        run: |
+          set -e
+          FTP_PATH="${FTP_PATH%/}/"
+          CREDS="${FTP_USER}:${FTP_PASS}"
+
+          echo "Upload admin/index.html (novo, $(wc -c < admin/index.html) bytes)"
+          curl -sS --ftp-create-dirs --user "$CREDS" -T admin/index.html \
+            "ftp://${FTP_HOST}${FTP_PATH}admin/index.html" \
+            -w "HTTP: %{http_code}\n" -o /dev/null --max-time 60
+
+          echo "Upload admin/_legacy/index.html"
+          curl -sS --ftp-create-dirs --user "$CREDS" -T admin/_legacy/index.html \
+            "ftp://${FTP_HOST}${FTP_PATH}admin/_legacy/index.html" \
+            -w "HTTP: %{http_code}\n" -o /dev/null --max-time 60
+
+          echo "Upload admin/_legacy/.htaccess"
+          curl -sS --ftp-create-dirs --user "$CREDS" -T admin/_legacy/.htaccess \
+            "ftp://${FTP_HOST}${FTP_PATH}admin/_legacy/.htaccess" \
+            -w "HTTP: %{http_code}\n" -o /dev/null --max-time 60
+
+      - name: Smoke — verificar tamanho do admin novo
+        run: |
+          set -e
+          sleep 3
+          SIZE=$(curl -sI "https://diamantes.grupoparticipa.app.br/servico/admin/" | grep -i "content-length" | awk '{print $2}' | tr -d '\r')
+          echo "Content-Length remoto: $SIZE"
+          LOCAL=$(wc -c < admin/index.html)
+          echo "Local: $LOCAL"
+          if [ "$SIZE" -lt 50000 ]; then
+            echo "OK — admin novo no ar"
+          else
+            echo "::warning::Tamanho remoto ($SIZE) ainda parece o antigo (~108KB)"
+          fi
