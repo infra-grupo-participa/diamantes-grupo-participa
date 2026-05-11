@@ -13,7 +13,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Listar arquivos remotos em /admin/
+      - name: Listar arquivos remotos em /admin/ (DETALHADO)
+        env:
+          FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
+          FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
+          FTP_PASS: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          FTP_PATH: ${{ secrets.HOSTINGER_FTP_PATH }}
+        run: |
+          set -e
+          FTP_PATH="${FTP_PATH%/}/"
+          CREDS="${FTP_USER}:${FTP_PASS}"
+          echo "=== Listagem ANTES (detalhada com tamanhos) ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}${FTP_PATH}admin/"
+          echo ""
+          echo "=== Baixar atual remoto e ver tamanho ==="
+          curl -sS --user "$CREDS" "ftp://${FTP_HOST}${FTP_PATH}admin/index.html" -o /tmp/before.html
+          wc -c /tmp/before.html
+          echo "Conteúdo (primeiras linhas):"
+          head -3 /tmp/before.html
+
+      - name: Listar arquivos remotos em /admin/ (LEGADO — pula)
         env:
           FTP_HOST: ${{ secrets.HOSTINGER_FTP_HOST }}
           FTP_USER: ${{ secrets.HOSTINGER_FTP_USER }}
