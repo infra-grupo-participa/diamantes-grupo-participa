@@ -715,16 +715,15 @@
       servicesBySlug: {},
     };
 
-    // Mapa baseado no nome canônico (saída de canonicalServiceName)
+    // Mapa por setor (saída de canonicalServiceName = nome do setor)
     const SERVICE_COLOR_MAP = {
-      'Tráfego':                  { cls: 'midia',      label: 'Tráfego' },
-      'Gestão de Redes Sociais':  { cls: 'midia',      label: 'Redes Sociais' },
-      'Web Designer':             { cls: 'design',     label: 'Web Designer' },
-      'Design Gráfico':           { cls: 'design',     label: 'Design Gráfico' },
-      'Edição de Vídeo':          { cls: 'video',      label: 'Edição de Vídeo' },
-      'Gestor de Disparos':       { cls: 'estrategia', label: 'Gestor de Disparos' },
-      'Copywriter':               { cls: 'copy',       label: 'Copywriter' },
-      'Hospedagem':               { cls: 'metrica',    label: 'Hospedagem' },
+      'Gestor de Tráfego': { cls: 'midia',      label: 'Tráfego' },
+      'Social Media':      { cls: 'midia',      label: 'Social Media' },
+      'Web Designer':      { cls: 'design',     label: 'Web Designer' },
+      'Designer':          { cls: 'design',     label: 'Design Gráfico' },
+      'Editor de Vídeo':   { cls: 'video',      label: 'Edição de Vídeo' },
+      'Automação':         { cls: 'estrategia', label: 'Automação' },
+      'Copywriter':        { cls: 'copy',       label: 'Copywriter' },
     };
 
     function serviceChipMeta(rawType) {

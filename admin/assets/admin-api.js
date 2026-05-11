@@ -20,19 +20,18 @@
     return window.getSupabaseClient();
   }
 
-  // Normaliza nomes de serviços legados e variantes Hotmart para nome canônico curto
+  // Mapeia serviço para o setor responsável (nomes dos positions no Supabase)
   function canonicalServiceName(raw) {
     if (!raw) return 'Desconhecido';
     const up = raw.toUpperCase().trim();
-    if (up.includes('TRÁFEGO') || up.includes('TRAFEGO') || up === 'ANÚNCIOS PAGOS' || up === 'ANUNCIOS PAGOS') return 'Tráfego';
-    if (up.includes('WEB DESIGN') || up === 'WEBDESIGNER' || up === 'WEB DESIGNER') return 'Web Designer';
-    if (up.includes('EDIÇÃO DE VÍDEO') || up.includes('EDICAO DE VIDEO') || up.includes('EDIÇÃO DE VIDEO')) return 'Edição de Vídeo';
-    if (up.includes('REDES SOCIAIS') || up === 'SOCIAL MEDIA') return 'Gestão de Redes Sociais';
-    if (up.includes('DISPAROS') || up === 'AUTOMAÇÃO' || up === 'AUTOMACAO') return 'Gestor de Disparos';
-    if (up.includes('DESIGN GRÁFICO') || up.includes('DESIGN GRAFICO') || up === 'DESIGNER') return 'Design Gráfico';
+    if (up.includes('TRÁFEGO') || up.includes('TRAFEGO') || up === 'ANÚNCIOS PAGOS' || up === 'ANUNCIOS PAGOS') return 'Gestor de Tráfego';
+    if (up.includes('WEB DESIGN') || up === 'WEBDESIGNER' || up === 'WEB DESIGNER' || up === 'HOST' || up.includes('HOSPED')) return 'Web Designer';
+    if (up.includes('EDIÇÃO DE VÍDEO') || up.includes('EDICAO DE VIDEO') || up.includes('EDIÇÃO DE VIDEO')) return 'Editor de Vídeo';
+    if (up.includes('REDES SOCIAIS') || up === 'SOCIAL MEDIA') return 'Social Media';
+    if (up.includes('DISPAROS') || up === 'AUTOMAÇÃO' || up === 'AUTOMACAO') return 'Automação';
+    if (up.includes('DESIGN GRÁFICO') || up.includes('DESIGN GRAFICO') || up === 'DESIGNER') return 'Designer';
     if (up.includes('COPYWRITER') || up === 'COPY') return 'Copywriter';
-    if (up === 'HOST' || up.includes('HOSPED')) return 'Hospedagem';
-    return raw; // mantém o nome Hotmart canônico como fallback
+    return raw;
   }
 
   // =============================================================
