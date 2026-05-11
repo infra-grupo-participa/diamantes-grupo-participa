@@ -39,6 +39,8 @@ function hm_supabase_rpc(string $rpc, array $params): array {
             'Content-Type: application/json',
             'apikey: ' . $apiKey,
             'Authorization: Bearer ' . $apiKey,
+            'Accept-Profile: portal',
+            'Content-Profile: portal',
             'Prefer: return=representation',
         ],
         CURLOPT_TIMEOUT        => 10,
