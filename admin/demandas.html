@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demandas — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --sidebar-bg: #ffffff;
+      --border: #eef0f4;
+      --border-strong: #e3e6ec;
+      --text: #0f172a;
+      --text-secondary: #475569;
+      --muted: #94a3b8;
+      --accent: #F29725;
+      --accent-soft: #fff4e3;
+      --accent-strong: #d97e0f;
+      --success: #16a34a;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+
+      --col-open:  #dbeafe;
+      --col-prog:  #fff4d6;
+      --col-review:#ffe9ee;
+      --col-done:  #e7f7ee;
+
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+      --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.06);
+      --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; height:100%; font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; color:var(--text); background:var(--bg); -webkit-font-smoothing:antialiased; font-size:14px; }
+    button { font-family: inherit; cursor: pointer; }
+    input, select, textarea { font-family: inherit; }
+
+    .app-shell { display:grid; grid-template-columns:248px 1fr; min-height:100vh; }
+    .sidebar { background:var(--sidebar-bg); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:24px 16px; gap:20px; position:sticky; top:0; height:100vh; }
+    .brand { display:flex; align-items:center; gap:10px; padding:4px 8px 12px; }
+    .brand-mark { width:32px; height:32px; border-radius:8px; background:linear-gradient(135deg,var(--accent),var(--accent-strong)); display:grid; place-items:center; color:#fff; }
+    .brand-name { font-weight:700; font-size:1rem; }
+    .nav-section-label { font-size:0.72rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--muted); padding:0 12px; margin-bottom:6px; }
+    .nav { display:flex; flex-direction:column; gap:2px; flex:1; }
+    .nav-item { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:10px; color:var(--text-secondary); text-decoration:none; font-weight:500; font-size:0.9rem; transition:background 0.15s, color 0.15s; }
+    .nav-item:hover { background:var(--bg); color:var(--text); }
+    .nav-item.active { background:var(--accent-soft); color:var(--accent-strong); font-weight:600; }
+    .nav-item .ico { width:18px; height:18px; flex-shrink:0; }
+    .sidebar-footer { border-top:1px solid var(--border); padding-top:16px; display:flex; flex-direction:column; gap:10px; }
+    .user-pill { display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; }
+    .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#fcd9a5,var(--accent)); display:grid; place-items:center; color:#fff; font-weight:700; font-size:0.78rem; flex-shrink:0; }
+    .user-pill-info { display:flex; flex-direction:column; min-width:0; }
+    .user-pill-name { font-weight:600; font-size:0.85rem; color:var(--text); }
+    .user-pill-role { font-size:0.72rem; color:var(--muted); }
+    .logout-button { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; border:none; background:transparent; color:var(--text-secondary); font-size:0.85rem; font-weight:500; }
+    .logout-button:hover { background:var(--bg); color:var(--danger); }
+
+    /* MAIN */
+    .main { padding:32px 32px 48px; min-width:0; display:flex; flex-direction:column; gap:18px; }
+    .page-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+    .page-title { margin:0 0 6px; font-size:1.5rem; font-weight:700; letter-spacing:-0.02em; }
+    .page-subtitle { margin:0; color:var(--text-secondary); font-size:0.92rem; }
+    .page-actions { display:flex; gap:10px; align-items:center; }
+    .btn { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:10px; font-size:0.88rem; font-weight:600; border:1px solid transparent; transition:background 0.15s; }
+    .btn-ghost { background:var(--surface); color:var(--text); border-color:var(--border-strong); }
+    .btn-ghost:hover { background:var(--bg); }
+
+    /* KPIs */
+    .kpi-grid { display:grid; grid-template-columns:repeat(5, 1fr); gap:12px; }
+    .kpi-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow-sm); }
+    .kpi-icon { width:40px; height:40px; border-radius:10px; display:grid; place-items:center; flex-shrink:0; }
+    .kpi-icon svg { width:20px; height:20px; }
+    .kpi-label { font-size:0.74rem; color:var(--muted); font-weight:500; margin-bottom:2px; }
+    .kpi-value { font-size:1.35rem; font-weight:700; letter-spacing:-0.02em; line-height:1.1; }
+
+    /* Filtros */
+    .filters { display:flex; gap:10px; align-items:center; }
+    .search-input-wrap { flex:1; max-width:380px; position:relative; }
+    .search-input-wrap svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); width:16px; height:16px; }
+    .search-input { width:100%; padding:10px 12px 10px 36px; border:1px solid var(--border-strong); border-radius:10px; font-size:0.88rem; background:var(--surface); color:var(--text); }
+    .search-input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(242,151,37,0.16); }
+    .select-pill { padding:10px 12px; border:1px solid var(--border-strong); border-radius:10px; font-size:0.86rem; background:var(--surface); color:var(--text); min-width:180px; }
+    .select-pill:focus { outline:none; border-color:var(--accent); }
+
+    /* KANBAN */
+    .kanban {
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:14px;
+      min-height:60vh;
+    }
+    @media (max-width: 1200px) { .kanban { grid-template-columns:repeat(2, 1fr); } }
+    @media (max-width: 720px)  { .kanban { grid-template-columns:1fr; } }
+
+    .kcol {
+      background:var(--bg);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      display:flex; flex-direction:column;
+      min-height:300px;
+    }
+    .kcol-head {
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+      padding:6px 4px 12px;
+      border-bottom:1px dashed var(--border-strong);
+      margin-bottom:10px;
+    }
+    .kcol-title { display:flex; align-items:center; gap:8px; font-weight:700; font-size:0.88rem; }
+    .kcol-dot { width:10px; height:10px; border-radius:50%; }
+    .kcol-open   .kcol-dot { background:#3b82f6; }
+    .kcol-prog   .kcol-dot { background:#eab308; }
+    .kcol-review .kcol-dot { background:#ec4899; }
+    .kcol-done   .kcol-dot { background:#16a34a; }
+    .kcol-count { background:var(--surface); border:1px solid var(--border); padding:1px 9px; border-radius:999px; font-size:0.72rem; color:var(--text-secondary); font-weight:700; }
+
+    .kcards { display:flex; flex-direction:column; gap:10px; min-height:80px; }
+    .kcard {
+      background:var(--surface);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px;
+      cursor:pointer;
+      transition:transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    }
+    .kcard:hover { transform:translateY(-1px); box-shadow:var(--shadow-md); border-color:var(--border-strong); }
+    .kcard .top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; margin-bottom:6px; }
+    .kcard .title { font-weight:600; font-size:0.92rem; line-height:1.3; }
+    .kcard .client { font-size:0.74rem; color:var(--muted); margin-top:2px; }
+    .kcard .meta-row { display:flex; align-items:center; justify-content:space-between; margin-top:10px; }
+    .kcard .due { font-size:0.74rem; color:var(--muted); }
+    .kcard .due.late { color:var(--danger); font-weight:600; }
+    .kcard .due.soon { color:var(--warning); font-weight:600; }
+    .kcard .avatars { display:flex; }
+    .kcard .avatars .avatar {
+      width:22px; height:22px; font-size:0.6rem;
+      margin-left:-6px; border:2px solid var(--surface);
+    }
+    .kcard .avatars .avatar:first-child { margin-left:0; }
+    .kcard .avatars .more {
+      width:22px; height:22px; border-radius:50%; background:var(--border-strong); color:var(--text-secondary);
+      display:grid; place-items:center; font-size:0.62rem; font-weight:700; margin-left:-6px; border:2px solid var(--surface);
+    }
+    .kcard .progress {
+      height:4px; background:var(--bg); border-radius:999px; margin-top:8px; overflow:hidden;
+    }
+    .kcard .progress > div { height:100%; background:var(--success); border-radius:999px; }
+    .kcard .chat-count { display:inline-flex; align-items:center; gap:4px; font-size:0.7rem; color:var(--muted); }
+    .kcard .chat-count svg { width:11px; height:11px; }
+
+    .kcol .empty {
+      color:var(--muted); font-size:0.84rem;
+      padding:30px 10px;
+      text-align:center;
+    }
+
+    /* MODAL detalhes */
+    .modal-bg {
+      display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55);
+      z-index:200; align-items:center; justify-content:center; padding:24px;
+      backdrop-filter:blur(2px);
+    }
+    .modal-bg.open { display:flex; }
+    .modal {
+      background:var(--surface); border-radius:16px;
+      width:100%; max-width:780px; max-height:90vh;
+      box-shadow:var(--shadow-lg); overflow:hidden;
+      display:flex; flex-direction:column;
+    }
+    .modal-head {
+      padding:20px 24px;
+      border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:flex-start; gap:14px;
+    }
+    .modal-head h3 { margin:0; font-size:1.15rem; font-weight:700; }
+    .modal-head .sub { margin-top:4px; font-size:0.82rem; color:var(--muted); }
+    .modal-close { width:32px; height:32px; border-radius:8px; border:1px solid var(--border-strong); background:transparent; color:var(--muted); font-size:1.2rem; cursor:pointer; }
+    .modal-close:hover { background:var(--bg); color:var(--text); }
+
+    .modal-body { padding:20px 24px; overflow-y:auto; display:grid; gap:20px; }
+    .meta-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+    .meta-item { padding:10px 12px; background:var(--bg); border-radius:10px; }
+    .meta-item .lbl { font-size:0.72rem; color:var(--muted); margin-bottom:2px; }
+    .meta-item .val { font-weight:600; }
+
+    .badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:999px; font-size:0.72rem; font-weight:700; }
+    .b-open    { background:#dbeafe; color:#1d4ed8; }
+    .b-prog    { background:#fff4d6; color:#b45309; }
+    .b-review  { background:#ffe9ee; color:#be185d; }
+    .b-done    { background:#e7f7ee; color:#15803d; }
+    .b-cancel  { background:#e2e8f0; color:#475569; }
+
+    .section-title { font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-secondary); margin:0 0 10px; }
+
+    .team-list { display:flex; flex-direction:column; gap:8px; }
+    .team-row { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:8px 12px; background:var(--bg); border-radius:10px; }
+    .team-row .avatar { width:30px; height:30px; font-size:0.66rem; }
+    .team-row .name { font-weight:600; font-size:0.88rem; }
+    .team-row .role { font-size:0.72rem; color:var(--muted); }
+    .team-row .approved { font-size:0.72rem; color:var(--success); font-weight:700; }
+    .team-row .approved.no { color:var(--muted); font-weight:500; }
+
+    .chat-box {
+      max-height:300px; overflow-y:auto;
+      background:var(--bg); border:1px solid var(--border);
+      border-radius:12px; padding:14px;
+      display:flex; flex-direction:column; gap:12px;
+    }
+    .msg { display:grid; grid-template-columns:auto 1fr; gap:10px; max-width:90%; }
+    .msg .avatar { width:28px; height:28px; font-size:0.62rem; margin-top:2px; }
+    .msg-body { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:8px 12px; }
+    .msg-body .author { font-size:0.72rem; color:var(--muted); margin-bottom:4px; font-weight:600; }
+    .msg-body .text { font-size:0.88rem; line-height:1.45; }
+    .msg-body .time { font-size:0.68rem; color:var(--muted); margin-top:4px; }
+    .msg.mine { margin-left:auto; grid-template-columns:1fr auto; }
+    .msg.mine .avatar { order:2; }
+    .msg.mine .msg-body { background:var(--accent-soft); border-color:rgba(242,151,37,0.28); }
+
+    .status-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+    .status-btn {
+      padding:8px 14px; border-radius:10px;
+      font-size:0.82rem; font-weight:600;
+      border:1px solid var(--border-strong);
+      background:var(--surface); color:var(--text-secondary);
+      cursor:pointer;
+    }
+    .status-btn:hover { background:var(--bg); color:var(--text); }
+    .status-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+    .status-btn.danger { color:var(--danger); }
+    .status-btn.danger:hover { background:#fee2e2; }
+
+    @media (max-width: 900px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { position: static; height: auto; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+        </div>
+        <div class="brand-name">Diamantes</div>
+      </div>
+      <div>
+        <div class="nav-section-label">Geral</div>
+        <nav class="nav">
+          <a href="index.html" class="nav-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Funcionários
+          </a>
+          <a href="alunos-diamantes.html" class="nav-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+            Alunos Diamantes
+          </a>
+          <a href="assinaturas.html" class="nav-item">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            Assinaturas
+          </a>
+          <a href="demandas.html" class="nav-item active">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Demandas
+          </a>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <div class="user-pill">
+          <div class="avatar">AD</div>
+          <div class="user-pill-info">
+            <div class="user-pill-name">Administrador</div>
+            <div class="user-pill-role">admin@diamantes</div>
+          </div>
+        </div>
+        <button class="logout-button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sair do admin
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Demandas — Serviços Diamante</h1>
+          <p class="page-subtitle">Acompanhe o fluxo de cada solicitação dos alunos em tempo real.</p>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#dbeafe; color:#1d4ed8;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">Total</div>
+            <div class="kpi-value" id="kpiTotal">—</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#dbeafe; color:#1d4ed8;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">Abertas</div>
+            <div class="kpi-value" id="kpiOpen">—</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#fff4d6; color:#eab308;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">Em andamento</div>
+            <div class="kpi-value" id="kpiProg">—</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#ffe9ee; color:#ec4899;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">Em revisão</div>
+            <div class="kpi-value" id="kpiReview">—</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon" style="background:#e7f7ee; color:#16a34a;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div>
+            <div class="kpi-label">Concluídas</div>
+            <div class="kpi-value" id="kpiDone">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtros -->
+      <div class="filters">
+        <div class="search-input-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" id="searchInput" type="text" placeholder="Buscar por título, cliente ou descrição" />
+        </div>
+        <select class="select-pill" id="clientFilter">
+          <option value="all">Cliente: Todos</option>
+        </select>
+        <button class="btn btn-ghost" id="btnRefresh" title="Atualizar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Atualizar
+        </button>
+      </div>
+
+      <!-- Kanban -->
+      <div class="kanban" id="kanban">
+        <div class="kcol kcol-open">
+          <div class="kcol-head">
+            <div class="kcol-title"><span class="kcol-dot"></span>Aberta</div>
+            <span class="kcol-count" id="cntOpen">0</span>
+          </div>
+          <div class="kcards" id="colOpen"></div>
+        </div>
+        <div class="kcol kcol-prog">
+          <div class="kcol-head">
+            <div class="kcol-title"><span class="kcol-dot"></span>Em andamento</div>
+            <span class="kcol-count" id="cntProg">0</span>
+          </div>
+          <div class="kcards" id="colProg"></div>
+        </div>
+        <div class="kcol kcol-review">
+          <div class="kcol-head">
+            <div class="kcol-title"><span class="kcol-dot"></span>Em revisão</div>
+            <span class="kcol-count" id="cntReview">0</span>
+          </div>
+          <div class="kcards" id="colReview"></div>
+        </div>
+        <div class="kcol kcol-done">
+          <div class="kcol-head">
+            <div class="kcol-title"><span class="kcol-dot"></span>Concluída</div>
+            <span class="kcol-count" id="cntDone">0</span>
+          </div>
+          <div class="kcards" id="colDone"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal de detalhes -->
+  <div class="modal-bg" id="detailModal">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h3 id="dmTitle">—</h3>
+          <div class="sub" id="dmSubtitle">—</div>
+        </div>
+        <button class="modal-close" id="dmClose">×</button>
+      </div>
+      <div class="modal-body">
+        <div>
+          <h4 class="section-title">Status</h4>
+          <div id="dmStatusBadge"></div>
+          <div class="status-actions" id="dmStatusActions"></div>
+        </div>
+        <div>
+          <h4 class="section-title">Detalhes</h4>
+          <div class="meta-grid">
+            <div class="meta-item"><div class="lbl">Cliente</div><div class="val" id="dmClient">—</div></div>
+            <div class="meta-item"><div class="lbl">Solicitante</div><div class="val" id="dmRequester">—</div></div>
+            <div class="meta-item"><div class="lbl">Início</div><div class="val" id="dmStart">—</div></div>
+            <div class="meta-item"><div class="lbl">Prazo</div><div class="val" id="dmEnd">—</div></div>
+            <div class="meta-item"><div class="lbl">Aberta em</div><div class="val" id="dmCreated">—</div></div>
+            <div class="meta-item"><div class="lbl">Aprovações</div><div class="val" id="dmApprovals">—</div></div>
+          </div>
+          <div id="dmDescriptionWrap" style="margin-top:12px; padding:12px; background:var(--bg); border-radius:10px; font-size:0.88rem; line-height:1.5; white-space:pre-wrap; display:none;"></div>
+        </div>
+        <div>
+          <h4 class="section-title">Equipe</h4>
+          <div class="team-list" id="dmTeam"></div>
+        </div>
+        <div>
+          <h4 class="section-title">Chat (somente leitura)</h4>
+          <div class="chat-box" id="dmChat"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" style="position:fixed; bottom:24px; right:24px; z-index:300; display:none; padding:14px 18px; border-radius:12px; box-shadow:0 12px 28px rgba(0,0,0,0.18); font-weight:600; font-size:0.88rem;"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="assets/admin-api.js"></script>
+
+  <script>
+    'use strict';
+
+    function initials(name) {
+      return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+    }
+    function fmtDate(s) {
+      if (!s) return '—';
+      const d = new Date(s); if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('pt-BR');
+    }
+    function fmtDateTime(s) {
+      if (!s) return '—';
+      const d = new Date(s);
+      return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    function dueLabel(d) {
+      if (d.status === 'done') return 'Concluída em ' + fmtDate(d.finalized_at);
+      if (d.status === 'canceled') return 'Cancelada';
+      if (!d.ends_at) return 'Sem prazo';
+      const today = new Date(); today.setHours(0,0,0,0);
+      const due = new Date(d.ends_at);
+      const diff = Math.ceil((due - today) / (1000*60*60*24));
+      if (diff < 0)  return { text: 'Atrasada há ' + Math.abs(diff) + 'd', cls: 'late' };
+      if (diff === 0) return { text: 'Vence hoje', cls: 'late' };
+      if (diff === 1) return { text: 'Vence amanhã', cls: 'soon' };
+      if (diff <= 3) return { text: 'Em ' + diff + ' dias', cls: 'soon' };
+      return { text: fmtDate(d.ends_at), cls: '' };
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+
+    const STATUS_BADGE = {
+      open:        { cls:'b-open',   label:'Aberta' },
+      in_progress: { cls:'b-prog',   label:'Em andamento' },
+      review:      { cls:'b-review', label:'Em revisão' },
+      done:        { cls:'b-done',   label:'Concluída' },
+      canceled:    { cls:'b-cancel', label:'Cancelada' },
+    };
+    function toast(msg, kind='success') {
+      const el = document.getElementById('toast');
+      el.style.background = kind === 'error' ? '#fee2e2' : kind === 'warning' ? '#fef3c7' : '#dcfce7';
+      el.style.color      = kind === 'error' ? '#991b1b' : kind === 'warning' ? '#92400e' : '#166534';
+      el.textContent = msg; el.style.display = 'block';
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { el.style.display = 'none'; }, 3500);
+    }
+
+    const state = {
+      filter: { search:'', clientSlug:'all' },
+      demands: [],            // todas
+      membersById: {},        // demand_id → members
+      realtimeUnsub: null,
+      currentDetailId: null,
+    };
+
+    async function loadAll() {
+      try {
+        const [stats, demands] = await Promise.all([
+          AdminAPI.adminDemandStats(),
+          AdminAPI.listAllDemands(state.filter),
+        ]);
+        state.demands = demands;
+        // Stats globais (sem filtro) → manter os contadores macro
+        document.getElementById('kpiTotal').textContent  = stats.total;
+        document.getElementById('kpiOpen').textContent   = stats.open;
+        document.getElementById('kpiProg').textContent   = stats.in_progress;
+        document.getElementById('kpiReview').textContent = stats.review;
+        document.getElementById('kpiDone').textContent   = stats.done;
+
+        // Membros de cada demanda visível (até 50 chamadas — ok pra escopo atual)
+        await Promise.all(demands.map(async d => {
+          state.membersById[d.id] = await AdminAPI._client()
+            .from('demand_members')
+            .select('user_id, role, approved_finish')
+            .eq('demand_id', d.id)
+            .then(r => r.data || []);
+        }));
+
+        // Resolve nomes dos operadores em uma query só
+        const opIds = [...new Set(Object.values(state.membersById).flat().filter(m => m.role === 'operator').map(m => m.user_id))];
+        let usersById = {};
+        if (opIds.length) {
+          const { data } = await AdminAPI._client()
+            .from('users').select('id, name, metadata').in('id', opIds);
+          usersById = Object.fromEntries((data || []).map(u => [u.id, u]));
+        }
+        state.usersById = usersById;
+
+        renderKanban();
+      } catch (e) {
+        console.error(e);
+        toast('Erro ao carregar demandas: ' + (e.message || e), 'error');
+      }
+    }
+
+    function cardHtml(d) {
+      const due = dueLabel(d);
+      const dueObj = typeof due === 'string' ? { text: due, cls: '' } : due;
+      const members = state.membersById[d.id] || [];
+      const ops = members.filter(m => m.role === 'operator');
+      const totalOps = ops.length;
+      const approvedOps = ops.filter(m => m.approved_finish).length;
+      const usersById = state.usersById || {};
+      const visibleOps = ops.slice(0, 4);
+      const moreCount = ops.length - visibleOps.length;
+      const avatars = visibleOps.map(m => {
+        const u = usersById[m.user_id] || {};
+        return `<div class="avatar" title="${u.name || '—'}">${initials(u.name || '?')}</div>`;
+      }).join('') + (moreCount > 0 ? `<div class="more">+${moreCount}</div>` : '');
+      const progress = totalOps > 0 ? Math.round((approvedOps / totalOps) * 100) : 0;
+      return `
+        <div class="kcard" data-id="${d.id}">
+          <div class="top">
+            <div>
+              <div class="title">${escapeHtml(d.title || 'Sem título')}</div>
+              <div class="client">${escapeHtml(d.client_name || d.client_slug || '—')}</div>
+            </div>
+          </div>
+          ${totalOps > 0 ? `
+            <div style="font-size:0.72rem; color:var(--muted); margin-top:6px;">
+              Aprovações: <strong>${approvedOps}/${totalOps}</strong>
+            </div>
+            <div class="progress"><div style="width:${progress}%"></div></div>
+          ` : ''}
+          <div class="meta-row">
+            <div class="avatars">${avatars || '<span style="font-size:0.72rem; color:var(--muted);">sem equipe</span>'}</div>
+            <span class="due ${dueObj.cls}">${dueObj.text}</span>
+          </div>
+          ${d.messages_count > 0 ? `
+            <div style="margin-top:8px;">
+              <span class="chat-count">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                ${d.messages_count}
+              </span>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    function renderKanban() {
+      const list = state.demands;
+      const map = { open: [], in_progress: [], review: [], done: [] };
+      list.forEach(d => {
+        if (d.status === 'canceled') return; // não renderiza canceladas no quadro principal
+        if (map[d.status]) map[d.status].push(d);
+      });
+      document.getElementById('colOpen').innerHTML   = map.open.length   ? map.open.map(cardHtml).join('')   : '<div class="empty">Nada por aqui.</div>';
+      document.getElementById('colProg').innerHTML   = map.in_progress.length ? map.in_progress.map(cardHtml).join('') : '<div class="empty">Nada por aqui.</div>';
+      document.getElementById('colReview').innerHTML = map.review.length ? map.review.map(cardHtml).join('') : '<div class="empty">Nada por aqui.</div>';
+      document.getElementById('colDone').innerHTML   = map.done.length   ? map.done.map(cardHtml).join('')   : '<div class="empty">Nada por aqui.</div>';
+
+      document.getElementById('cntOpen').textContent   = map.open.length;
+      document.getElementById('cntProg').textContent   = map.in_progress.length;
+      document.getElementById('cntReview').textContent = map.review.length;
+      document.getElementById('cntDone').textContent   = map.done.length;
+
+      document.querySelectorAll('.kcard').forEach(el => {
+        el.addEventListener('click', () => openDetail(el.dataset.id));
+      });
+    }
+
+    async function openDetail(id) {
+      try {
+        state.currentDetailId = id;
+        const det = await AdminAPI.getDemandFullDetails(id);
+        if (!det) return;
+        const { demand: d, members, messages } = det;
+
+        document.getElementById('dmTitle').textContent = d.title || 'Sem título';
+        document.getElementById('dmSubtitle').textContent = `${d.client_name} • aberta em ${fmtDate(d.created_at)}`;
+        const sb = STATUS_BADGE[d.status] || { cls:'b-cancel', label:d.status };
+        document.getElementById('dmStatusBadge').innerHTML = `<span class="badge ${sb.cls}">${sb.label}</span>`;
+
+        // Ações de status
+        const actionsEl = document.getElementById('dmStatusActions');
+        const statuses = ['open','in_progress','review','done','canceled'];
+        actionsEl.innerHTML = statuses.map(s => {
+          const isCurrent = d.status === s;
+          const lbl = STATUS_BADGE[s].label;
+          const danger = s === 'canceled' ? 'danger' : '';
+          return `<button class="status-btn ${isCurrent ? 'active' : ''} ${danger}" data-status="${s}" ${isCurrent ? 'disabled' : ''}>${lbl}</button>`;
+        }).join('');
+        actionsEl.querySelectorAll('button[data-status]').forEach(b => {
+          b.addEventListener('click', async () => {
+            const ns = b.dataset.status;
+            if (!confirm(`Mudar status para "${STATUS_BADGE[ns].label}"?`)) return;
+            try {
+              await AdminAPI.adminUpdateDemandStatus(d.id, ns);
+              toast('Status atualizado.');
+              await loadAll();
+              openDetail(d.id);
+            } catch (e) {
+              toast('Erro: ' + (e.message || e), 'error');
+            }
+          });
+        });
+
+        document.getElementById('dmClient').textContent = d.client_name || '—';
+        document.getElementById('dmRequester').textContent = d.created_by_name || '—';
+        document.getElementById('dmStart').textContent = fmtDate(d.starts_at);
+        document.getElementById('dmEnd').textContent = fmtDate(d.ends_at);
+        document.getElementById('dmCreated').textContent = fmtDateTime(d.created_at);
+        document.getElementById('dmApprovals').textContent = `${d.operators_approved || 0} / ${d.operators_total || 0}`;
+
+        const descWrap = document.getElementById('dmDescriptionWrap');
+        if (d.description && d.description.trim()) {
+          descWrap.style.display = 'block';
+          descWrap.textContent = d.description;
+        } else { descWrap.style.display = 'none'; }
+
+        // Equipe
+        const team = members.map(m => {
+          const approved = m.approved_finish ? '<span class="approved">✓ Aprovou</span>' : '<span class="approved no">aguardando</span>';
+          return `
+            <div class="team-row">
+              <div class="avatar" style="${m.position_color ? `background:linear-gradient(135deg,${m.position_color}33,${m.position_color});`:''}">${initials(m.user_name)}</div>
+              <div>
+                <div class="name">${escapeHtml(m.user_name || '—')} <span style="font-size:0.7rem; color:var(--muted); font-weight:500;">— ${m.role === 'operator' ? 'operador' : 'cliente'}</span></div>
+                <div class="role">${escapeHtml(m.position_name || m.user_email || '')}</div>
+              </div>
+              ${m.role === 'operator' ? approved : ''}
+            </div>
+          `;
+        }).join('') || '<div style="color:var(--muted); font-size:0.84rem;">Sem membros.</div>';
+        document.getElementById('dmTeam').innerHTML = team;
+
+        // Chat
+        const chat = (messages || []).map(m => `
+          <div class="msg">
+            <div class="avatar" ${m.avatar_url ? `style="background:url('${m.avatar_url}') center/cover no-repeat;"` : ''}>${m.avatar_url ? '' : initials(m.author_name)}</div>
+            <div class="msg-body">
+              <div class="author">${escapeHtml(m.author_name || 'Alguém')}</div>
+              <div class="text">${escapeHtml(m.content || '')}</div>
+              <div class="time">${fmtDateTime(m.created_at)}</div>
+            </div>
+          </div>
+        `).join('') || '<div style="color:var(--muted); font-size:0.86rem; padding:20px; text-align:center;">Sem mensagens ainda.</div>';
+        document.getElementById('dmChat').innerHTML = chat;
+
+        document.getElementById('detailModal').classList.add('open');
+      } catch (e) {
+        console.error(e);
+        toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    function closeDetail() {
+      document.getElementById('detailModal').classList.remove('open');
+      state.currentDetailId = null;
+    }
+
+    document.getElementById('dmClose').addEventListener('click', closeDetail);
+    document.getElementById('detailModal').addEventListener('click', (e) => {
+      if (e.target.id === 'detailModal') closeDetail();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeDetail();
+    });
+
+    // ===== Filtros =====
+    let searchTimer = null;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        state.filter.search = e.target.value;
+        loadAll();
+      }, 280);
+    });
+    document.getElementById('clientFilter').addEventListener('change', (e) => {
+      state.filter.clientSlug = e.target.value;
+      loadAll();
+    });
+    document.getElementById('btnRefresh').addEventListener('click', () => loadAll());
+
+    // ===== Logout =====
+    document.querySelector('.logout-button').addEventListener('click', async () => {
+      await AdminAPI.logout();
+    });
+
+    async function fillSession(profile) {
+      if (!profile) return;
+      document.querySelector('.user-pill-name').textContent = profile.name || 'Administrador';
+      document.querySelector('.user-pill-role').textContent = profile.email || '';
+      document.querySelector('.user-pill .avatar').textContent = initials(profile.name || profile.email);
+    }
+
+    // ===== Realtime: atualiza Kanban quando algo muda no DB =====
+    function setupRealtime() {
+      const supabase = AdminAPI._client();
+      const ch = supabase.channel('admin-demands')
+        .on('postgres_changes',
+            { event: '*', schema: 'portal', table: 'demands' },
+            () => loadAll())
+        .on('postgres_changes',
+            { event: '*', schema: 'portal', table: 'demand_members' },
+            () => loadAll())
+        .subscribe();
+      state.realtimeUnsub = () => { try { supabase.removeChannel(ch); } catch (_) {} };
+    }
+
+    async function fillClientFilter() {
+      try {
+        const clients = await AdminAPI.listClientsSimple();
+        const sel = document.getElementById('clientFilter');
+        sel.innerHTML = '<option value="all">Cliente: Todos</option>' +
+          clients.map(c => `<option value="${c.slug}">${escapeHtml(c.display_name || c.slug)}</option>`).join('');
+      } catch (e) { console.error(e); }
+    }
+
+    (async function init() {
+      const profile = await AdminAPI.requireAdmin();
+      if (!profile) return;
+      await fillSession(profile);
+      await fillClientFilter();
+      await loadAll();
+      setupRealtime();
+    })();
+  </script>
+</body>
+</html>

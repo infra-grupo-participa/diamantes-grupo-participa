@@ -138,7 +138,7 @@ if ($txCode === '' || $buyerEmail === '') {
 $isCancellation = in_array($status, ['canceled', 'refunded', 'chargeback'], true);
 
 if ($isCancellation) {
-    // Primeiro grava o evento de cancelamento no histórico
+    // Grava o evento de cancelamento no histórico
     hm_supabase_rpc('process_hotmart_purchase', [
         'p_transaction_code'   => $txCode,
         'p_buyer_email'        => $buyerEmail,
@@ -153,22 +153,12 @@ if ($isCancellation) {
         'p_raw_payload'        => $payload,
     ]);
 
-    // Resolve client_slug pelo email para passar ao cancel RPC
-    $lookupResult = hm_supabase_rpc('process_hotmart_purchase', [
-        'p_transaction_code'   => $txCode . '_cancel_lookup',
-        'p_buyer_email'        => $buyerEmail,
-        'p_offer_code'         => $offerCode,
-        'p_service_name'       => $serviceName,
-        'p_amount'             => 0,
-        'p_status'             => 'other',
-        'p_payment_type'       => '',
-        'p_installments_total' => 0,
-        'p_installment_number' => 0,
-        'p_charged_at'         => $chargedAt,
-        'p_raw_payload'        => [],
-    ]);
-    $lookupBody = json_decode($lookupResult['body'], true);
-    $clientSlug = $lookupBody['client_slug'] ?? null;
+    // Resolve client_slug diretamente pelo email
+    $slugResult = hm_supabase_rpc('get_client_slug_by_email', ['p_email' => $buyerEmail]);
+    $clientSlug = json_decode($slugResult['body'], true) ?? null;
+    if (is_array($clientSlug)) {
+        $clientSlug = $clientSlug[0] ?? null;
+    }
 
     if ($clientSlug && $offerCode !== '') {
         $result = hm_supabase_rpc('cancel_client_service', [

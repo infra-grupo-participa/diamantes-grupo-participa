@@ -20,6 +20,21 @@
     return window.getSupabaseClient();
   }
 
+  // Normaliza nomes de serviços legados e variantes Hotmart para nome canônico curto
+  function canonicalServiceName(raw) {
+    if (!raw) return 'Desconhecido';
+    const up = raw.toUpperCase().trim();
+    if (up.includes('TRÁFEGO') || up.includes('TRAFEGO') || up === 'ANÚNCIOS PAGOS' || up === 'ANUNCIOS PAGOS') return 'Tráfego';
+    if (up.includes('WEB DESIGN') || up === 'WEBDESIGNER' || up === 'WEB DESIGNER') return 'Web Designer';
+    if (up.includes('EDIÇÃO DE VÍDEO') || up.includes('EDICAO DE VIDEO') || up.includes('EDIÇÃO DE VIDEO')) return 'Edição de Vídeo';
+    if (up.includes('REDES SOCIAIS') || up === 'SOCIAL MEDIA') return 'Gestão de Redes Sociais';
+    if (up.includes('DISPAROS') || up === 'AUTOMAÇÃO' || up === 'AUTOMACAO') return 'Gestor de Disparos';
+    if (up.includes('DESIGN GRÁFICO') || up.includes('DESIGN GRAFICO') || up === 'DESIGNER') return 'Design Gráfico';
+    if (up.includes('COPYWRITER') || up === 'COPY') return 'Copywriter';
+    if (up === 'HOST' || up.includes('HOSPED')) return 'Hospedagem';
+    return raw; // mantém o nome Hotmart canônico como fallback
+  }
+
   // =============================================================
   // POSIÇÕES (cargos)
   // =============================================================
@@ -444,29 +459,9 @@
       .eq('status', 'active');
     if (error) throw error;
 
-    // Mapa de normalização: nomes legados -> nome canônico Hotmart
-    const normalize = {
-      'ANÚNCIOS PAGOS': 'Tráfego',
-      'WEBDESIGNER':    'Web Designer',
-      'WEB DESIGNER':   'Web Designer',
-      'EDIÇÃO DE VÍDEO':'Edição de Vídeo',
-      'SOCIAL MEDIA':   'Gestão de Redes Sociais',
-      'AUTOMAÇÃO':      'Gestor de Disparos',
-      'DESIGNER':       'Design Gráfico',
-      'COPY':           'Copywriter',
-      'COPYWRITER':     'Copywriter',
-      'HOST':           'HOST',
-    };
-
     const counts = {};
     (data || []).forEach(s => {
-      // Usa nome da oferta Hotmart se disponível, senão normaliza nome legado
-      const offerName = s.metadata?.offer_code
-        ? null  // será resolvido pelo service_type já gravado como nome Hotmart
-        : null;
-      const raw = s.service_type || '';
-      const canonical = offerName || normalize[raw.toUpperCase()] || raw;
-      counts[canonical] = (counts[canonical] || 0) + 1;
+      counts[canonicalServiceName(s.service_type)] = (counts[canonicalServiceName(s.service_type)] || 0) + 1;
     });
     return Object.entries(counts)
       .map(([type, count]) => ({ type, count }))
@@ -534,6 +529,98 @@
     ]);
     const csv = [header, ...rows].map(r => r.map(csvEscape).join(';')).join('\n');
     return new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  }
+
+  // =============================================================
+  // DEMANDAS (Kanban admin — Etapa D3)
+  // =============================================================
+
+  async function listAllDemands({ search = '', clientSlug = 'all', status = 'all' } = {}) {
+    let q = client()
+      .from('v_demands').select('*').order('created_at', { ascending: false });
+    if (status && status !== 'all') q = q.eq('status', status);
+    if (clientSlug && clientSlug !== 'all') q = q.eq('client_slug', clientSlug);
+    if (search && search.trim()) {
+      const s = search.trim().replace(/[%_]/g, '');
+      q = q.or(`title.ilike.%${s}%,client_name.ilike.%${s}%,description.ilike.%${s}%`);
+    }
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getDemandFullDetails(demand_id) {
+    const supabase = client();
+    const [{ data: demand }, { data: members }, { data: messages }] = await Promise.all([
+      supabase.from('v_demands').select('*').eq('id', demand_id).maybeSingle(),
+      supabase.from('demand_members').select('*').eq('demand_id', demand_id),
+      supabase.from('demand_messages').select('*').eq('demand_id', demand_id).order('created_at'),
+    ]);
+    if (!demand) return null;
+    const userIds = [...new Set([...(members||[]).map(m=>m.user_id), ...(messages||[]).map(m=>m.user_id)])];
+    let usersById = {};
+    if (userIds.length) {
+      const { data: users } = await supabase.from('users')
+        .select('id, name, email, role, position_id, metadata').in('id', userIds);
+      usersById = Object.fromEntries((users||[]).map(u => [u.id, u]));
+      const pids = [...new Set((users||[]).map(u=>u.position_id).filter(Boolean))];
+      if (pids.length) {
+        const { data: positions } = await supabase.from('positions').select('id,name,color').in('id', pids);
+        const positionsById = Object.fromEntries((positions||[]).map(p => [p.id, p]));
+        Object.values(usersById).forEach(u => {
+          const p = positionsById[u.position_id];
+          if (p) { u._position_name = p.name; u._position_color = p.color; }
+        });
+      }
+    }
+    const memb = (members||[]).map(m => {
+      const u = usersById[m.user_id] || {};
+      return { ...m, user_name: u.name, user_email: u.email,
+               position_name: u._position_name, position_color: u._position_color };
+    });
+    const msgs = (messages||[]).map(m => {
+      const u = usersById[m.user_id] || {};
+      return { ...m, author_name: u.name, author_role: u.role, avatar_url: u.metadata?.avatar_url || null };
+    });
+    return { demand, members: memb, messages: msgs };
+  }
+
+  async function adminUpdateDemandStatus(id, status) {
+    const valid = ['open','in_progress','review','done','canceled'];
+    if (!valid.includes(status)) throw new Error('Status inválido.');
+    const patch = { status, updated_at: new Date().toISOString() };
+    if (status === 'done') patch.finalized_at = new Date().toISOString();
+    const { data, error } = await client()
+      .from('demands').update(patch).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function adminDemandStats() {
+    const supabase = client();
+    const [open, prog, review, done, canceled, all] = await Promise.all([
+      supabase.from('demands').select('id', { count: 'exact', head: true }).eq('status','open'),
+      supabase.from('demands').select('id', { count: 'exact', head: true }).eq('status','in_progress'),
+      supabase.from('demands').select('id', { count: 'exact', head: true }).eq('status','review'),
+      supabase.from('demands').select('id', { count: 'exact', head: true }).eq('status','done'),
+      supabase.from('demands').select('id', { count: 'exact', head: true }).eq('status','canceled'),
+      supabase.from('demands').select('id', { count: 'exact', head: true }),
+    ]);
+    return {
+      total: all.count || 0,
+      open: open.count || 0,
+      in_progress: prog.count || 0,
+      review: review.count || 0,
+      done: done.count || 0,
+      canceled: canceled.count || 0,
+    };
+  }
+
+  async function listClientsSimple() {
+    const { data, error } = await client()
+      .from('clients').select('slug, display_name').order('display_name');
+    if (error) throw error;
+    return data || [];
   }
 
   // =============================================================
@@ -692,7 +779,14 @@
     deleteSubscription,
     listClientsForSubscription,
     exportSubscriptionsCsv,
+    // Demandas
+    listAllDemands,
+    getDemandFullDetails,
+    adminUpdateDemandStatus,
+    adminDemandStats,
+    listClientsSimple,
     // Utils
+    canonicalServiceName,
     downloadBlob,
     requireAdmin,
     logout,
