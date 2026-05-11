@@ -612,11 +612,11 @@
           <p class="page-subtitle">Gerencie sua equipe e acompanhe o desempenho de cada membro.</p>
         </div>
         <div class="page-actions">
-          <button class="btn btn-ghost">
+          <button class="btn btn-ghost" id="btnExport">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Exportar planilha
           </button>
-          <button class="btn btn-primary">
+          <button class="btn btn-primary" id="btnNew">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Criar funcionário
           </button>
@@ -631,48 +631,27 @@
           </div>
           <div class="kpi-info">
             <div class="kpi-label">Total de funcionários</div>
-            <div class="kpi-value">29</div>
-          </div>
-        </div>
-
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background: var(--kpi-purple); color: var(--kpi-purple-ico);">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
-          </div>
-          <div class="kpi-info">
-            <div class="kpi-label">Alunos diamantes</div>
-            <div class="kpi-value">27</div>
+            <div class="kpi-value" id="kpiTotal">—</div>
           </div>
         </div>
 
         <div class="kpi-card">
           <div class="kpi-icon" style="background: var(--kpi-green); color: var(--kpi-green-ico);">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
           <div class="kpi-info">
-            <div class="kpi-label">Avaliações recebidas</div>
-            <div class="kpi-value">1.248</div>
-          </div>
-        </div>
-
-        <div class="kpi-card">
-          <div class="kpi-icon" style="background: var(--kpi-yellow); color: var(--kpi-yellow-ico);">
-            <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="0.4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          </div>
-          <div class="kpi-info">
-            <div class="kpi-label">Média geral</div>
-            <div class="kpi-value">4,72</div>
-            <div class="kpi-trend">+0,3 este mês</div>
+            <div class="kpi-label">Ativos</div>
+            <div class="kpi-value" id="kpiActive">—</div>
           </div>
         </div>
 
         <div class="kpi-card">
           <div class="kpi-icon" style="background: var(--kpi-pink); color: var(--kpi-pink-ico);">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
           </div>
           <div class="kpi-info">
-            <div class="kpi-label">Ativos hoje</div>
-            <div class="kpi-value">29</div>
+            <div class="kpi-label">Desabilitados</div>
+            <div class="kpi-value" id="kpiDisabled">—</div>
           </div>
         </div>
       </div>
@@ -687,12 +666,14 @@
           <div class="table-controls">
             <div class="search-input-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input class="search-input" type="text" placeholder="Buscar por nome, email ou documento" />
+              <input class="search-input" id="searchInput" type="text" placeholder="Buscar por nome ou email" />
             </div>
-            <button class="btn btn-ghost">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-              Filtros
-            </button>
+            <select class="search-input" id="statusFilter" style="max-width:170px; padding-left:12px;">
+              <option value="all">Todos</option>
+              <option value="approved">Ativos</option>
+              <option value="disabled">Desabilitados</option>
+              <option value="rejected">Rejeitados</option>
+            </select>
           </div>
         </div>
 
@@ -702,107 +683,139 @@
               <tr>
                 <th>Funcionário</th>
                 <th>Email</th>
-                <th>Avaliação geral</th>
-                <th>Tarefas realizadas</th>
+                <th>Status</th>
+                <th>Cadastro</th>
                 <th style="text-align:right;">Ação</th>
               </tr>
             </thead>
-            <tbody id="usersTableBody">
-              <!-- preenchido via JS -->
-            </tbody>
+            <tbody id="usersTableBody"></tbody>
           </table>
         </div>
 
         <div class="pagination">
-          <span>Mostrando <strong>1–8</strong> de <strong>29</strong> funcionários</span>
+          <span id="pgInfo">Carregando…</span>
           <div class="page-size-wrap">
             <span>Itens por página</span>
-            <select>
-              <option>8</option>
-              <option>16</option>
-              <option>32</option>
+            <select id="pgSize">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
             </select>
           </div>
-          <div class="page-nav">
-            <button class="page-btn" disabled>‹</button>
-            <button class="page-btn active">1</button>
-            <button class="page-btn">2</button>
-            <button class="page-btn">3</button>
-            <button class="page-btn">4</button>
-            <button class="page-btn">›</button>
-          </div>
+          <div class="page-nav" id="pageNav"></div>
         </div>
       </div>
     </main>
   </div>
 
+  <!-- ============ MODAL: Criar/Editar funcionário ============ -->
+  <div id="empModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:100; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; width:100%; max-width:480px; box-shadow:0 24px 48px rgba(15,23,42,0.20); overflow:hidden;">
+      <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="empModalTitle" style="margin:0; font-size:1.1rem; font-weight:700;">Criar funcionário</h3>
+        <button type="button" id="empModalClose" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:var(--muted);">×</button>
+      </div>
+      <form id="empForm" style="padding:24px;">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Nome completo</label>
+            <input id="empName" type="text" required class="search-input" style="padding-left:12px;" />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">E-mail</label>
+            <input id="empEmail" type="email" required class="search-input" style="padding-left:12px;" />
+          </div>
+          <div id="empPasswordWrap">
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Senha (mín. 8 caracteres)</label>
+            <input id="empPassword" type="password" minlength="8" class="search-input" style="padding-left:12px;" />
+            <small style="color:var(--muted); font-size:0.74rem;">A senha não pode ser alterada por aqui depois — peça para o usuário usar "esqueci a senha".</small>
+          </div>
+          <div id="empStatusWrap" style="display:none;">
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Status</label>
+            <select id="empStatus" class="search-input" style="padding-left:12px;">
+              <option value="approved">Ativo</option>
+              <option value="disabled">Desabilitado</option>
+              <option value="rejected">Rejeitado</option>
+            </select>
+          </div>
+        </div>
+        <div id="empError" style="color:var(--danger); font-size:0.82rem; margin-top:12px; display:none;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+          <button type="button" class="btn btn-ghost" id="empModalCancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="empSubmit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ Toast ============ -->
+  <div id="toast" style="position:fixed; bottom:24px; right:24px; z-index:200; display:none; padding:14px 18px; border-radius:12px; box-shadow:0 12px 28px rgba(0,0,0,0.18); font-weight:600; font-size:0.88rem;"></div>
+
+  <!-- Supabase + módulos -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="assets/admin-api.js"></script>
+
   <script>
-    // Mock data — apenas para visualização do layout
-    const MOCK_USERS = [
-      { name: 'Ana Souza',        email: 'ana.souza@grupoparticipa.com.br',        rating: 4.8, tasksDone: 47, tasksTotal: 52 },
-      { name: 'Bruno Lima',       email: 'bruno.lima@grupoparticipa.com.br',       rating: 4.6, tasksDone: 38, tasksTotal: 50 },
-      { name: 'Carla Mendes',     email: 'carla.mendes@grupoparticipa.com.br',     rating: 4.9, tasksDone: 61, tasksTotal: 63 },
-      { name: 'Douglas Pereira',  email: 'douglas.pereira@grupoparticipa.com.br',  rating: 4.3, tasksDone: 22, tasksTotal: 48 },
-      { name: 'Eva Oliveira',     email: 'eva.oliveira@grupoparticipa.com.br',     rating: 4.5, tasksDone: 34, tasksTotal: 45 },
-      { name: 'Fernanda Costa',   email: 'fernanda.costa@grupoparticipa.com.br',   rating: 4.7, tasksDone: 50, tasksTotal: 55 },
-      { name: 'Giulia Fernandes', email: 'giulia.fernandes@grupoparticipa.com.br', rating: 4.4, tasksDone: 29, tasksTotal: 42 },
-      { name: 'Henrique Rocha',   email: 'henrique.rocha@grupoparticipa.com.br',   rating: 4.2, tasksDone: 15, tasksTotal: 40 },
-    ];
+    'use strict';
+
+    const state = { page: 1, pageSize: 25, search: '', status: 'all', total: 0, editingId: null };
 
     function initials(name) {
-      return name.split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase();
+      return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
     }
 
-    function starsHtml(rating) {
-      const full = Math.round(rating);
-      let html = '<span class="stars">';
-      for (let i = 1; i <= 5; i++) {
-        const filled = i <= full;
-        html += `<svg viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.4"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-      }
-      html += '</span>';
-      return html;
+    function fmtDate(s) {
+      if (!s) return '—';
+      const d = new Date(s);
+      return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     }
 
-    function row(u) {
-      const percent = Math.round((u.tasksDone / u.tasksTotal) * 100);
-      const level = percent >= 80 ? 'high' : percent >= 50 ? 'mid' : 'low';
+    function badge(status) {
+      const map = {
+        approved: { cls: 'badge-green',  txt: 'Ativo' },
+        disabled: { cls: 'badge-yellow', txt: 'Desabilitado' },
+        rejected: { cls: 'badge-red',    txt: 'Rejeitado' },
+        pending:  { cls: 'badge-blue',   txt: 'Pendente' },
+      };
+      const b = map[status] || { cls: 'badge-yellow', txt: status || '—' };
+      return `<span class="badge ${b.cls}">${b.txt}</span>`;
+    }
+
+    function toast(message, kind = 'success') {
+      const el = document.getElementById('toast');
+      el.style.background = kind === 'error' ? '#fee2e2' : kind === 'warning' ? '#fef3c7' : '#dcfce7';
+      el.style.color = kind === 'error' ? '#991b1b' : kind === 'warning' ? '#92400e' : '#166534';
+      el.textContent = message;
+      el.style.display = 'block';
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+
+    function rowHtml(u) {
       return `
-        <tr>
+        <tr data-id="${u.id}">
           <td>
             <div class="user-cell">
               <div class="avatar">${initials(u.name)}</div>
               <div class="user-cell-info">
-                <span class="user-cell-name">${u.name}</span>
-                <span class="user-cell-id">ID #${Math.floor(Math.random()*9000+1000)}</span>
+                <span class="user-cell-name">${u.name || '—'}</span>
+                <span class="user-cell-id">${u.last_login_at ? 'Último login ' + fmtDate(u.last_login_at) : 'Nunca acessou'}</span>
               </div>
             </div>
           </td>
-          <td><span style="color:var(--text-secondary)">${u.email}</span></td>
-          <td>
-            <div class="rating">
-              ${starsHtml(u.rating)}
-              <span class="rating-value">${u.rating.toFixed(2)}</span>
-            </div>
-          </td>
-          <td>
-            <div class="tasks-cell">
-              <div class="tasks-label">
-                <span class="tasks-count">${u.tasksDone} / ${u.tasksTotal}</span>
-                <span class="tasks-percent">${percent}%</span>
-              </div>
-              <div class="progress-bar">
-                <div class="progress-fill ${level}" style="width:${percent}%;"></div>
-              </div>
-            </div>
-          </td>
+          <td><span style="color:var(--text-secondary)">${u.email || '—'}</span></td>
+          <td>${badge(u.status)}</td>
+          <td><span style="color:var(--text-secondary)">${fmtDate(u.created_at)}</span></td>
           <td style="text-align:right;">
             <div class="row-actions" style="justify-content:flex-end;">
-              <button class="icon-btn" title="Editar">
+              <button class="icon-btn" data-action="edit" title="Editar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
               </button>
-              <button class="icon-btn danger" title="Remover">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+              <button class="icon-btn ${u.status === 'disabled' ? '' : 'danger'}" data-action="toggle" title="${u.status === 'disabled' ? 'Reativar' : 'Desabilitar'}">
+                ${u.status === 'disabled'
+                  ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+                  : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'}
               </button>
             </div>
           </td>
@@ -810,14 +823,205 @@
       `;
     }
 
-    document.getElementById('usersTableBody').innerHTML = MOCK_USERS.map(row).join('');
+    function renderPagination() {
+      const totalPages = Math.max(1, Math.ceil(state.total / state.pageSize));
+      const cur = state.page;
+      const nav = document.getElementById('pageNav');
+      const btns = [];
+      btns.push(`<button class="page-btn" data-pg="prev" ${cur <= 1 ? 'disabled' : ''}>‹</button>`);
+      const start = Math.max(1, cur - 2);
+      const end = Math.min(totalPages, start + 4);
+      for (let i = start; i <= end; i++) {
+        btns.push(`<button class="page-btn ${i === cur ? 'active' : ''}" data-pg="${i}">${i}</button>`);
+      }
+      btns.push(`<button class="page-btn" data-pg="next" ${cur >= totalPages ? 'disabled' : ''}>›</button>`);
+      nav.innerHTML = btns.join('');
 
-    document.querySelectorAll('.nav-item').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+      const first = state.total === 0 ? 0 : (cur - 1) * state.pageSize + 1;
+      const last  = Math.min(cur * state.pageSize, state.total);
+      document.getElementById('pgInfo').innerHTML =
+        `Mostrando <strong>${first}–${last}</strong> de <strong>${state.total}</strong> funcionários`;
+
+      nav.querySelectorAll('[data-pg]').forEach(b => {
+        b.addEventListener('click', () => {
+          const v = b.dataset.pg;
+          if (v === 'prev' && cur > 1) state.page = cur - 1;
+          else if (v === 'next' && cur < totalPages) state.page = cur + 1;
+          else if (/^\d+$/.test(v)) state.page = parseInt(v, 10);
+          load();
+        });
       });
+    }
+
+    async function loadStats() {
+      try {
+        const s = await AdminAPI.getEmployeeStats();
+        document.getElementById('kpiTotal').textContent    = s.total;
+        document.getElementById('kpiActive').textContent   = s.active;
+        document.getElementById('kpiDisabled').textContent = s.disabled;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function load() {
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
+      try {
+        const offset = (state.page - 1) * state.pageSize;
+        const { data, count } = await AdminAPI.listEmployees({
+          search: state.search, status: state.status, limit: state.pageSize, offset,
+        });
+        state.total = count;
+        if (data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" style="padding:32px; text-align:center; color:var(--muted);">Nenhum funcionário encontrado.</td></tr>`;
+        } else {
+          tbody.innerHTML = data.map(rowHtml).join('');
+        }
+        renderPagination();
+        attachRowHandlers(data);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        console.error(e);
+      }
+    }
+
+    function attachRowHandlers(data) {
+      const byId = Object.fromEntries(data.map(u => [u.id, u]));
+      document.querySelectorAll('#usersTableBody tr[data-id]').forEach(tr => {
+        const id = tr.dataset.id;
+        const u = byId[id];
+        tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(u));
+        tr.querySelector('[data-action="toggle"]').addEventListener('click', () => toggleStatus(u));
+      });
+    }
+
+    async function toggleStatus(u) {
+      const next = u.status === 'disabled' ? 'approved' : 'disabled';
+      const action = next === 'disabled' ? 'desabilitar' : 'reativar';
+      if (!confirm(`Tem certeza que deseja ${action} ${u.name}?`)) return;
+      try {
+        await AdminAPI.setEmployeeStatus(u.id, next);
+        toast(next === 'disabled' ? 'Funcionário desabilitado.' : 'Funcionário reativado.');
+        await Promise.all([load(), loadStats()]);
+      } catch (e) {
+        toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    // ===== Modal =====
+    function openCreateModal() {
+      state.editingId = null;
+      document.getElementById('empModalTitle').textContent = 'Criar funcionário';
+      document.getElementById('empPasswordWrap').style.display = '';
+      document.getElementById('empStatusWrap').style.display = 'none';
+      document.getElementById('empForm').reset();
+      document.getElementById('empError').style.display = 'none';
+      document.getElementById('empModal').style.display = 'flex';
+      document.getElementById('empName').focus();
+    }
+    function openEditModal(u) {
+      state.editingId = u.id;
+      document.getElementById('empModalTitle').textContent = 'Editar funcionário';
+      document.getElementById('empPasswordWrap').style.display = 'none';
+      document.getElementById('empStatusWrap').style.display = '';
+      document.getElementById('empName').value = u.name || '';
+      document.getElementById('empEmail').value = u.email || '';
+      document.getElementById('empStatus').value = u.status || 'approved';
+      document.getElementById('empError').style.display = 'none';
+      document.getElementById('empModal').style.display = 'flex';
+    }
+    function closeModal() { document.getElementById('empModal').style.display = 'none'; }
+
+    document.getElementById('btnNew').addEventListener('click', openCreateModal);
+    document.getElementById('empModalClose').addEventListener('click', closeModal);
+    document.getElementById('empModalCancel').addEventListener('click', closeModal);
+    document.getElementById('empModal').addEventListener('click', (e) => {
+      if (e.target.id === 'empModal') closeModal();
     });
+
+    document.getElementById('empForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('empSubmit');
+      const err = document.getElementById('empError');
+      err.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Salvando…';
+      try {
+        const name  = document.getElementById('empName').value.trim();
+        const email = document.getElementById('empEmail').value.trim();
+        if (state.editingId) {
+          const status = document.getElementById('empStatus').value;
+          await AdminAPI.updateEmployee(state.editingId, { name, email, status });
+          toast('Funcionário atualizado.');
+        } else {
+          const password = document.getElementById('empPassword').value;
+          await AdminAPI.createEmployee({ name, email, password });
+          toast('Funcionário criado.');
+        }
+        closeModal();
+        await Promise.all([load(), loadStats()]);
+      } catch (ex) {
+        err.style.display = 'block';
+        err.textContent = ex.message || String(ex);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Salvar';
+      }
+    });
+
+    // ===== Filtros & busca =====
+    let searchTimer = null;
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        state.search = e.target.value;
+        state.page = 1;
+        load();
+      }, 280);
+    });
+    document.getElementById('statusFilter').addEventListener('change', (e) => {
+      state.status = e.target.value;
+      state.page = 1;
+      load();
+    });
+    document.getElementById('pgSize').addEventListener('change', (e) => {
+      state.pageSize = parseInt(e.target.value, 10) || 25;
+      state.page = 1;
+      load();
+    });
+
+    // ===== Exportar =====
+    document.getElementById('btnExport').addEventListener('click', async () => {
+      try {
+        const blob = await AdminAPI.exportEmployeesCsv();
+        const ts = new Date().toISOString().slice(0, 10);
+        AdminAPI.downloadBlob(blob, `funcionarios-${ts}.csv`);
+      } catch (e) {
+        toast('Erro ao exportar: ' + (e.message || e), 'error');
+      }
+    });
+
+    // ===== Logout =====
+    document.querySelector('.logout-button').addEventListener('click', async () => {
+      await AdminAPI.logout();
+    });
+
+    // ===== Footer: nome do admin logado =====
+    async function fillSession(profile) {
+      if (!profile) return;
+      document.querySelector('.user-pill-name').textContent = profile.name || 'Administrador';
+      document.querySelector('.user-pill-role').textContent = profile.email || '';
+      document.querySelector('.user-pill .avatar').textContent = initials(profile.name || profile.email);
+    }
+
+    // ===== Init =====
+    (async function init() {
+      const profile = await AdminAPI.requireAdmin();
+      if (!profile) return; // já redirecionou
+      await fillSession(profile);
+      await Promise.all([load(), loadStats()]);
+    })();
   </script>
 </body>
 </html>

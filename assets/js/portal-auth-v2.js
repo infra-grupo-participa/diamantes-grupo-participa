@@ -99,7 +99,11 @@
     if (user.status === 'rejected' || user.status === 'disabled') {
       return { ok: false, error: 'Acesso bloqueado. Fale com o administrador.' };
     }
-    const redirect = user.role === 'admin' ? toAppUrl('admin/app.html') : getClientUrl(user.clientSlug);
+    // Atualiza last_login_at (best-effort; falha silenciosa se RLS não permitir)
+    try {
+      await supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('auth_user_id', data.user.id);
+    } catch (_) { /* ignore */ }
+    const redirect = user.role === 'admin' ? toAppUrl('admin/') : getClientUrl(user.clientSlug);
     return { ok: true, user, redirect };
   }
 

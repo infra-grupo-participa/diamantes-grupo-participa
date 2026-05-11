@@ -773,7 +773,7 @@
         sessionPill.textContent = sessionUser.email;
 
         if (sessionUser.role === "admin") {
-          window.location.replace(auth.toAppUrl("admin/app.html"));
+          window.location.replace(auth.toAppUrl("admin/"));
           return;
         }
 
