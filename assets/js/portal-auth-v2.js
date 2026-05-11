@@ -99,7 +99,7 @@
     if (user.status === 'rejected' || user.status === 'disabled') {
       return { ok: false, error: 'Acesso bloqueado. Fale com o administrador.' };
     }
-    const redirect = user.role === 'admin' ? toAppUrl('admin/') : getClientUrl(user.clientSlug);
+    const redirect = user.role === 'admin' ? toAppUrl('admin/app.html') : getClientUrl(user.clientSlug);
     return { ok: true, user, redirect };
   }
 

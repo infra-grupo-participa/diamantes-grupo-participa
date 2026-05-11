@@ -71,7 +71,7 @@
       "cursor:pointer"
     ].join(";"));
     adminButton.addEventListener("click", () => {
-      window.location.href = auth.toAppUrl("admin/index.html");
+      window.location.href = auth.toAppUrl("admin/app.html");
     });
 
     const logoutButton = document.createElement("button");
