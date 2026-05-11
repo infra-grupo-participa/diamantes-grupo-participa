@@ -708,6 +708,7 @@
       page: 1, pageSize: 25, search: '', billingStatus: 'all',
       total: 0, currentSlug: null, editingSlug: null,
       positions: [], operators: [],
+      servicesBySlug: {},
     };
 
     const SERVICE_COLOR_MAP = {
@@ -761,6 +762,23 @@
     }
 
     function rowHtml(s) {
+      // Badge do serviço mais próximo do vencimento
+      const svcs = state.servicesBySlug[s.slug] || [];
+      const nearest = nearestDueService(svcs);
+      let dueBadge = '';
+      if (nearest) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const due = new Date(nearest.access_until);
+        const diff = Math.ceil((due - today) / (1000*60*60*24));
+        const label = nearest.service_type;
+        if (diff < 0) {
+          dueBadge = `<div style="font-size:0.7rem;color:#b91c1c;margin-top:2px;">⚠ ${label} vencido</div>`;
+        } else if (diff <= 7) {
+          dueBadge = `<div style="font-size:0.7rem;color:#b45309;margin-top:2px;">⚠ ${label} vence em ${diff}d</div>`;
+        } else if (diff <= 18) {
+          dueBadge = `<div style="font-size:0.7rem;color:var(--muted);margin-top:2px;">${label} — ${due.toLocaleDateString('pt-BR')}</div>`;
+        }
+      }
       return `
         <tr data-slug="${s.slug}">
           <td>
@@ -769,6 +787,7 @@
               <div>
                 <div class="user-cell-name">${s.name || s.slug}</div>
                 <div class="user-cell-id">${s.slug}</div>
+                ${dueBadge}
               </div>
             </div>
           </td>
@@ -906,6 +925,7 @@
           AdminAPI.getStudentTeam(s.slug),
           AdminAPI.getStudentServices(s.slug),
         ]);
+        state.servicesBySlug[s.slug] = services;
         renderTeam(team);
         renderServices(services);
       } catch (e) {
@@ -956,10 +976,37 @@
         el.innerHTML = `<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Nenhum serviço ativo.</div>`;
         return;
       }
-      el.innerHTML = active.map(s => {
+      const today = new Date(); today.setHours(0,0,0,0);
+      // Ordena pelo vencimento mais próximo primeiro
+      const sorted = [...active].sort((a, b) => {
+        const da = a.access_until ? new Date(a.access_until) : new Date('9999-12-31');
+        const db = b.access_until ? new Date(b.access_until) : new Date('9999-12-31');
+        return da - db;
+      });
+      el.innerHTML = sorted.map(s => {
         const meta = SERVICE_COLOR_MAP[s.service_type] || { cls: 'estrategia', label: s.service_type };
-        return `<div class="service-chip ${meta.cls}"><span class="dot"></span>${meta.label}</div>`;
+        let dueBadge = '';
+        if (s.access_until) {
+          const due = new Date(s.access_until);
+          const diff = Math.ceil((due - today) / (1000*60*60*24));
+          if (diff < 0) {
+            dueBadge = `<span style="margin-left:6px;font-size:0.68rem;background:#fee2e2;color:#b91c1c;border-radius:4px;padding:1px 5px;font-weight:700;">Vencido</span>`;
+          } else if (diff <= 7) {
+            dueBadge = `<span style="margin-left:6px;font-size:0.68rem;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-weight:700;">Vence em ${diff}d</span>`;
+          } else {
+            dueBadge = `<span style="margin-left:6px;font-size:0.68rem;color:var(--muted);">até ${new Date(s.access_until).toLocaleDateString('pt-BR')}</span>`;
+          }
+        }
+        return `<div class="service-chip ${meta.cls}" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;"><span class="dot"></span>${meta.label}${dueBadge}</div>`;
       }).join('');
+    }
+
+    // Retorna o serviço ativo com vencimento mais próximo (para badge na linha da tabela)
+    function nearestDueService(services) {
+      const today = new Date(); today.setHours(0,0,0,0);
+      const active = (services || []).filter(s => s.status === 'active' && s.access_until);
+      if (!active.length) return null;
+      return active.sort((a, b) => new Date(a.access_until) - new Date(b.access_until))[0];
     }
 
     async function refreshCurrent() {
@@ -1054,21 +1101,47 @@
     }
 
     // ===== Modal Equipe =====
-    function openTeamModal() {
+    async function openTeamModal() {
       if (!state.currentSlug) return;
-      // Popula selects
+
+      // Carrega serviços ativos do aluno para montar dropdown de cargos por serviço
+      let activeServices = [];
+      try {
+        activeServices = await AdminAPI.getClientActiveServices(state.currentSlug);
+      } catch (e) { console.error(e); }
+
       const userSel = document.getElementById('teamUser');
       const posSel  = document.getElementById('teamPosition');
+
       userSel.innerHTML = '<option value="">— selecione —</option>' +
         state.operators.map(o => `<option value="${o.id}" data-position="${o.position_id || ''}">${o.name} (${o.email})</option>`).join('');
-      posSel.innerHTML = '<option value="">— selecione —</option>' +
-        state.positions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+      // Monta optgroups por serviço ativo — filtra posições que correspondem ao serviço
+      if (activeServices.length > 0) {
+        const groups = activeServices.map(svc => {
+          const svcNameLower = (svc.service_type || '').toLowerCase();
+          const matching = state.positions.filter(p =>
+            p.name.toLowerCase().includes(svcNameLower) ||
+            svcNameLower.includes(p.name.toLowerCase())
+          );
+          const opts = matching.length > 0 ? matching : state.positions;
+          return `<optgroup label="${svc.service_type}">` +
+            opts.map(p => `<option value="${p.id}">${p.name}</option>`).join('') +
+            `</optgroup>`;
+        });
+        posSel.innerHTML = '<option value="">— selecione o cargo —</option>' + groups.join('');
+      } else {
+        posSel.innerHTML = '<option value="">— selecione —</option>' +
+          state.positions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      }
+
       // Auto-pré-seleciona cargo do operador escolhido
       userSel.addEventListener('change', () => {
         const opt = userSel.options[userSel.selectedIndex];
         const pos = opt?.dataset?.position;
         if (pos && !posSel.value) posSel.value = pos;
       });
+
       document.getElementById('teamForm').reset();
       document.getElementById('teamError').style.display = 'none';
       document.getElementById('teamModal').style.display = 'flex';

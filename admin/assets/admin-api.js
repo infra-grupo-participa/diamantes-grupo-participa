@@ -437,13 +437,36 @@
   }
 
   async function getServicesByType() {
-    // Contagem de serviços ativos agrupados por tipo (para o card lateral)
+    // Prioriza serviços vindos do Hotmart (com offer_code) — usa nome canônico da oferta
     const { data, error } = await client()
-      .from('services').select('service_type, status').eq('status', 'active');
+      .from('services')
+      .select('service_type, status, offer_code, metadata')
+      .eq('status', 'active');
     if (error) throw error;
+
+    // Mapa de normalização: nomes legados -> nome canônico Hotmart
+    const normalize = {
+      'ANÚNCIOS PAGOS': 'Tráfego',
+      'WEBDESIGNER':    'Web Designer',
+      'WEB DESIGNER':   'Web Designer',
+      'EDIÇÃO DE VÍDEO':'Edição de Vídeo',
+      'SOCIAL MEDIA':   'Gestão de Redes Sociais',
+      'AUTOMAÇÃO':      'Gestor de Disparos',
+      'DESIGNER':       'Design Gráfico',
+      'COPY':           'Copywriter',
+      'COPYWRITER':     'Copywriter',
+      'HOST':           'HOST',
+    };
+
     const counts = {};
     (data || []).forEach(s => {
-      counts[s.service_type] = (counts[s.service_type] || 0) + 1;
+      // Usa nome da oferta Hotmart se disponível, senão normaliza nome legado
+      const offerName = s.metadata?.offer_code
+        ? null  // será resolvido pelo service_type já gravado como nome Hotmart
+        : null;
+      const raw = s.service_type || '';
+      const canonical = offerName || normalize[raw.toUpperCase()] || raw;
+      counts[canonical] = (counts[canonical] || 0) + 1;
     });
     return Object.entries(counts)
       .map(([type, count]) => ({ type, count }))
@@ -649,6 +672,7 @@
     getStudent,
     getStudentTeam,
     getStudentServices,
+    getClientActiveServices,
     getStudentStats,
     createStudent,
     updateStudent,
