@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meus dados — Diamantes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fdfaf5;
+      --bg-soft: #fffdf9;
+      --surface: #ffffff;
+      --border: #f1ebe0;
+      --border-strong: #e6dfd0;
+      --text: #1a1410;
+      --text-secondary: #5b524a;
+      --muted: #9c8f81;
+      --accent: #F29725;
+      --accent-soft: #fff4e3;
+      --accent-strong: #d97e0f;
+      --success: #16a34a;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+
+      --shadow-sm: 0 1px 2px rgba(85, 60, 30, 0.04);
+      --shadow-md: 0 4px 16px rgba(85, 60, 30, 0.06);
+      --shadow-lg: 0 18px 40px rgba(85, 60, 30, 0.10);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 90% -10%, rgba(242,151,37,0.10), transparent 60%),
+        radial-gradient(900px 500px at -10% 30%, rgba(242,151,37,0.06), transparent 60%),
+        var(--bg);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+    }
+    button { font-family: inherit; cursor: pointer; }
+    input, select, textarea { font-family: inherit; }
+
+    /* ============ TOPBAR ============ */
+    .topbar {
+      max-width: 1200px; margin: 0 auto;
+      padding: 20px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 20px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
+    .brand-mark { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); display: grid; place-items: center; color: #fff; }
+    .topnav {
+      display: flex; gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px;
+      box-shadow: var(--shadow-sm);
+    }
+    .topnav a {
+      padding: 8px 18px;
+      border-radius: 999px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.88rem;
+    }
+    .topnav a:hover { background: var(--bg-soft); color: var(--text); }
+    .topnav a.active { background: var(--text); color: #fff; }
+    .user-chip {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 14px 6px 6px;
+      border-radius: 999px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fcd9a5, var(--accent));
+      display: grid; place-items: center;
+      color: #fff; font-weight: 700; font-size: 0.78rem;
+      flex-shrink: 0;
+    }
+    .user-chip-name { font-weight: 600; font-size: 0.85rem; }
+
+    /* ============ CONTAINER ============ */
+    .container { max-width: 1200px; margin: 0 auto; padding: 8px 28px 64px; }
+
+    .page-head {
+      display: flex; justify-content: space-between; align-items: flex-end; gap: 16px;
+      margin: 16px 0 24px;
+    }
+    .page-head h1 { margin: 0; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.02em; }
+    .page-head .sub { margin: 6px 0 0; color: var(--text-secondary); font-size: 0.95rem; }
+    .page-head .saved {
+      font-size: 0.8rem; color: var(--success); font-weight: 600;
+      display: none; align-items: center; gap: 6px;
+    }
+    .page-head .saved.show { display: inline-flex; }
+    .page-head .saved svg { width: 14px; height: 14px; }
+
+    /* ============ LAYOUT 2 COLUNAS ============ */
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .page-head { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ============ CARDS ============ */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card + .card { margin-top: 18px; }
+    .card-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 16px;
+      margin: 0 0 18px;
+    }
+    .card-head h2 {
+      margin: 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card-head .sub {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .card-link {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--accent-strong);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .card-link:hover { text-decoration: underline; }
+
+    /* ============ AVATAR EDITOR ============ */
+    .avatar-row {
+      display: flex; align-items: center; gap: 18px;
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+    }
+    .avatar-big {
+      width: 92px; height: 92px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #fcd9a5, var(--accent));
+      display: grid; place-items: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 1.7rem;
+      flex-shrink: 0;
+      box-shadow: 0 8px 20px rgba(242,151,37,0.24);
+    }
+    .avatar-info { flex: 1; min-width: 0; }
+    .avatar-info-buttons { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-ghost {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: var(--surface);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 0.84rem;
+      transition: background 0.15s;
+    }
+    .btn-ghost:hover { background: var(--bg-soft); }
+    .btn-ghost.danger { color: var(--danger); border-color: rgba(239,68,68,0.2); }
+    .btn-ghost.danger:hover { background: rgba(239,68,68,0.06); }
+    .btn-ghost svg { width: 14px; height: 14px; }
+    .avatar-hint {
+      font-size: 0.74rem; color: var(--muted); margin-top: 6px;
+    }
+
+    /* ============ FORMS ============ */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 18px;
+    }
+    @media (max-width: 540px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    .field label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .field input,
+    .field select,
+    .field textarea {
+      padding: 11px 14px;
+      border: 1px solid var(--border-strong);
+      border-radius: 11px;
+      font-size: 0.92rem;
+      color: var(--text);
+      background: var(--bg-soft);
+      transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    }
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(242,151,37,0.16);
+    }
+    .field input[readonly] { color: var(--muted); background: var(--bg-soft); cursor: not-allowed; }
+    .field textarea { min-height: 100px; resize: vertical; }
+    .field .hint {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .save-row {
+      display: flex; justify-content: flex-end; gap: 10px;
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+    }
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 20px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9rem;
+      border: none;
+      box-shadow: 0 6px 16px rgba(242,151,37,0.28);
+    }
+    .btn-primary:hover { background: var(--accent-strong); }
+
+    /* ============ SEGURANÇA / LISTA ============ */
+    .list-row {
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .list-row:last-child { border-bottom: none; }
+    .list-row .ico {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+      display: grid; place-items: center;
+    }
+    .list-row .ico.danger { background: #fee2e2; color: #b91c1c; }
+    .list-row .ico svg { width: 18px; height: 18px; }
+    .list-row .title { font-weight: 600; font-size: 0.92rem; }
+    .list-row .desc { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+    .list-row .action a {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--accent-strong);
+      text-decoration: none;
+    }
+    .list-row .action a:hover { text-decoration: underline; }
+    .list-row .action a.danger { color: var(--danger); }
+
+    /* ============ ASSINATURA CARD ============ */
+    .plan-card {
+      background: linear-gradient(135deg, #fff7ea 0%, #fff 60%);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 14px;
+      align-items: center;
+    }
+    .plan-icon {
+      width: 44px; height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #fff;
+      display: grid; place-items: center;
+    }
+    .plan-icon svg { width: 22px; height: 22px; }
+    .plan-name { font-weight: 700; font-size: 0.98rem; }
+    .plan-since { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+    .plan-link {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent-strong);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .plan-link:hover { text-decoration: underline; }
+
+    /* ============ NOTIFICAÇÕES (toggles) ============ */
+    .toggle-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: center;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .toggle-row:last-child { border-bottom: none; }
+    .toggle-row .title { font-weight: 600; font-size: 0.9rem; }
+    .toggle-row .desc { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+
+    .switch {
+      position: relative;
+      width: 40px; height: 22px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; inset: 0;
+      background: var(--border-strong);
+      border-radius: 999px;
+      transition: background 0.18s;
+    }
+    .switch .slider::before {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      left: 2px; top: 2px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.18s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.18);
+    }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider::before { transform: translateX(18px); }
+
+    /* ============ PREFERÊNCIAS (select) ============ */
+    .pref-row {
+      display: grid;
+      grid-template-columns: 1fr 160px;
+      gap: 14px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .pref-row:last-child { border-bottom: none; }
+    .pref-row .title { font-weight: 600; font-size: 0.9rem; }
+    .pref-row select {
+      padding: 9px 12px;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      font-size: 0.88rem;
+      background: var(--bg-soft);
+      color: var(--text);
+    }
+    .pref-row select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(242,151,37,0.16);
+    }
+
+    @media (max-width: 720px) {
+      .topbar { flex-wrap: wrap; }
+      .topnav { order: 3; width: 100%; justify-content: space-around; }
+      .avatar-row { flex-direction: column; align-items: flex-start; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+      </div>
+      Diamantes
+    </div>
+    <nav class="topnav">
+      <a href="dashboard.html">Início</a>
+      <a href="demandas.html">Demandas</a>
+      <a href="perfil.html" class="active">Meus dados</a>
+    </nav>
+    <div class="user-chip">
+      <div class="avatar" id="navAvatar">AC</div>
+      <div class="user-chip-name" id="navName">Ana Carolina</div>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="container">
+    <div class="page-head">
+      <div>
+        <h1>Meus dados</h1>
+        <p class="sub">Gerencie suas informações pessoais, preferências e configurações da conta.</p>
+      </div>
+      <span class="saved" id="savedFlag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        Tudo salvo
+      </span>
+    </div>
+
+    <div class="grid">
+      <!-- ============ COLUNA ESQUERDA ============ -->
+      <div>
+        <!-- Informações pessoais -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Informações pessoais</h2>
+              <div class="sub">Como você prefere ser identificada por aqui.</div>
+            </div>
+          </div>
+
+          <div class="avatar-row">
+            <div class="avatar-big" id="bigAvatar">AC</div>
+            <div class="avatar-info">
+              <div style="font-weight:600;font-size:1.02rem;" id="avatarName">Ana Carolina Silva</div>
+              <div style="font-size:0.84rem; color:var(--muted); margin-top:2px;">Sua foto de exibição.</div>
+              <div class="avatar-info-buttons">
+                <button class="btn-ghost">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  Alterar foto
+                </button>
+                <button class="btn-ghost danger">Remover</button>
+              </div>
+              <div class="avatar-hint">JPG, PNG ou GIF. Máx. 2 MB.</div>
+            </div>
+          </div>
+
+          <form id="personalForm">
+            <div class="form-grid">
+              <div class="field">
+                <label for="fName">Nome completo</label>
+                <input id="fName" type="text" value="Ana Carolina Silva" />
+              </div>
+              <div class="field">
+                <label for="fEmail">E-mail</label>
+                <input id="fEmail" type="email" value="ana.carolina@empresa.com.br" readonly />
+                <span class="hint">Esse é o e-mail vinculado à sua conta — não pode ser alterado por aqui.</span>
+              </div>
+              <div class="field">
+                <label for="fPhone">Celular</label>
+                <input id="fPhone" type="tel" value="(11) 98765-4321" placeholder="(00) 00000-0000" />
+              </div>
+              <div class="field">
+                <label for="fRole">Cargo / função</label>
+                <input id="fRole" type="text" value="Coordenadora de Marketing" />
+              </div>
+              <div class="field">
+                <label for="fCompany">Empresa</label>
+                <input id="fCompany" type="text" value="Empresa Exemplo Ltda." />
+              </div>
+              <div class="field">
+                <label for="fLocation">Cidade — UF</label>
+                <input id="fLocation" type="text" value="São Paulo — SP" />
+              </div>
+              <div class="field full">
+                <label for="fBio">Sobre você</label>
+                <textarea id="fBio">Coordenadora de Marketing há mais de 6 anos, em transição para investir em educação digital. Apaixonada por design e comunicação visual.</textarea>
+                <span class="hint">Sua equipe vê isso ao iniciar uma demanda. Conte rapidamente o que faz e o que valoriza.</span>
+              </div>
+            </div>
+            <div class="save-row">
+              <button type="button" class="btn-ghost">Descartar</button>
+              <button type="submit" class="btn-primary">Salvar alterações</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Segurança da conta -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Segurança da conta</h2>
+              <div class="sub">Mantenha sua conta protegida.</div>
+            </div>
+          </div>
+
+          <div class="list-row">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <div>
+              <div class="title">Senha</div>
+              <div class="desc">Última alteração há 3 meses.</div>
+            </div>
+            <div class="action"><a href="#" id="btnChangePass">Alterar senha</a></div>
+          </div>
+
+          <div class="list-row">
+            <div class="ico">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div>
+              <div class="title">Sessões ativas</div>
+              <div class="desc">2 dispositivos conectados agora.</div>
+            </div>
+            <div class="action"><a href="#">Gerenciar sessões</a></div>
+          </div>
+
+          <div class="list-row">
+            <div class="ico danger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
+            </div>
+            <div>
+              <div class="title">Encerrar conta</div>
+              <div class="desc">Você perderá acesso ao portal e ao histórico.</div>
+            </div>
+            <div class="action"><a href="#" class="danger">Solicitar encerramento</a></div>
+          </div>
+        </div>
+
+        <!-- Informações de assinatura -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Informações da assinatura</h2>
+              <div class="sub">Seu plano e relação com a gente.</div>
+            </div>
+          </div>
+          <div class="plan-card">
+            <div class="plan-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/></svg>
+            </div>
+            <div>
+              <div class="plan-name">Plano Diamante</div>
+              <div class="plan-since">Com você desde <strong id="planSince">12/06/2024</strong></div>
+            </div>
+            <a href="#" class="plan-link">Ver detalhes →</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ COLUNA DIREITA ============ -->
+      <div>
+        <!-- Sobre você -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Sobre você</h2>
+              <div class="sub">O que sua equipe lê primeiro.</div>
+            </div>
+          </div>
+          <p style="margin:0; font-size:0.92rem; line-height:1.55; color:var(--text-secondary);" id="aboutPreview">
+            Coordenadora de Marketing há mais de 6 anos, em transição para investir em educação digital. Apaixonada por design e comunicação visual.
+          </p>
+        </div>
+
+        <!-- Notificações -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Notificações</h2>
+              <div class="sub">Avisamos por aqui sempre que algo acontecer.</div>
+            </div>
+          </div>
+
+          <label class="toggle-row">
+            <div>
+              <div class="title">Novas mensagens</div>
+              <div class="desc">Quando sua equipe te responde no chat.</div>
+            </div>
+            <span class="switch">
+              <input type="checkbox" checked />
+              <span class="slider"></span>
+            </span>
+          </label>
+
+          <label class="toggle-row">
+            <div>
+              <div class="title">Atualizações de demanda</div>
+              <div class="desc">Quando algo muda em uma demanda sua.</div>
+            </div>
+            <span class="switch">
+              <input type="checkbox" checked />
+              <span class="slider"></span>
+            </span>
+          </label>
+
+          <label class="toggle-row">
+            <div>
+              <div class="title">Prazos e entregas</div>
+              <div class="desc">Lembretes na véspera do prazo.</div>
+            </div>
+            <span class="switch">
+              <input type="checkbox" checked />
+              <span class="slider"></span>
+            </span>
+          </label>
+
+          <label class="toggle-row">
+            <div>
+              <div class="title">Resumo semanal</div>
+              <div class="desc">Recebido toda segunda às 9h por e-mail.</div>
+            </div>
+            <span class="switch">
+              <input type="checkbox" />
+              <span class="slider"></span>
+            </span>
+          </label>
+
+          <label class="toggle-row">
+            <div>
+              <div class="title">Novidades do Diamantes</div>
+              <div class="desc">Recursos novos, dicas e eventos.</div>
+            </div>
+            <span class="switch">
+              <input type="checkbox" />
+              <span class="slider"></span>
+            </span>
+          </label>
+        </div>
+
+        <!-- Preferências -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Preferências</h2>
+              <div class="sub">Pequenos ajustes pessoais.</div>
+            </div>
+          </div>
+
+          <div class="pref-row">
+            <div>
+              <div class="title">Idioma</div>
+              <div class="desc" style="font-size:0.78rem; color:var(--muted); margin-top:2px;">Idioma de exibição do portal.</div>
+            </div>
+            <select>
+              <option>Português (BR)</option>
+              <option>English (US)</option>
+              <option>Español</option>
+            </select>
+          </div>
+
+          <div class="pref-row">
+            <div>
+              <div class="title">Fuso horário</div>
+              <div class="desc" style="font-size:0.78rem; color:var(--muted); margin-top:2px;">Datas e horários no portal.</div>
+            </div>
+            <select>
+              <option>São Paulo (GMT-3)</option>
+              <option>Brasília (GMT-3)</option>
+              <option>Manaus (GMT-4)</option>
+              <option>Lisboa (GMT+0)</option>
+            </select>
+          </div>
+
+          <div class="pref-row">
+            <div>
+              <div class="title">Tema</div>
+              <div class="desc" style="font-size:0.78rem; color:var(--muted); margin-top:2px;">Aparência padrão.</div>
+            </div>
+            <select>
+              <option>Claro</option>
+              <option>Automático</option>
+              <option disabled>Escuro (em breve)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    'use strict';
+
+    function getSlug() {
+      const q = new URLSearchParams(window.location.search).get('slug');
+      return q || 'ana-carolina';
+    }
+
+    function deriveFirstName(slug) {
+      return (slug || 'aluno').split('-')[0].replace(/^./, c => c.toUpperCase());
+    }
+
+    // Bootstrap do header (consistente com dashboard/demandas)
+    (function() {
+      const slug = getSlug();
+      const first = deriveFirstName(slug);
+      const ini = first.slice(0, 2).toUpperCase();
+      document.getElementById('navAvatar').textContent = ini;
+      document.getElementById('navName').textContent = first;
+    })();
+
+    // Reflete nome digitado no avatar grande + nome + preview "Sobre você"
+    const fName = document.getElementById('fName');
+    const bigAv = document.getElementById('bigAvatar');
+    const avName = document.getElementById('avatarName');
+    const fBio = document.getElementById('fBio');
+    const aboutPreview = document.getElementById('aboutPreview');
+
+    function refreshAvatar() {
+      const parts = fName.value.trim().split(/\s+/).filter(Boolean);
+      const ini = (parts.slice(0, 2).map(p => p[0]).join('') || '?').toUpperCase();
+      bigAv.textContent = ini;
+      avName.textContent = fName.value || '—';
+    }
+    fName.addEventListener('input', refreshAvatar);
+
+    fBio.addEventListener('input', () => {
+      aboutPreview.textContent = fBio.value.trim() || 'Sem descrição ainda.';
+    });
+
+    // "Tudo salvo" — fica visível por 2s após salvar
+    const savedFlag = document.getElementById('savedFlag');
+    document.getElementById('personalForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      // (backend será ligado depois)
+      savedFlag.classList.add('show');
+      setTimeout(() => savedFlag.classList.remove('show'), 2200);
+    });
+
+    // Toggles — salva visualmente (sem backend ainda)
+    document.querySelectorAll('.switch input').forEach(inp => {
+      inp.addEventListener('change', () => {
+        savedFlag.classList.add('show');
+        setTimeout(() => savedFlag.classList.remove('show'), 1800);
+      });
+    });
+    document.querySelectorAll('.pref-row select').forEach(s => {
+      s.addEventListener('change', () => {
+        savedFlag.classList.add('show');
+        setTimeout(() => savedFlag.classList.remove('show'), 1800);
+      });
+    });
+
+    document.getElementById('btnChangePass').addEventListener('click', (e) => {
+      e.preventDefault();
+      alert('A troca de senha será aberta em um modal quando ligarmos ao backend.');
+    });
+  </script>
+</body>
+</html>
