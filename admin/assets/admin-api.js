@@ -640,7 +640,7 @@
     let usersById = {};
     if (userIds.length) {
       const { data: users } = await supabase.from('users')
-        .select('id, name, email, role, position_id, metadata').in('id', userIds);
+        .select('id, name, email, role, position_id, metadata, clickup_user_id').in('id', userIds);
       usersById = Object.fromEntries((users||[]).map(u => [u.id, u]));
       const pids = [...new Set((users||[]).map(u=>u.position_id).filter(Boolean))];
       if (pids.length) {
@@ -655,7 +655,8 @@
     const memb = (members||[]).map(m => {
       const u = usersById[m.user_id] || {};
       return { ...m, user_name: u.name, user_email: u.email,
-               position_name: u._position_name, position_color: u._position_color };
+               position_name: u._position_name, position_color: u._position_color,
+               clickup_user_id: u.clickup_user_id || null };
     });
     const msgs = (messages||[]).map(m => {
       const u = usersById[m.user_id] || {};

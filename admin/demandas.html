@@ -645,7 +645,7 @@
         let usersById = {};
         if (opIds.length) {
           const { data } = await AdminAPI._client()
-            .from('users').select('id, name, metadata').in('id', opIds);
+            .from('users').select('id, name, metadata, clickup_user_id').in('id', opIds);
           usersById = Object.fromEntries((data || []).map(u => [u.id, u]));
         }
         state.usersById = usersById;
@@ -690,12 +690,21 @@
             <div class="avatars">${avatars || '<span style="font-size:0.72rem; color:var(--muted);">sem equipe</span>'}</div>
             <span class="due ${dueObj.cls}">${dueObj.text}</span>
           </div>
-          ${d.messages_count > 0 ? `
-            <div style="margin-top:8px;">
-              <span class="chat-count">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                ${d.messages_count}
-              </span>
+          ${d.messages_count > 0 || d.clickup_task_id ? `
+            <div style="margin-top:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              ${d.messages_count > 0 ? `
+                <span class="chat-count">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                  ${d.messages_count}
+                </span>` : ''}
+              ${d.clickup_task_id ? `
+                <a href="https://app.clickup.com/t/${d.clickup_task_id}" target="_blank" rel="noopener"
+                   onclick="event.stopPropagation()"
+                   title="Abrir no ClickUp"
+                   style="display:inline-flex; align-items:center; gap:4px; font-size:0.7rem; color:#7b68ee; font-weight:700; text-decoration:none;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:11px; height:11px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                  ClickUp
+                </a>` : ''}
             </div>
           ` : ''}
         </div>
@@ -879,7 +888,10 @@
         const { demand: d, members, messages } = det;
 
         document.getElementById('dmTitle').textContent = d.title || 'Sem título';
-        document.getElementById('dmSubtitle').textContent = `${d.client_name} • aberta em ${fmtDate(d.created_at)}`;
+        const cuLink = d.clickup_task_id
+          ? ` • <a href="https://app.clickup.com/t/${d.clickup_task_id}" target="_blank" rel="noopener" style="color:#7b68ee; font-weight:600; text-decoration:none;">Abrir no ClickUp ↗</a>`
+          : ' • <span style="color:var(--muted); font-size:0.78rem;">sem vínculo ClickUp ainda</span>';
+        document.getElementById('dmSubtitle').innerHTML = `${escapeHtml(d.client_name)} • aberta em ${fmtDate(d.created_at)}${cuLink}`;
         const sb = STATUS_BADGE[d.status] || { cls:'b-cancel', label:d.status };
         document.getElementById('dmStatusBadge').innerHTML = `<span class="badge ${sb.cls}">${sb.label}</span>`;
 
@@ -923,6 +935,14 @@
         // Equipe
         const team = members.map(m => {
           const approved = m.approved_finish ? '<span class="approved">✓ Aprovou</span>' : '<span class="approved no">aguardando</span>';
+          const cuBadge = (m.role === 'operator' && m.clickup_user_id)
+            ? `<span title="Vinculado ao ClickUp (ID ${m.clickup_user_id})" style="display:inline-flex; align-items:center; gap:3px; font-size:0.66rem; font-weight:700; color:#7b68ee; background:#efebff; padding:2px 7px; border-radius:999px; margin-right:6px;">
+                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                 ClickUp
+               </span>`
+            : (m.role === 'operator'
+              ? '<span title="Sem usuário no ClickUp" style="font-size:0.66rem; color:var(--muted); margin-right:6px;">sem ClickUp</span>'
+              : '');
           return `
             <div class="team-row">
               <div class="avatar" style="${m.position_color ? `background:linear-gradient(135deg,${m.position_color}33,${m.position_color});`:''}">${initials(m.user_name)}</div>
@@ -930,7 +950,7 @@
                 <div class="name">${escapeHtml(m.user_name || '—')} <span style="font-size:0.7rem; color:var(--muted); font-weight:500;">— ${m.role === 'operator' ? 'operador' : 'cliente'}</span></div>
                 <div class="role">${escapeHtml(m.position_name || m.user_email || '')}</div>
               </div>
-              ${m.role === 'operator' ? approved : ''}
+              ${m.role === 'operator' ? cuBadge + approved : ''}
             </div>
           `;
         }).join('') || '<div style="color:var(--muted); font-size:0.84rem;">Sem membros.</div>';
