@@ -271,6 +271,34 @@
     }));
   }
 
+  // ============================================================
+  // Avaliações (operador → cliente)
+  // ============================================================
+
+  async function getMyOperatorRating(demand_id) {
+    const me = await getMe();
+    if (!me) return null;
+    const { data, error } = await client()
+      .from('operator_to_client_ratings')
+      .select('id, score, comment, dimensions, status, submitted_at')
+      .eq('demand_id',   demand_id)
+      .eq('operator_id', me.id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function submitOperatorRating(demand_id, score, comment, dimensions) {
+    const { data, error } = await client().rpc('submit_operator_rating', {
+      p_demand_id:  demand_id,
+      p_score:      score,
+      p_comment:    comment || null,
+      p_dimensions: dimensions || {},
+    });
+    if (error) throw error;
+    return data;
+  }
+
   async function logout() {
     clearCached();
     await client().auth.signOut();
@@ -290,6 +318,8 @@
     updateDemandStatus,
     getDashboard,
     listMyStudents,
+    getMyOperatorRating,
+    submitOperatorRating,
     logout,
     _client: client,
   };
