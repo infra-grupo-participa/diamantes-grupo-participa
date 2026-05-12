@@ -3,7 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const PROD = 'https://diamantes.grupoparticipa.app.br/servico';
+const PROD = 'https://diamantes.grupoparticipa.app.br';
 const USERS = {
   cliente: { email: 'joao@advmais.com', password: 'TesteAutomacao@2026' },
   admin:   { email: 'admin-teste@diamantes.test', password: 'AdminTesteAuto@2026' },
@@ -57,7 +57,7 @@ test.describe('Quality — sem ruído de console em produção', () => {
     await page.waitForTimeout(8000);
 
     // Filtrar 404 esperados de PHPs órfãos legacy (já tratados pelo stub)
-    const httpFails = issues.httpFails.filter(f => !/insights\.php|portal-contracts\.js/i.test(f));
+    const httpFails = issues.httpFails.filter(f => !/insights\.php/i.test(f));
     expect(issues.pageErrors, 'pageError em portal').toEqual([]);
     expect(issues.errors, 'console.error em portal').toEqual([]);
     expect(httpFails, 'HTTP fails em portal').toEqual([]);
@@ -69,7 +69,7 @@ test.describe('Quality — sem ruído de console em produção', () => {
     await page.waitForTimeout(8000);
 
     // Admin chama /api/insights.php que stub silencia (200 fake) → não vira fail
-    const httpFails = issues.httpFails.filter(f => !/insights\.php|portal-contracts\.js/i.test(f));
+    const httpFails = issues.httpFails.filter(f => !/insights\.php/i.test(f));
     expect(issues.pageErrors, 'pageError em admin').toEqual([]);
     expect(issues.errors, 'console.error em admin').toEqual([]);
     expect(httpFails, 'HTTP fails em admin').toEqual([]);
