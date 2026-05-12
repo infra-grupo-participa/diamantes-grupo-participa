@@ -7,149 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg: #f6f8fc;
-      --surface: #ffffff;
-      --border: #e9ecf3;
-      --text: #14182a;
-      --text-secondary: #4b5468;
-      --muted: #8a92a5;
-      --accent: #F29725;
-      --accent-soft: #fff4e3;
-      --accent-strong: #d97e0f;
-      --indigo: #6366f1;
-      --success: #16a34a;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
-    }
-    * { box-sizing: border-box; }
-    html, body { margin:0; padding:0; height:100%;
-      font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-      color:var(--text); background:var(--bg);
-      -webkit-font-smoothing:antialiased; font-size:14px; }
-    button { font-family:inherit; cursor:pointer; }
-    a { text-decoration:none; color:inherit; }
-
-    .app-shell { display:grid; grid-template-columns:244px 1fr; min-height:100vh; }
-
-    .sidebar { background:var(--surface); border-right:1px solid var(--border);
-      display:flex; flex-direction:column; padding:22px 14px; gap:22px;
-      position:sticky; top:0; height:100vh; }
-    .brand { display:flex; align-items:center; gap:10px; padding:4px 10px 14px; }
-    .brand-mark { width:30px; height:30px; border-radius:8px;
-      background:linear-gradient(135deg,var(--accent),var(--accent-strong));
-      display:grid; place-items:center; color:#fff; }
-    .brand-name { font-weight:700; font-size:1.02rem; letter-spacing:-0.01em; }
-
-    .nav { display:flex; flex-direction:column; gap:4px; flex:1; }
-    .nav-item { display:flex; align-items:center; gap:12px;
-      padding:10px 12px; border-radius:12px; color:var(--text-secondary);
-      font-weight:500; font-size:0.9rem; transition:background .15s, color .15s; cursor:pointer; }
-    .nav-item:hover { background:var(--bg); color:var(--text); }
-    .nav-item.active { background:linear-gradient(135deg,var(--accent),var(--accent-strong));
-      color:#fff; font-weight:700; box-shadow:0 6px 14px rgba(242,151,37,.30); }
-    .nav-item .ico { width:18px; height:18px; flex-shrink:0; }
-
-    .sidebar-footer { border-top:1px solid var(--border); padding-top:14px;
-      display:flex; flex-direction:column; gap:8px; }
-    .user-pill { display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; }
-    .avatar { width:38px; height:38px; border-radius:50%;
-      background:linear-gradient(135deg,#c7d2fe,var(--indigo));
-      display:grid; place-items:center; color:#fff; font-weight:700; font-size:0.8rem; flex-shrink:0; }
-    .user-pill-name { font-weight:600; font-size:0.86rem; }
-    .user-pill-role { font-size:0.72rem; color:var(--muted); }
-    .logout-btn { display:flex; align-items:center; gap:10px; padding:10px 12px;
-      border-radius:10px; border:none; background:transparent;
-      color:var(--text-secondary); font-size:0.85rem; font-weight:500; }
-    .logout-btn:hover { background:var(--bg); color:var(--danger); }
-    .logout-btn svg { width:16px; height:16px; }
-
-    .main { padding:30px 36px 56px; min-width:0; display:flex; flex-direction:column; gap:22px; }
-
-    .page-head h1 { margin:0; font-size:1.5rem; font-weight:800; letter-spacing:-0.02em; }
-    .page-head .sub { margin-top:4px; color:var(--text-secondary); font-size:0.92rem; }
-
-    /* HERO Perfil */
-    .profile-hero {
-      background:var(--surface); border:1px solid var(--border); border-radius:16px;
-      padding:26px; display:grid; grid-template-columns:auto 1fr auto; gap:24px; align-items:center;
-      box-shadow:var(--shadow-sm);
-    }
-    .big-avatar {
-      width:96px; height:96px; border-radius:50%;
-      background:linear-gradient(135deg,#fde68a,var(--accent));
-      display:grid; place-items:center; color:#fff; font-weight:800; font-size:2rem;
-      box-shadow:0 8px 24px rgba(242,151,37,0.28);
-    }
-    .profile-info h2 { margin:0; font-size:1.4rem; font-weight:800; letter-spacing:-0.02em; }
-    .profile-info .role-line { color:var(--text-secondary); font-size:0.9rem; margin-top:4px; }
-    .role-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-    .role-tag { font-size:0.72rem; font-weight:600; padding:4px 10px; border-radius:999px;
-      background:var(--accent-soft); color:var(--accent-strong); }
-    .profile-actions { display:flex; flex-direction:column; gap:8px; }
-    .btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent-strong));
-      color:#fff; border:none; padding:10px 18px; border-radius:10px;
-      font-weight:600; font-size:0.85rem; box-shadow:0 6px 14px rgba(242,151,37,.30); }
-    .btn-secondary { background:var(--surface); color:var(--text-secondary);
-      border:1px solid var(--border); padding:10px 18px; border-radius:10px;
-      font-weight:600; font-size:0.85rem; }
-
-    .grid-2 { display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:16px; }
-    @media (max-width:900px){ .grid-2 { grid-template-columns:1fr; } .profile-hero { grid-template-columns:1fr; text-align:center; } .profile-actions { flex-direction:row; justify-content:center; } }
-
-    .card { background:var(--surface); border:1px solid var(--border); border-radius:16px;
-      padding:18px; box-shadow:var(--shadow-sm); }
-    .card h2 { margin:0 0 14px; font-size:0.98rem; font-weight:700; letter-spacing:-0.01em; }
-
-    /* Form de perfil */
-    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-    @media (max-width:600px){ .form-grid { grid-template-columns:1fr; } }
-    .field { display:flex; flex-direction:column; gap:6px; }
-    .field label { font-size:0.78rem; color:var(--muted); font-weight:600; }
-    .field input, .field select, .field textarea {
-      padding:10px 12px; border:1px solid var(--border); border-radius:10px;
-      background:var(--bg); font-size:0.88rem; color:var(--text); outline:none;
-    }
-    .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--accent); background:var(--surface); }
-    .field-full { grid-column:1 / -1; }
-
-    /* Estatísticas mensais */
-    .stats-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
-    .stat-tile {
-      padding:14px; border-radius:12px; border:1px solid var(--border);
-      display:flex; align-items:center; gap:12px;
-    }
-    .stat-tile .ico { width:38px; height:38px; border-radius:10px; display:grid; place-items:center; flex-shrink:0; }
-    .stat-tile .ico svg { width:18px; height:18px; }
-    .stat-tile.green  .ico { background:#e8f7ee; color:#16a34a; }
-    .stat-tile.orange .ico { background:#fff4e3; color:var(--accent-strong); }
-    .stat-tile.indigo .ico { background:#eef0ff; color:#6366f1; }
-    .stat-tile.pink   .ico { background:#fbe2ec; color:#be185d; }
-    .stat-tile .num { font-weight:800; font-size:1.2rem; line-height:1; }
-    .stat-tile .lbl { font-size:0.74rem; color:var(--muted); margin-top:3px; }
-
-    /* Avaliações */
-    .rating-summary { display:flex; align-items:center; gap:14px; padding-bottom:14px; border-bottom:1px dashed var(--border); margin-bottom:14px; }
-    .rating-num { font-size:2.4rem; font-weight:800; letter-spacing:-0.02em; line-height:1; }
-    .rating-stars { color:var(--accent); font-size:1.05rem; letter-spacing:2px; }
-    .rating-count { color:var(--muted); font-size:0.78rem; margin-top:2px; }
-    .review-row { display:grid; grid-template-columns:auto 1fr; gap:12px; padding:10px 0; border-bottom:1px dashed var(--border); }
-    .review-row:last-child { border-bottom:none; }
-    .review-row .av { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; color:#fff; font-weight:700; font-size:0.74rem; }
-    .review-row .head { display:flex; justify-content:space-between; align-items:baseline; }
-    .review-row .name { font-weight:600; font-size:0.86rem; }
-    .review-row .stars { color:var(--accent); font-size:0.78rem; letter-spacing:1.5px; }
-    .review-row .comment { font-size:0.84rem; color:var(--text-secondary); margin-top:4px; line-height:1.45; }
-    .review-row .when { font-size:0.7rem; color:var(--muted); margin-top:4px; }
-
-    @media (max-width:900px) {
-      .app-shell { grid-template-columns:1fr; }
-      .sidebar { position:static; height:auto; }
-      .main { padding:22px; }
-    }
-  </style>
+  <link rel="stylesheet" href="assets/perfil.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -176,13 +34,13 @@
       </nav>
       <div class="sidebar-footer">
         <div class="user-pill">
-          <div class="avatar">JC</div>
+          <div class="avatar" id="navAvatar">OP</div>
           <div>
-            <div class="user-pill-name">Juliana Costa</div>
-            <div class="user-pill-role">Operadora</div>
+            <div class="user-pill-name" id="navName">Operador</div>
+            <div class="user-pill-role">Operador</div>
           </div>
         </div>
-        <button class="logout-btn">
+        <button class="logout-btn" id="logoutBtn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           Sair
         </button>
@@ -195,60 +53,52 @@
         <p class="sub">Suas informações pessoais, cargos e desempenho no atendimento.</p>
       </div>
 
-      <!-- Hero -->
       <section class="profile-hero">
-        <div class="big-avatar">JC</div>
+        <div class="big-avatar" id="bigAvatar">
+          <span id="bigAvatarText">OP</span>
+          <span class="avatar-edit-overlay">Trocar foto</span>
+          <input type="file" id="avatarInput" accept="image/*" style="display:none" />
+        </div>
         <div class="profile-info">
-          <h2>Juliana Costa</h2>
-          <div class="role-line">juliana.costa@grupoparticipa.app.br • Membro desde Jan/2026</div>
-          <div class="role-tags">
-            <span class="role-tag">Designer</span>
-            <span class="role-tag">Editor de Vídeo</span>
-            <span class="role-tag">Social Media</span>
-          </div>
+          <h2 id="heroName">—</h2>
+          <div class="role-line" id="heroSub">—</div>
+          <div class="role-tags" id="heroTags"></div>
         </div>
         <div class="profile-actions">
-          <button class="btn-primary">Editar dados</button>
-          <button class="btn-secondary">Trocar senha</button>
+          <button class="btn-primary" id="btnSave">Salvar alterações</button>
+          <button class="btn-secondary" id="btnChangePass">Trocar senha</button>
         </div>
       </section>
 
       <div class="grid-2">
-        <!-- Form -->
         <div class="card">
           <h2>Dados pessoais</h2>
           <div class="form-grid">
             <div class="field">
               <label>Nome completo</label>
-              <input type="text" value="Juliana Costa" />
+              <input type="text" id="fName" />
             </div>
             <div class="field">
               <label>E-mail</label>
-              <input type="email" value="juliana.costa@grupoparticipa.app.br" disabled />
+              <input type="email" id="fEmail" disabled />
             </div>
             <div class="field">
               <label>WhatsApp</label>
-              <input type="text" value="(11) 98765-4321" />
+              <input type="text" id="fWhatsapp" placeholder="(11) 99999-9999" />
             </div>
             <div class="field">
               <label>Cargo principal</label>
-              <select>
-                <option>Designer</option>
-                <option>Editor de Vídeo</option>
-                <option>Social Media</option>
-                <option>Web-Designer</option>
-                <option>Gestor de tráfego</option>
-                <option>Automação</option>
+              <select id="fPosition">
+                <option value="">— sem cargo —</option>
               </select>
             </div>
             <div class="field field-full">
               <label>Bio / Apresentação</label>
-              <textarea rows="3">Designer e editora de vídeo, atendo alunos do plano Diamante com foco em criativos para campanhas e edição de depoimentos.</textarea>
+              <textarea id="fBio" rows="3" placeholder="Conte um pouco sobre você e seu trabalho..."></textarea>
             </div>
           </div>
         </div>
 
-        <!-- Estatísticas -->
         <div class="card">
           <h2>Desempenho no mês</h2>
           <div class="stats-grid">
@@ -257,8 +107,8 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
               </div>
               <div>
-                <div class="num">48</div>
-                <div class="lbl">Demandas concluídas</div>
+                <div class="num" id="statDone">—</div>
+                <div class="lbl">Concluídas hoje</div>
               </div>
             </div>
             <div class="stat-tile orange">
@@ -266,7 +116,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               </div>
               <div>
-                <div class="num">5</div>
+                <div class="num" id="statInProgress">—</div>
                 <div class="lbl">Em execução</div>
               </div>
             </div>
@@ -275,7 +125,7 @@
                 <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               </div>
               <div>
-                <div class="num">4,85</div>
+                <div class="num" id="statRating">—</div>
                 <div class="lbl">Nota média</div>
               </div>
             </div>
@@ -284,7 +134,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               <div>
-                <div class="num">9</div>
+                <div class="num" id="statStudents">—</div>
                 <div class="lbl">Alunos atendidos</div>
               </div>
             </div>
@@ -292,61 +142,26 @@
         </div>
       </div>
 
-      <!-- Avaliações -->
       <section class="card">
         <h2>Avaliações dos alunos</h2>
         <div class="rating-summary">
           <div>
-            <div class="rating-num">4,85</div>
-            <div class="rating-count">Baseado em 32 avaliações</div>
+            <div class="rating-num" id="ratingAvg">—</div>
+            <div class="rating-count" id="ratingCount">Sem avaliações ainda</div>
           </div>
           <div>
-            <div class="rating-stars">★ ★ ★ ★ ★</div>
-            <div class="rating-count">Últimos 90 dias</div>
+            <div class="rating-stars" id="ratingStars">☆ ☆ ☆ ☆ ☆</div>
+            <div class="rating-count">Histórico completo</div>
           </div>
         </div>
-        <div class="review-row">
-          <div class="av" style="background:linear-gradient(135deg,#fde68a,#f59e0b)">AC</div>
-          <div>
-            <div class="head">
-              <div class="name">Ana Carolina</div>
-              <div class="stars">★ ★ ★ ★ ★</div>
-            </div>
-            <div class="comment">"Os criativos ficaram exatamente como eu queria. Juliana entendeu rapidamente a proposta da campanha e entregou antes do prazo."</div>
-            <div class="when">Há 3 dias</div>
-          </div>
-        </div>
-        <div class="review-row">
-          <div class="av" style="background:linear-gradient(135deg,#bae6fd,#0284c7)">BC</div>
-          <div>
-            <div class="head">
-              <div class="name">Bruno Cardoso</div>
-              <div class="stars">★ ★ ★ ★ ★</div>
-            </div>
-            <div class="comment">"Edição do depoimento ficou incrível. Comunicação super atenciosa, recomendo!"</div>
-            <div class="when">Semana passada</div>
-          </div>
-        </div>
-        <div class="review-row">
-          <div class="av" style="background:linear-gradient(135deg,#f5d0fe,#a855f7)">CM</div>
-          <div>
-            <div class="head">
-              <div class="name">Carla Mendonça</div>
-              <div class="stars">★ ★ ★ ★ ☆</div>
-            </div>
-            <div class="comment">"Atendimento muito bom, só precisei pedir um ajuste pequeno na cor do CTA."</div>
-            <div class="when">Há 2 semanas</div>
-          </div>
-        </div>
+        <div id="reviewsList"></div>
       </section>
     </main>
   </div>
 
-  <script>
-    'use strict';
-    document.querySelector('.logout-btn').addEventListener('click', () => {
-      if (confirm('Sair do portal?')) window.location.href = '/';
-    });
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="assets/operator-api.js?v=20260512d"></script>
+  <script src="assets/perfil.js?v=20260512d"></script>
 </body>
 </html>

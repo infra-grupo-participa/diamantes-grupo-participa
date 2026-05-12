@@ -75,7 +75,7 @@
     }
     const { data: profile, error } = await supabase
       .from('users')
-      .select('id, role, status, name, email, metadata, position_id, clickup_user_id, last_login_at')
+      .select('id, role, status, name, email, metadata, position_id, clickup_user_id, last_login_at, created_at')
       .eq('auth_user_id', session.user.id)
       .maybeSingle();
     if (error || !profile) {
@@ -112,7 +112,7 @@
       }
       const { data: profile } = await supabase
         .from('users')
-        .select('id, role, status, name, email, metadata, position_id, clickup_user_id, last_login_at')
+        .select('id, role, status, name, email, metadata, position_id, clickup_user_id, last_login_at, created_at')
         .eq('auth_user_id', session.user.id)
         .maybeSingle();
       if (!profile || profile.role !== 'operator' || profile.status !== 'approved') {
@@ -132,7 +132,7 @@
     if (!session) return null;
     const { data } = await supabase
       .from('users')
-      .select('id, role, status, name, email, metadata, position_id, clickup_user_id, last_login_at')
+      .select('id, role, status, name, email, metadata, position_id, clickup_user_id, last_login_at, created_at')
       .eq('auth_user_id', session.user.id)
       .maybeSingle();
     if (data) writeCached(data);
@@ -187,6 +187,90 @@
     return data || [];
   }
 
+  async function updateMe(patch) {
+    const supabase = client();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Sessão expirada.');
+
+    const allowed = ['name', 'position_id'];
+    const clean = {};
+    for (const k of allowed) if (patch[k] !== undefined) clean[k] = patch[k];
+
+    if (patch.metadata && typeof patch.metadata === 'object') {
+      const { data: current } = await supabase.from('users')
+        .select('metadata').eq('auth_user_id', session.user.id).maybeSingle();
+      clean.metadata = Object.assign({}, current?.metadata || {}, patch.metadata);
+    }
+    clean.updated_at = new Date().toISOString();
+
+    const { data, error } = await supabase.from('users').update(clean)
+      .eq('auth_user_id', session.user.id).select().single();
+    if (error) throw error;
+    clearCached();
+    return data;
+  }
+
+  async function changePassword(newPassword) {
+    if (!newPassword || newPassword.length < 8) {
+      throw new Error('A senha precisa ter no mínimo 8 caracteres.');
+    }
+    const { error } = await client().auth.updateUser({ password: newPassword });
+    if (error) throw error;
+    return true;
+  }
+
+  async function uploadAvatar(file) {
+    if (!file) throw new Error('Selecione um arquivo.');
+    if (file.size > 2 * 1024 * 1024) throw new Error('Arquivo maior que 2 MB.');
+    const supabase = client();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Sessão expirada.');
+    const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+    const path = `${session.user.id}/avatar.${ext}`;
+    const { error: upErr } = await supabase.storage.from('avatars')
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (upErr) throw upErr;
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+    await updateMe({ metadata: { avatar_url: publicUrl } });
+    return publicUrl;
+  }
+
+  async function listPositions() {
+    const { data, error } = await client()
+      .from('positions')
+      .select('id, slug, name, color, active')
+      .eq('active', true)
+      .order('sort_order', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function listMyRatings(limit = 50) {
+    const me = await getMe();
+    if (!me) throw new Error('Sessão expirada.');
+    const supabase = client();
+    const { data, error } = await supabase
+      .from('ratings')
+      .select('id, client_slug, task_id, score, comment, created_at')
+      .eq('user_id', me.id)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    const slugs = [...new Set(data.map(r => r.client_slug).filter(Boolean))];
+    let clientsBySlug = {};
+    if (slugs.length) {
+      const { data: clients } = await supabase
+        .from('clients').select('slug, display_name').in('slug', slugs);
+      clientsBySlug = Object.fromEntries((clients || []).map(c => [c.slug, c]));
+    }
+    return data.map(r => ({
+      ...r,
+      client_display_name: clientsBySlug[r.client_slug]?.display_name || r.client_slug,
+    }));
+  }
+
   async function logout() {
     clearCached();
     await client().auth.signOut();
@@ -196,6 +280,11 @@
   window.OperatorAPI = {
     requireOperator,
     getMe,
+    updateMe,
+    changePassword,
+    uploadAvatar,
+    listPositions,
+    listMyRatings,
     listAssignedDemands,
     getDemand,
     updateDemandStatus,
