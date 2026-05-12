@@ -603,7 +603,7 @@
     }
 
     function rowHtml(sub) {
-      const svcsText = (sub.active_services || []).map(sv => AdminAPI.canonicalServiceName(sv.service_type)).filter(Boolean).join(', ') || sub.plan_name || '—';
+      const svcsText = [...new Set((sub.active_services || []).map(sv => AdminAPI.canonicalServiceName(sv.service_type)).filter(Boolean))].join(', ') || sub.plan_name || '—';
 
       const pmText = sub.payment_method === 'cc' ? 'Cartão' : sub.payment_method === 'pix' ? 'PIX' : sub.payment_method === 'boleto' ? 'Boleto' : sub.payment_method_label || (sub.payment_method ? sub.payment_method.toUpperCase() : '—');
 
