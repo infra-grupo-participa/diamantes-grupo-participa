@@ -9,60 +9,34 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #f6f8fc;
-      --surface: #ffffff;
-      --border: #e9ecf3;
-      --text: #14182a;
-      --text-secondary: #4b5468;
-      --muted: #8a92a5;
-      --accent: #F29725;
-      --accent-soft: #fff4e3;
-      --accent-strong: #d97e0f;
-      --indigo: #6366f1;
-      --success: #16a34a;
-      --warning: #f59e0b;
-      --danger: #ef4444;
+      --bg: #f6f8fc; --surface: #ffffff; --border: #e9ecf3;
+      --text: #14182a; --text-secondary: #4b5468; --muted: #8a92a5;
+      --accent: #F29725; --accent-soft: #fff4e3; --accent-strong: #d97e0f;
+      --indigo: #6366f1; --success: #16a34a; --warning: #f59e0b; --danger: #ef4444;
       --shadow-sm: 0 1px 2px rgba(15,23,42,0.04);
-      --shadow-md: 0 8px 24px rgba(15,23,42,0.08);
     }
     * { box-sizing:border-box; }
-    html, body { margin:0; padding:0; height:100%;
-      font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-      color:var(--text); background:var(--bg);
-      -webkit-font-smoothing:antialiased; font-size:14px; }
-    button, input, select, textarea { font-family:inherit; }
+    html, body { margin:0; padding:0; height:100%; font-family:'Inter',sans-serif; color:var(--text); background:var(--bg); -webkit-font-smoothing:antialiased; font-size:14px; }
+    button, input, select, textarea { font-family:inherit; } button { cursor:pointer; }
     a { text-decoration:none; color:inherit; }
-    button { cursor:pointer; }
 
     .app-shell { display:grid; grid-template-columns:244px 1fr; min-height:100vh; }
 
-    .sidebar { background:var(--surface); border-right:1px solid var(--border);
-      display:flex; flex-direction:column; padding:22px 14px; gap:22px;
-      position:sticky; top:0; height:100vh; }
+    .sidebar { background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; padding:22px 14px; gap:22px; position:sticky; top:0; height:100vh; }
     .brand { display:flex; align-items:center; gap:10px; padding:4px 10px 14px; }
-    .brand-mark { width:30px; height:30px; border-radius:8px;
-      background:linear-gradient(135deg,var(--accent),var(--accent-strong));
-      display:grid; place-items:center; color:#fff; }
-    .brand-name { font-weight:700; font-size:1.02rem; letter-spacing:-0.01em; }
+    .brand-mark { width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,var(--accent),var(--accent-strong)); display:grid; place-items:center; color:#fff; }
+    .brand-name { font-weight:700; font-size:1.02rem; }
     .nav { display:flex; flex-direction:column; gap:4px; flex:1; }
-    .nav-item { display:flex; align-items:center; gap:12px;
-      padding:10px 12px; border-radius:12px; color:var(--text-secondary);
-      font-weight:500; font-size:0.9rem; }
+    .nav-item { display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px; color:var(--text-secondary); font-weight:500; font-size:0.9rem; }
     .nav-item:hover { background:var(--bg); color:var(--text); }
-    .nav-item.active { background:linear-gradient(135deg,var(--accent),var(--accent-strong));
-      color:#fff; font-weight:700; box-shadow:0 6px 14px rgba(242,151,37,.30); }
+    .nav-item.active { background:linear-gradient(135deg,var(--accent),var(--accent-strong)); color:#fff; font-weight:700; box-shadow:0 6px 14px rgba(242,151,37,.30); }
     .nav-item .ico { width:18px; height:18px; flex-shrink:0; }
-    .sidebar-footer { border-top:1px solid var(--border); padding-top:14px;
-      display:flex; flex-direction:column; gap:8px; }
+    .sidebar-footer { border-top:1px solid var(--border); padding-top:14px; display:flex; flex-direction:column; gap:8px; }
     .user-pill { display:flex; align-items:center; gap:10px; padding:8px; border-radius:10px; }
-    .avatar { width:38px; height:38px; border-radius:50%;
-      background:linear-gradient(135deg,#c7d2fe,var(--indigo));
-      display:grid; place-items:center; color:#fff; font-weight:700; font-size:0.8rem; flex-shrink:0; }
+    .avatar { width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,#c7d2fe,var(--indigo)); display:grid; place-items:center; color:#fff; font-weight:700; font-size:0.8rem; flex-shrink:0; }
     .user-pill-name { font-weight:600; font-size:0.86rem; }
     .user-pill-role { font-size:0.72rem; color:var(--muted); }
-    .logout-btn { display:flex; align-items:center; gap:10px; padding:10px 12px;
-      border-radius:10px; border:none; background:transparent;
-      color:var(--text-secondary); font-size:0.85rem; font-weight:500; }
+    .logout-btn { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; border:none; background:transparent; color:var(--text-secondary); font-size:0.85rem; font-weight:500; }
     .logout-btn:hover { background:var(--bg); color:var(--danger); }
     .logout-btn svg { width:16px; height:16px; }
 
@@ -70,42 +44,25 @@
     .page-head { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; }
     .page-head h1 { margin:0; font-size:1.5rem; font-weight:800; letter-spacing:-0.02em; }
     .page-head .sub { margin-top:4px; color:var(--text-secondary); font-size:0.92rem; }
-    .page-head .filters { display:flex; gap:8px; flex-wrap:wrap; }
-    .search-box { display:flex; align-items:center; gap:8px;
-      background:var(--surface); border:1px solid var(--border); border-radius:10px;
-      padding:8px 12px; min-width:240px; }
+    .search-box { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:8px 12px; min-width:240px; }
     .search-box svg { width:16px; height:16px; color:var(--muted); }
     .search-box input { border:none; outline:none; background:transparent; flex:1; font-size:0.86rem; }
-    .filter-pill { background:var(--surface); border:1px solid var(--border);
-      padding:8px 14px; border-radius:10px; font-size:0.85rem; color:var(--text-secondary);
-      font-weight:500; }
-    .filter-pill.active { background:var(--accent-soft); border-color:var(--accent); color:var(--accent-strong); font-weight:700; }
 
-    /* Tabs por status (count) */
     .status-tabs { display:flex; gap:8px; flex-wrap:wrap; }
-    .status-tab { display:flex; align-items:center; gap:8px;
-      background:var(--surface); border:1px solid var(--border);
-      padding:10px 14px; border-radius:12px; cursor:pointer;
-      font-size:0.85rem; font-weight:600; color:var(--text-secondary); }
+    .status-tab { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); padding:10px 14px; border-radius:12px; cursor:pointer; font-size:0.85rem; font-weight:600; color:var(--text-secondary); }
     .status-tab.active { background:#fff; border-color:var(--accent); color:var(--accent-strong); box-shadow:0 6px 14px rgba(242,151,37,.15); }
-    .status-tab .count { font-size:0.72rem; padding:2px 8px; border-radius:999px;
-      background:var(--bg); color:var(--muted); font-weight:700; }
+    .status-tab .count { font-size:0.72rem; padding:2px 8px; border-radius:999px; background:var(--bg); color:var(--muted); font-weight:700; }
     .status-tab.active .count { background:var(--accent); color:#fff; }
 
-    /* Layout principal: lista + chat */
-    .work-area { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,420px); gap:16px; align-items:start; }
+    .work-area { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,440px); gap:16px; align-items:start; }
     @media (max-width:1080px) { .work-area { grid-template-columns:1fr; } }
 
-    .list-card { background:var(--surface); border:1px solid var(--border); border-radius:16px;
-      padding:0; box-shadow:var(--shadow-sm); overflow:hidden; }
-    .list-row { display:grid; grid-template-columns:42px 1fr auto auto;
-      gap:14px; align-items:center; padding:14px 18px; border-bottom:1px solid var(--border);
-      cursor:pointer; transition:background .15s; }
+    .list-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:0; box-shadow:var(--shadow-sm); overflow:hidden; }
+    .list-row { display:grid; grid-template-columns:42px 1fr auto auto; gap:14px; align-items:center; padding:14px 18px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s; }
     .list-row:last-child { border-bottom:none; }
     .list-row:hover { background:#fafbff; }
     .list-row.active { background:var(--accent-soft); }
-    .list-row .demand-icon { width:42px; height:42px; border-radius:12px;
-      display:grid; place-items:center; }
+    .list-row .demand-icon { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; }
     .demand-icon svg { width:18px; height:18px; }
     .demand-icon.design { background:#fbe2ec; color:#be185d; }
     .demand-icon.video  { background:#fee9e2; color:#b94512; }
@@ -113,66 +70,52 @@
     .demand-icon.traf   { background:#e9faec; color:#15803d; }
     .demand-icon.auto   { background:#ede9fe; color:#5b21b6; }
     .demand-icon.social { background:#e0f2fe; color:#075985; }
-
     .row-info { min-width:0; }
     .row-title { font-weight:600; font-size:0.92rem; }
     .row-meta { font-size:0.76rem; color:var(--muted); margin-top:3px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
     .row-meta .sep { opacity:0.5; }
-
-    .demand-tag { font-size:0.66rem; font-weight:700;
-      padding:4px 10px; border-radius:999px; }
+    .demand-tag { font-size:0.66rem; font-weight:700; padding:4px 10px; border-radius:999px; }
     .demand-tag.in_progress { background:#fff8db; color:#b45309; }
     .demand-tag.review      { background:#fbe2ec; color:#be185d; }
     .demand-tag.new         { background:#dcfce7; color:#15803d; }
     .demand-tag.done        { background:#eef0ff; color:#4338ca; }
-    .demand-tag.urgent      { background:#fee2e2; color:#b91c1c; }
-
     .row-date { font-size:0.78rem; color:var(--muted); white-space:nowrap; }
 
-    /* Painel de detalhes/chat */
-    .detail-card { background:var(--surface); border:1px solid var(--border); border-radius:16px;
-      box-shadow:var(--shadow-sm); display:flex; flex-direction:column; height:fit-content;
-      max-height:calc(100vh - 60px); position:sticky; top:24px; overflow:hidden; }
-    .detail-head { padding:18px; border-bottom:1px solid var(--border);
-      display:flex; gap:12px; align-items:center; }
-    .detail-head .demand-icon { width:42px; height:42px; }
-    .detail-head h3 { margin:0; font-size:0.98rem; font-weight:700; letter-spacing:-0.01em; }
+    .detail-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; height:fit-content; max-height:calc(100vh - 60px); position:sticky; top:24px; overflow:hidden; }
+    .detail-head { padding:18px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:center; }
+    .detail-head .demand-icon { width:42px; height:42px; flex-shrink:0; }
+    .detail-head h3 { margin:0; font-size:0.98rem; font-weight:700; }
     .detail-head .who { font-size:0.76rem; color:var(--muted); margin-top:2px; }
 
-    .detail-tabs { display:flex; gap:0; padding:0 18px; border-bottom:1px solid var(--border); }
-    .detail-tab { padding:12px 0; margin-right:18px; font-size:0.84rem;
-      font-weight:600; color:var(--muted); cursor:pointer;
-      border-bottom:2px solid transparent; }
-    .detail-tab.active { color:var(--text); border-bottom-color:var(--accent); }
-
-    .detail-body { padding:16px 18px; overflow-y:auto; flex:1; min-height:0; }
-
-    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+    .detail-body { padding:16px 18px 8px; overflow-y:auto; flex-shrink:0; max-height:40vh; border-bottom:1px solid var(--border); }
+    .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
     .info-grid .item { font-size:0.78rem; }
     .info-grid .item .k { color:var(--muted); font-weight:600; margin-bottom:3px; }
     .info-grid .item .v { color:var(--text); font-weight:600; }
-
     .desc-box { background:var(--bg); border-radius:10px; padding:12px; font-size:0.84rem; line-height:1.5; color:var(--text-secondary); }
+    .status-actions { display:flex; flex-wrap:wrap; gap:8px; }
+    .op-btn { background:linear-gradient(135deg,var(--accent),var(--accent-strong)); color:#fff; border:none; padding:8px 14px; border-radius:10px; font-weight:600; font-size:0.82rem; }
+    .op-btn:disabled { opacity:0.5; cursor:wait; }
 
-    /* Chat */
-    .chat-area { display:flex; flex-direction:column; gap:10px; padding-bottom:6px; }
+    .chat-scroll { padding:14px 18px; overflow-y:auto; flex:1; min-height:200px; display:flex; flex-direction:column; gap:10px; }
     .msg { display:flex; gap:8px; max-width:90%; }
     .msg .av { width:30px; height:30px; border-radius:50%; flex-shrink:0; display:grid; place-items:center; color:#fff; font-weight:700; font-size:0.66rem; }
-    .msg-body { background:var(--bg); padding:10px 12px; border-radius:12px; }
+    .msg-body { background:var(--bg); padding:10px 12px; border-radius:12px; min-width:0; }
     .msg-head { display:flex; gap:8px; align-items:baseline; font-size:0.72rem; color:var(--muted); margin-bottom:3px; }
     .msg-head .name { color:var(--text); font-weight:700; }
-    .msg-text { font-size:0.86rem; line-height:1.45; }
+    .msg-text { font-size:0.86rem; line-height:1.45; white-space:pre-wrap; word-break:break-word; }
     .msg.me { align-self:flex-end; flex-direction:row-reverse; }
     .msg.me .msg-body { background:var(--accent-soft); }
 
-    .chat-input { padding:12px 18px; border-top:1px solid var(--border);
-      display:flex; gap:10px; align-items:center; }
-    .chat-input input { flex:1; padding:10px 14px; border:1px solid var(--border);
-      border-radius:10px; background:var(--bg); font-size:0.86rem; outline:none; }
-    .chat-input input:focus { border-color:var(--accent); background:var(--surface); }
-    .send-btn { background:linear-gradient(135deg,var(--accent),var(--accent-strong));
-      color:#fff; border:none; width:40px; height:40px; border-radius:10px; display:grid; place-items:center; }
-    .send-btn svg { width:16px; height:16px; }
+    .chat-composer { padding:10px 14px 14px; border-top:1px solid var(--border); }
+    .composer-wrap { display:flex; align-items:flex-end; gap:8px; padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:14px; }
+    .composer-wrap:focus-within { border-color:var(--accent); background:var(--surface); }
+    .composer-wrap textarea { flex:1; border:none; background:transparent; resize:none; font-size:0.88rem; color:var(--text); outline:none; max-height:140px; min-height:24px; padding:4px 0; line-height:1.4; }
+    .composer-btn { background:transparent; border:none; padding:6px; display:grid; place-items:center; color:var(--muted); border-radius:8px; cursor:pointer; }
+    .composer-btn:hover { background:var(--surface); color:var(--accent-strong); }
+    .composer-btn.send { background:linear-gradient(135deg,var(--accent),var(--accent-strong)); color:#fff; width:36px; height:36px; border-radius:10px; }
+    .composer-btn.send:hover { background:var(--accent-strong); color:#fff; }
+    .composer-btn svg { width:16px; height:16px; }
 
     @media (max-width:900px) {
       .app-shell { grid-template-columns:1fr; }
@@ -207,10 +150,10 @@
       </nav>
       <div class="sidebar-footer">
         <div class="user-pill">
-          <div class="avatar">JC</div>
+          <div class="avatar" id="navAvatar">OP</div>
           <div>
-            <div class="user-pill-name">Juliana Costa</div>
-            <div class="user-pill-role">Operadora</div>
+            <div class="user-pill-name" id="navName">Operador</div>
+            <div class="user-pill-role">Operador</div>
           </div>
         </div>
         <button class="logout-btn">
@@ -226,224 +169,42 @@
           <h1>Minhas demandas</h1>
           <p class="sub">Demandas atribuídas a você. Selecione uma para conversar com o aluno.</p>
         </div>
-        <div class="filters">
-          <div class="search-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input placeholder="Buscar por aluno ou título..." />
-          </div>
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="searchInput" placeholder="Buscar por aluno ou título..." />
         </div>
       </div>
 
-      <div class="status-tabs">
-        <div class="status-tab active">Todas <span class="count">8</span></div>
-        <div class="status-tab">Novas <span class="count">2</span></div>
-        <div class="status-tab">Em andamento <span class="count">3</span></div>
-        <div class="status-tab">Em revisão <span class="count">2</span></div>
-        <div class="status-tab">Concluídas <span class="count">1</span></div>
-      </div>
+      <div class="status-tabs" id="statusTabs"></div>
 
       <div class="work-area">
-        <!-- Lista -->
-        <section class="list-card">
-          <div class="list-row active">
-            <div class="demand-icon design">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Criação de criativos — Campanha Abr/24</div>
-              <div class="row-meta">Ana Carolina <span class="sep">•</span> Diamante Pro <span class="sep">•</span> 3 dias restantes</div>
-            </div>
-            <span class="demand-tag in_progress">Em andamento</span>
-            <span class="row-date">Há 2h</span>
-          </div>
+        <section class="list-card" id="listCard"></section>
 
-          <div class="list-row">
-            <div class="demand-icon video">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Edição do vídeo — Depoimento cliente</div>
-              <div class="row-meta">Bruno Cardoso <span class="sep">•</span> Diamante <span class="sep">•</span> Aguardando feedback</div>
-            </div>
-            <span class="demand-tag review">Em revisão</span>
-            <span class="row-date">Ontem</span>
-          </div>
-
-          <div class="list-row">
-            <div class="demand-icon web">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Revisão de landing page institucional</div>
-              <div class="row-meta">Carla Mendonça <span class="sep">•</span> Diamante Pro <span class="sep">•</span> 5 dias restantes</div>
-            </div>
-            <span class="demand-tag new">Nova</span>
-            <span class="row-date">09:15</span>
-          </div>
-
-          <div class="list-row">
-            <div class="demand-icon auto">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Automação de e-mail marketing</div>
-              <div class="row-meta">Diego Ramalho <span class="sep">•</span> Diamante Plus <span class="sep">•</span> 7 dias</div>
-            </div>
-            <span class="demand-tag in_progress">Em andamento</span>
-            <span class="row-date">Qua</span>
-          </div>
-
-          <div class="list-row">
-            <div class="demand-icon social">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Posts para Instagram — Semana 3</div>
-              <div class="row-meta">Erika Mello <span class="sep">•</span> Diamante <span class="sep">•</span> Prazo amanhã</div>
-            </div>
-            <span class="demand-tag urgent">Urgente</span>
-            <span class="row-date">10:42</span>
-          </div>
-
-          <div class="list-row">
-            <div class="demand-icon traf">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Otimização de campanha Meta Ads</div>
-              <div class="row-meta">Fernanda Martins <span class="sep">•</span> Diamante Pro <span class="sep">•</span> 4 dias</div>
-            </div>
-            <span class="demand-tag in_progress">Em andamento</span>
-            <span class="row-date">Seg</span>
-          </div>
-
-          <div class="list-row">
-            <div class="demand-icon design">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Banner de aniversário</div>
-              <div class="row-meta">Gabriel Pereira <span class="sep">•</span> Diamante <span class="sep">•</span> Entregue 04/05</div>
-            </div>
-            <span class="demand-tag done">Concluída</span>
-            <span class="row-date">04/05</span>
-          </div>
-
-          <div class="list-row">
-            <div class="demand-icon video">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-            </div>
-            <div class="row-info">
-              <div class="row-title">Reels — Dicas semanais (3 vídeos)</div>
-              <div class="row-meta">Helena Soares <span class="sep">•</span> Diamante Pro <span class="sep">•</span> 6 dias</div>
-            </div>
-            <span class="demand-tag new">Nova</span>
-            <span class="row-date">Hoje</span>
-          </div>
-        </section>
-
-        <!-- Detalhe + chat -->
         <aside class="detail-card">
-          <div class="detail-head">
-            <div class="demand-icon design">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/></svg>
+          <div class="detail-head" id="detailHead"></div>
+          <div class="detail-body" id="detailBody"></div>
+          <div class="chat-scroll" id="chatScroll"></div>
+          <div class="chat-composer">
+            <div class="composer-wrap" id="composerWrap">
+              <button class="composer-btn" id="attachBtn" title="Anexar arquivo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <textarea id="composer" placeholder="Escreva uma mensagem para o aluno..." rows="1"></textarea>
+              <button class="composer-btn send" id="sendBtn" title="Enviar (Enter)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
             </div>
-            <div>
-              <h3>Criação de criativos — Campanha Abr/24</h3>
-              <div class="who">Ana Carolina • Aberta há 3 dias</div>
-            </div>
-          </div>
-
-          <div class="detail-tabs">
-            <div class="detail-tab active">Conversa</div>
-            <div class="detail-tab">Detalhes</div>
-            <div class="detail-tab">Anexos</div>
-          </div>
-
-          <div class="detail-body">
-            <div class="info-grid">
-              <div class="item"><div class="k">Tipo</div><div class="v">Design</div></div>
-              <div class="item"><div class="k">Status</div><div class="v">Em andamento</div></div>
-              <div class="item"><div class="k">Prazo</div><div class="v">14/05/2026</div></div>
-              <div class="item"><div class="k">Prioridade</div><div class="v">Alta</div></div>
-            </div>
-
-            <div class="desc-box" style="margin-bottom:16px">
-              Preciso de 5 criativos para campanha de Abril com tema "renovação". Formatos: feed (1080x1080), stories (1080x1920) e Reels capa. Identidade visual nos anexos.
-            </div>
-
-            <div class="chat-area">
-              <div class="msg">
-                <div class="av" style="background:linear-gradient(135deg,#fde68a,#f59e0b)">AC</div>
-                <div class="msg-body">
-                  <div class="msg-head"><span class="name">Ana Carolina</span><span>09 mai, 14:32</span></div>
-                  <div class="msg-text">Oi Juliana! Acabei de subir o briefing detalhado nos anexos. Pode dar uma olhada?</div>
-                </div>
-              </div>
-              <div class="msg me">
-                <div class="av" style="background:linear-gradient(135deg,#fde68a,var(--accent))">JC</div>
-                <div class="msg-body">
-                  <div class="msg-head"><span class="name">Você</span><span>09 mai, 15:10</span></div>
-                  <div class="msg-text">Oi Ana, recebi! Já vou começar pelos formatos de feed. Te mando o primeiro rascunho até amanhã.</div>
-                </div>
-              </div>
-              <div class="msg">
-                <div class="av" style="background:linear-gradient(135deg,#fde68a,#f59e0b)">AC</div>
-                <div class="msg-body">
-                  <div class="msg-head"><span class="name">Ana Carolina</span><span>10 mai, 09:05</span></div>
-                  <div class="msg-text">Maravilha! Vou aguardar. Lembrando que a paleta principal é a laranja institucional 🍊</div>
-                </div>
-              </div>
-              <div class="msg me">
-                <div class="av" style="background:linear-gradient(135deg,#fde68a,var(--accent))">JC</div>
-                <div class="msg-body">
-                  <div class="msg-head"><span class="name">Você</span><span>11 mai, 11:42</span></div>
-                  <div class="msg-text">Subi os 3 primeiros aqui. Dá uma olhada e me diz o que achou 👀</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="chat-input">
-            <input placeholder="Escreva uma mensagem..." />
-            <button class="send-btn" title="Enviar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
           </div>
         </aside>
       </div>
     </main>
   </div>
 
-  <script>
-    'use strict';
-    document.querySelector('.logout-btn').addEventListener('click', () => {
-      if (confirm('Sair do portal?')) window.location.href = '/';
-    });
-
-    // Seleção mock de linha da lista
-    document.querySelectorAll('.list-row').forEach(row => {
-      row.addEventListener('click', () => {
-        document.querySelectorAll('.list-row').forEach(r => r.classList.remove('active'));
-        row.classList.add('active');
-      });
-    });
-
-    // Tabs status mock
-    document.querySelectorAll('.status-tab').forEach(t => {
-      t.addEventListener('click', () => {
-        document.querySelectorAll('.status-tab').forEach(x => x.classList.remove('active'));
-        t.classList.add('active');
-      });
-    });
-
-    // Tabs do detalhe mock
-    document.querySelectorAll('.detail-tab').forEach(t => {
-      t.addEventListener('click', () => {
-        document.querySelectorAll('.detail-tab').forEach(x => x.classList.remove('active'));
-        t.classList.add('active');
-      });
-    });
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
+  <script src="../assets/js/supabase-config.js"></script>
+  <script src="../assets/js/demand-chat-api.js?v=20260512c"></script>
+  <script src="../assets/js/chat-composer.js?v=20260512c"></script>
+  <script src="assets/operator-api.js?v=20260512c"></script>
+  <script src="assets/demandas.js?v=20260512c"></script>
 </body>
 </html>
