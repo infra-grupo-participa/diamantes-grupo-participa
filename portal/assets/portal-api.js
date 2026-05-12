@@ -411,61 +411,38 @@
     return data;
   }
 
+  // Chat/anexos delegam para o núcleo compartilhado (DemandChatAPI)
+  function chatApi() {
+    if (!window.DemandChatAPI) throw new Error('demand-chat-api.js não carregado.');
+    return window.DemandChatAPI;
+  }
+
   async function listDemandMessages(demand_id) {
-    const supabase = client();
-    const { data: msgs, error } = await supabase
-      .from('demand_messages')
-      .select('id, user_id, content, attachments, created_at')
-      .eq('demand_id', demand_id)
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    if (!msgs || msgs.length === 0) return [];
-    const ids = [...new Set(msgs.map(m => m.user_id))];
-    const { data: users } = await supabase
-      .from('users').select('id, name, role, metadata, position_id').in('id', ids);
-    const usersById = Object.fromEntries((users || []).map(u => [u.id, u]));
-    return msgs.map(m => {
-      const u = usersById[m.user_id] || {};
-      return {
-        ...m,
-        author_name: u.name,
-        author_role: u.role,
-        avatar_url: u.metadata?.avatar_url || null,
-      };
-    });
+    return chatApi().listMessages(demand_id);
   }
 
   async function postDemandMessage(demand_id, content, attachments = []) {
-    if (!content || !content.trim()) return null;
     const me = await getMe();
     if (!me) throw new Error('Sessão expirada.');
-    const { data, error } = await client()
-      .from('demand_messages')
-      .insert({ demand_id, user_id: me.id, content: content.trim(), attachments })
-      .select().single();
-    if (error) throw error;
-    return data;
+    return chatApi().postMessage(demand_id, content, attachments, me.id);
+  }
+
+  function subscribeDemand(demand_id, callbacks) {
+    return chatApi().subscribe(demand_id, callbacks || {});
+  }
+
+  async function uploadDemandAttachment(demand_id, file) {
+    return chatApi().uploadAttachment(demand_id, file);
+  }
+
+  async function signDemandAttachment(path, ttlSec) {
+    return chatApi().signAttachment(path, ttlSec);
   }
 
   async function finalizeMyPart(demand_id) {
     const { data, error } = await client().rpc('finalize_my_part', { p_demand_id: demand_id });
     if (error) throw error;
     return data; // { status, approved, total_operators, finalized_at }
-  }
-
-  // Subscribe a mudanças em tempo real (mensagens + status da demanda).
-  // Retorna função pra unsubscribe.
-  function subscribeDemand(demand_id, { onMessage, onDemandUpdate }) {
-    const supabase = client();
-    const channel = supabase.channel('demand:' + demand_id)
-      .on('postgres_changes',
-          { event: 'INSERT', schema: 'portal', table: 'demand_messages', filter: 'demand_id=eq.' + demand_id },
-          (payload) => onMessage && onMessage(payload.new))
-      .on('postgres_changes',
-          { event: 'UPDATE', schema: 'portal', table: 'demands', filter: 'id=eq.' + demand_id },
-          (payload) => onDemandUpdate && onDemandUpdate(payload.new))
-      .subscribe();
-    return () => { try { supabase.removeChannel(channel); } catch (_) {} };
   }
 
   async function logout() {
@@ -496,6 +473,8 @@
     updateDemand,
     listDemandMessages,
     postDemandMessage,
+    uploadDemandAttachment,
+    signDemandAttachment,
     finalizeMyPart,
     subscribeDemand,
     // Sessão

@@ -349,12 +349,16 @@
   async function listOperators() {
     const { data, error } = await client()
       .from('users')
-      .select('id, name, email, position_id')
+      .select('id, name, email, position_id, positions(name)')
       .eq('role', 'operator')
       .eq('status', 'approved')
+      .eq('contract_active', true)
       .order('name', { ascending: true });
     if (error) throw error;
-    return data || [];
+    return (data || []).map(o => ({
+      ...o,
+      position_name: o.positions?.name || null,
+    }));
   }
 
   async function exportStudentsCsv() {
