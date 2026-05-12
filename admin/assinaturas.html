@@ -108,6 +108,7 @@
     .subs-table tbody td { padding: 12px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .subs-table tbody tr:last-child td { border-bottom: none; }
     .subs-table tbody tr:hover { background: #fafbfc; }
+    .subs-table tbody tr.row-overdue:hover { background: #fee2e2; }
 
     .user-cell { display: flex; align-items: center; gap: 12px; }
     .user-cell .avatar { width: 34px; height: 34px; font-size: 0.74rem; }
@@ -343,7 +344,7 @@
               <select class="search-input" id="statusFilter" style="max-width:170px; padding-left:12px;">
                 <option value="all">Status: Todos</option>
                 <option value="paid">Em dia</option>
-                <option value="late">Atrasados</option>
+                <option value="overdue">Em atraso</option>
                 <option value="pending">Pendentes</option>
                 <option value="canceled">Cancelados</option>
               </select>
@@ -476,7 +477,7 @@
               <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Status</label>
               <select id="subStatus" class="search-input" style="padding-left:12px;">
                 <option value="paid">Em dia</option>
-                <option value="late">Atrasado</option>
+                <option value="overdue">Em atraso</option>
                 <option value="pending">Pendente</option>
                 <option value="canceled">Cancelado</option>
               </select>
@@ -706,7 +707,7 @@
         // Resumo de "a receber" e "inadimplência" (calculados a partir das linhas)
         const { data: all } = await AdminAPI.listSubscriptions({ limit: 1000, offset: 0 });
         const due  = all.filter(x => x.status === 'pending').reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
-        const late = all.filter(x => x.status === 'late').reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
+        const late = all.filter(x => x.status === 'overdue' || x.status === 'late').reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
         const active = all.filter(x => x.status !== 'canceled');
         const avg = active.length ? active.reduce((acc, x) => acc + Number(x.monthly_value || 0), 0) / active.length : 0;
         document.getElementById('summaryDue').textContent  = fmtBRL(due);
