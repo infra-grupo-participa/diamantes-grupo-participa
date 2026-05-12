@@ -1,12 +1,13 @@
-# operator/assets/.htaccess — JS do operator não deve ser cacheado agressivamente
-# (espelho do portal/assets/.htaccess, evita Hostinger/LiteSpeed servir bundle antigo)
+# operator/assets/.htaccess — JS e CSS do operator não devem ser cacheados
+# agressivamente (espelho do portal/assets/.htaccess, evita Hostinger/LiteSpeed
+# servir bundle antigo).
 <IfModule mod_headers.c>
-    <FilesMatch "\.(js)$">
+    <FilesMatch "\.(js|css)$">
         Header set Cache-Control "no-cache, must-revalidate, max-age=0"
     </FilesMatch>
 </IfModule>
 <IfModule mod_expires.c>
-    <FilesMatch "\.(js)$">
+    <FilesMatch "\.(js|css)$">
         ExpiresActive On
         ExpiresDefault "access plus 0 seconds"
     </FilesMatch>

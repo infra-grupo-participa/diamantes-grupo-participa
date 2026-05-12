@@ -172,6 +172,21 @@
     return data;
   }
 
+  async function getDashboard() {
+    const { data, error } = await client().rpc('get_operator_dashboard');
+    if (error) throw error;
+    return data || {};
+  }
+
+  async function listMyStudents() {
+    const { data, error } = await client()
+      .from('v_my_students')
+      .select('*')
+      .order('display_name', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  }
+
   async function logout() {
     clearCached();
     await client().auth.signOut();
@@ -184,6 +199,8 @@
     listAssignedDemands,
     getDemand,
     updateDemandStatus,
+    getDashboard,
+    listMyStudents,
     logout,
     _client: client,
   };
