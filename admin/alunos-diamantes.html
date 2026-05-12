@@ -135,6 +135,7 @@
     .badge-yellow { background: #fef3c7; color: #b45309; }
     .badge-red { background: #fee2e2; color: #b91c1c; }
     .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-gray { background: #f3f4f6; color: #6b7280; }
     .badge-purple { background: #f1ecff; color: #6d28d9; }
     .badge-pink { background: #ffe9ee; color: #be185d; }
 
@@ -293,6 +294,22 @@
     .service-chip.video   .dot { background: #eab308; }
     .service-chip.estrategia { background: #fff4e3; color: var(--accent-strong); }
     .service-chip.estrategia .dot { background: var(--accent); }
+    /* Serviço com pagamento atrasado — sobrepõe a cor da classe de setor */
+    .service-chip.delinquent {
+      background: #fff1f2 !important;
+      color: #be123c !important;
+      border: 1.5px dashed #fca5a5;
+    }
+    .service-chip.delinquent .dot { background: #f43f5e !important; }
+    .service-section-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted);
+      margin: 10px 0 4px;
+    }
+    .service-section-label.late { color: #be123c; }
 
     /* Demandas */
     .demand-list { display: flex; flex-direction: column; gap: 10px; }
@@ -463,16 +480,16 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
             </div>
             <div>
-              <div class="kpi-label">Em dia (current)</div>
+              <div class="kpi-label">Em dia</div>
               <div class="kpi-value" id="kpiActive">—</div>
             </div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-icon" style="background: var(--kpi-yellow); color: var(--kpi-yellow-ico);">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <div class="kpi-icon" style="background: var(--kpi-red, #fee2e2); color: var(--kpi-red-ico, #b91c1c);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             </div>
             <div>
-              <div class="kpi-label">Outros status</div>
+              <div class="kpi-label">Com atraso</div>
               <div class="kpi-value" id="kpiPaused">—</div>
             </div>
           </div>
@@ -501,7 +518,11 @@
               </div>
               <select class="search-input" id="billingFilter" style="max-width:200px; padding-left:12px;">
                 <option value="all">Status: Todos</option>
-                <option value="current">Em dia</option>
+                <option value="paid">Em dia</option>
+                <option value="partial">Parcial</option>
+                <option value="overdue">Atrasado</option>
+                <option value="canceled">Cancelado</option>
+                <option value="paused">Pausado</option>
               </select>
             </div>
           </div>
@@ -743,9 +764,16 @@
     }
     function billingBadge(s) {
       const map = {
-        current: { cls: 'badge-green',  txt: 'Em dia' },
-        late:    { cls: 'badge-red',    txt: 'Atrasado' },
-        paused:  { cls: 'badge-yellow', txt: 'Pausado' },
+        // valores da subscription (novos)
+        paid:     { cls: 'badge-green',  txt: 'Em dia' },
+        partial:  { cls: 'badge-yellow', txt: 'Parcial' },
+        overdue:  { cls: 'badge-red',    txt: 'Atrasado' },
+        canceled: { cls: 'badge-gray',   txt: 'Cancelado' },
+        paused:   { cls: 'badge-yellow', txt: 'Pausado' },
+        trial:    { cls: 'badge-blue',   txt: 'Trial' },
+        // legado (campo manual client_profiles)
+        current:  { cls: 'badge-green',  txt: 'Em dia' },
+        late:     { cls: 'badge-red',    txt: 'Atrasado' },
       };
       const b = map[s] || { cls: 'badge-yellow', txt: s || 'Sem status' };
       return `<span class="badge ${b.cls}">${b.txt}</span>`;
@@ -853,7 +881,7 @@
         const s = await AdminAPI.getStudentStats();
         document.getElementById('kpiTotal').textContent    = s.total;
         document.getElementById('kpiActive').textContent   = s.active;
-        document.getElementById('kpiPaused').textContent   = s.paused;
+        document.getElementById('kpiPaused').textContent   = (s.overdue || 0) + (s.partial || 0);
         document.getElementById('kpiWithTeam').textContent = s.withTeam;
       } catch (e) {
         console.error(e);
@@ -981,42 +1009,61 @@
 
     function renderServices(services) {
       const el = document.getElementById('serviceGrid');
-      const active = services.filter(s => s.status === 'active');
-      if (active.length === 0) {
-        el.innerHTML = `<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Nenhum serviço ativo.</div>`;
+      const active      = services.filter(s => s.status === 'active');
+      const delinquent  = services.filter(s => s.status === 'delinquent');
+
+      if (active.length === 0 && delinquent.length === 0) {
+        el.innerHTML = `<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Nenhum serviço contratado.</div>`;
         return;
       }
+
       const today = new Date(); today.setHours(0,0,0,0);
-      // Ordena pelo vencimento mais próximo primeiro
-      const sorted = [...active].sort((a, b) => {
-        const da = a.access_until ? new Date(a.access_until) : new Date('9999-12-31');
-        const db = b.access_until ? new Date(b.access_until) : new Date('9999-12-31');
-        return da - db;
-      });
-      el.innerHTML = sorted.map(s => {
+
+      function sortByDue(list) {
+        return [...list].sort((a, b) => {
+          const da = a.access_until ? new Date(a.access_until) : new Date('9999-12-31');
+          const db = b.access_until ? new Date(b.access_until) : new Date('9999-12-31');
+          return da - db;
+        });
+      }
+
+      function dueBadge(s) {
+        if (!s.access_until) return '';
+        const due  = new Date(s.access_until);
+        const diff = Math.ceil((due - today) / (1000*60*60*24));
+        if (diff < 0)   return `<span style="margin-left:6px;font-size:0.68rem;background:#fee2e2;color:#b91c1c;border-radius:4px;padding:1px 5px;font-weight:700;">Vencido</span>`;
+        if (diff <= 7)  return `<span style="margin-left:6px;font-size:0.68rem;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-weight:700;">Vence em ${diff}d</span>`;
+        if (diff <= 18) return `<span style="margin-left:6px;font-size:0.68rem;color:var(--muted);">até ${due.toLocaleDateString('pt-BR')}</span>`;
+        return '';
+      }
+
+      function chipHtml(s, extraClass = '') {
         const meta = serviceChipMeta(s.service_type);
-        let dueBadge = '';
-        if (s.access_until) {
-          const due = new Date(s.access_until);
-          const diff = Math.ceil((due - today) / (1000*60*60*24));
-          if (diff < 0) {
-            dueBadge = `<span style="margin-left:6px;font-size:0.68rem;background:#fee2e2;color:#b91c1c;border-radius:4px;padding:1px 5px;font-weight:700;">Vencido</span>`;
-          } else if (diff <= 7) {
-            dueBadge = `<span style="margin-left:6px;font-size:0.68rem;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 5px;font-weight:700;">Vence em ${diff}d</span>`;
-          } else {
-            dueBadge = `<span style="margin-left:6px;font-size:0.68rem;color:var(--muted);">até ${new Date(s.access_until).toLocaleDateString('pt-BR')}</span>`;
-          }
+        return `<div class="service-chip ${meta.cls}${extraClass ? ' ' + extraClass : ''}" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;"><span class="dot"></span>${meta.label}${dueBadge(s)}</div>`;
+      }
+
+      let html = '';
+
+      if (active.length > 0) {
+        if (delinquent.length > 0) {
+          html += `<div class="service-section-label" style="grid-column:1/-1;">Ativos</div>`;
         }
-        return `<div class="service-chip ${meta.cls}" style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;"><span class="dot"></span>${meta.label}${dueBadge}</div>`;
-      }).join('');
+        html += sortByDue(active).map(s => chipHtml(s)).join('');
+      }
+
+      if (delinquent.length > 0) {
+        html += `<div class="service-section-label late" style="grid-column:1/-1;">⚠ Aguardando pagamento</div>`;
+        html += sortByDue(delinquent).map(s => chipHtml(s, 'delinquent')).join('');
+      }
+
+      el.innerHTML = html;
     }
 
-    // Retorna o serviço ativo com vencimento mais próximo (para badge na linha da tabela)
+    // Retorna o serviço (ativo ou delinquent) com vencimento mais próximo (para badge na linha da tabela)
     function nearestDueService(services) {
-      const today = new Date(); today.setHours(0,0,0,0);
-      const active = (services || []).filter(s => s.status === 'active' && s.access_until);
-      if (!active.length) return null;
-      return active.sort((a, b) => new Date(a.access_until) - new Date(b.access_until))[0];
+      const candidates = (services || []).filter(s => s.status === 'active' && s.access_until);
+      if (!candidates.length) return null;
+      return candidates.sort((a, b) => new Date(a.access_until) - new Date(b.access_until))[0];
     }
 
     async function refreshCurrent() {
