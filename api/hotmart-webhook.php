@@ -194,4 +194,8 @@ if ($result['status'] !== 200) {
 }
 
 $rpcResult = json_decode($result['body'], true);
+
+// Atualiza status overdue/paid após cada compra processada
+hm_supabase_rpc('run_overdue_sync', []);
+
 hm_json(['ok' => true, 'event' => $event, 'result' => $rpcResult]);

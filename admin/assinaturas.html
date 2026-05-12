@@ -129,6 +129,9 @@
     .badge-red { background: #fee2e2; color: #b91c1c; }
     .badge-gray { background: #e2e8f0; color: #475569; }
 
+    tr.row-overdue { background: #fff5f5; }
+    tr.row-overdue td:first-child { border-left: 3px solid var(--danger); }
+
     .icon-btn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-secondary); display: grid; place-items: center; transition: background 0.15s; }
     .icon-btn:hover { background: var(--bg); }
     .icon-btn svg { width: 15px; height: 15px; }
@@ -561,9 +564,12 @@
     function statusBadge(s) {
       const map = {
         paid:     { cls: 'badge-green',  txt: 'Em dia' },
-        late:     { cls: 'badge-red',    txt: 'Atrasado' },
+        overdue:  { cls: 'badge-red',    txt: 'Em atraso' },
+        late:     { cls: 'badge-red',    txt: 'Em atraso' },
         pending:  { cls: 'badge-yellow', txt: 'Pendente' },
         canceled: { cls: 'badge-gray',   txt: 'Cancelado' },
+        paused:   { cls: 'badge-gray',   txt: 'Pausado' },
+        trial:    { cls: 'badge-yellow', txt: 'Trial' },
       };
       const b = map[s] || { cls: 'badge-yellow', txt: s || '—' };
       return `<span class="badge ${b.cls}">${b.txt}</span>`;
@@ -586,17 +592,26 @@
         ? new Date(Math.min(...accessDates))
         : null;
 
-      // Próxima cobrança
+      // Próxima cobrança — status 'overdue' do banco tem precedência
       const billing = sub.next_billing_date ? new Date(sub.next_billing_date) : null;
+      const isOverdue = sub.status === 'overdue';
 
       let billingHtml = '<span style="color:var(--muted);">—</span>';
       if (billing) {
         const diff = Math.ceil((billing - today) / 86400000);
         const date = fmtDate(sub.next_billing_date);
-        if (diff < 0)   billingHtml = `<span style="color:var(--danger);font-weight:600;">Vencido</span><div class="amount-sub">${date}</div>`;
-        else if (diff === 0) billingHtml = `<span style="color:var(--danger);font-weight:600;">Hoje</span><div class="amount-sub">${date}</div>`;
-        else if (diff <= 5)  billingHtml = `<span style="color:var(--warning);font-weight:600;">Em ${diff}d</span><div class="amount-sub">${date}</div>`;
-        else billingHtml = `<span style="font-weight:600;">${date}</span><div class="amount-sub">Em ${diff} dias</div>`;
+        if (isOverdue || diff < 0) {
+          const daysLate = Math.abs(diff);
+          billingHtml = `<span style="color:var(--danger);font-weight:600;">Em atraso</span><div class="amount-sub">${daysLate}d · ${date}</div>`;
+        } else if (diff === 0) {
+          billingHtml = `<span style="color:var(--danger);font-weight:600;">Hoje</span><div class="amount-sub">${date}</div>`;
+        } else if (diff <= 5) {
+          billingHtml = `<span style="color:var(--warning);font-weight:600;">Em ${diff}d</span><div class="amount-sub">${date}</div>`;
+        } else {
+          billingHtml = `<span style="font-weight:600;">${date}</span><div class="amount-sub">Em ${diff} dias</div>`;
+        }
+      } else if (isOverdue) {
+        billingHtml = `<span style="color:var(--danger);font-weight:600;">Em atraso</span>`;
       }
 
       return billingHtml;
@@ -608,7 +623,7 @@
       const pmText = sub.payment_method === 'cc' ? 'Cartão' : sub.payment_method === 'pix' ? 'PIX' : sub.payment_method === 'boleto' ? 'Boleto' : sub.payment_method_label || (sub.payment_method ? sub.payment_method.toUpperCase() : '—');
 
       return `
-        <tr data-id="${sub.id}">
+        <tr data-id="${sub.id}" class="${sub.status === 'overdue' ? 'row-overdue' : ''}">
           <td>
             <div class="user-cell">
               <div class="avatar">${initials(sub.client_name)}</div>
