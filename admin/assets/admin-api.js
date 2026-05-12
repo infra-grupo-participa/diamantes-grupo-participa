@@ -274,16 +274,18 @@
 
   async function getStudentStats() {
     const supabase = client();
-    const [total, active, paused, withTeam] = await Promise.all([
+    const [total, paid, partial, overdue, withTeam] = await Promise.all([
       supabase.from('v_students').select('slug', { count: 'exact', head: true }),
-      supabase.from('v_students').select('slug', { count: 'exact', head: true }).eq('billing_status', 'current'),
-      supabase.from('v_students').select('slug', { count: 'exact', head: true }).neq('billing_status', 'current'),
+      supabase.from('v_students').select('slug', { count: 'exact', head: true }).in('billing_status', ['paid', 'current']),
+      supabase.from('v_students').select('slug', { count: 'exact', head: true }).eq('billing_status', 'partial'),
+      supabase.from('v_students').select('slug', { count: 'exact', head: true }).eq('billing_status', 'overdue'),
       supabase.from('v_students').select('slug', { count: 'exact', head: true }).gt('team_count', 0),
     ]);
     return {
       total:    total.count    || 0,
-      active:   active.count   || 0,
-      paused:   paused.count   || 0,
+      active:   paid.count     || 0,
+      partial:  partial.count  || 0,
+      overdue:  overdue.count  || 0,
       withTeam: withTeam.count || 0,
     };
   }
