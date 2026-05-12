@@ -624,7 +624,9 @@
       const u = raw.toUpperCase().trim();
       if (u.includes('TRÁFEGO') || u.includes('TRAFEGO') || u.includes('GESTÃO DE TRÁFEGO') || u === 'ANÚNCIOS PAGOS' || u === 'ANUNCIOS PAGOS')
         return { color: '#0ea5e9', label: 'Tráfego / Anúncios' };
-      if (u.includes('WEB DESIGN') || u === 'WEBDESIGNER' || u === 'WEB DESIGNER' || u.includes('HOST'))
+      if (u === 'HOST' || u.includes('HOSPED'))
+        return { color: '#a16207', label: 'Hospedagem' };
+      if (u.includes('WEB DESIGN') || u === 'WEBDESIGNER' || u === 'WEB DESIGNER')
         return { color: '#3b82f6', label: 'Web Designer' };
       if (u.includes('EDIÇÃO DE VÍDEO') || u.includes('EDICAO DE VIDEO') || u.includes('EDIÇÃO DE VIDEO') || u.includes('EDICAO DE VÍDEO'))
         return { color: '#eab308', label: 'Edição de Vídeo' };

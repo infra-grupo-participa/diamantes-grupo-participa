@@ -25,7 +25,8 @@
     if (!raw) return 'Desconhecido';
     const up = raw.toUpperCase().trim();
     if (up.includes('TRÁFEGO') || up.includes('TRAFEGO') || up === 'ANÚNCIOS PAGOS' || up === 'ANUNCIOS PAGOS') return 'Gestor de Tráfego';
-    if (up.includes('WEB DESIGN') || up === 'WEBDESIGNER' || up === 'WEB DESIGNER' || up === 'HOST' || up.includes('HOSPED')) return 'Web Designer';
+    if (up === 'HOST' || up.includes('HOSPED')) return 'Hospedagem';
+    if (up.includes('WEB DESIGN') || up === 'WEBDESIGNER' || up === 'WEB DESIGNER') return 'Web Designer';
     if (up.includes('EDIÇÃO DE VÍDEO') || up.includes('EDICAO DE VIDEO') || up.includes('EDIÇÃO DE VIDEO')) return 'Editor de Vídeo';
     if (up.includes('REDES SOCIAIS') || up === 'SOCIAL MEDIA') return 'Social Media';
     if (up.includes('DISPAROS') || up === 'AUTOMAÇÃO' || up === 'AUTOMACAO') return 'Automação';
