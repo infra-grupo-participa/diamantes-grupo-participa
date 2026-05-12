@@ -1114,60 +1114,28 @@
     async function openTeamModal() {
       if (!state.currentSlug) return;
 
-      // Carrega serviços ativos do aluno para montar dropdown de cargos por serviço
-      let activeServices = [];
-      try {
-        activeServices = await AdminAPI.getClientActiveServices(state.currentSlug);
-      } catch (e) { console.error(e); }
-
-      const userSel     = document.getElementById('teamUser');
-      const posSel      = document.getElementById('teamPosition');
-      const roleDisplay = document.getElementById('teamUserRole');
+      const userSel = document.getElementById('teamUser');
 
       // IDs dos operadores já na equipe deste cliente (evita duplicatas)
       const assignedIds = new Set((state.currentTeam || []).map(m => m.user_id));
-
       const availableOps = state.operators.filter(o => !assignedIds.has(o.id));
 
-      userSel.innerHTML = '<option value="">— selecione —</option>' +
-        availableOps.map(o => `<option value="${o.id}" data-position="${o.position_id || ''}" data-position-name="${o.position_name || ''}">${o.name}</option>`).join('');
-
-      roleDisplay.style.display = 'none';
-      roleDisplay.textContent = '';
-
-      // Monta optgroups por serviço ativo — filtra posições que correspondem ao serviço
-      if (activeServices.length > 0) {
-        const groups = activeServices.map(svc => {
-          const canonical = AdminAPI.canonicalServiceName(svc.service_type);
-          const canonLower = canonical.toLowerCase();
-          const matching = state.positions.filter(p =>
-            p.name.toLowerCase().includes(canonLower) ||
-            canonLower.includes(p.name.toLowerCase())
-          );
-          const opts = matching.length > 0 ? matching : state.positions;
-          return `<optgroup label="${canonical}">` +
-            opts.map(p => `<option value="${p.id}">${p.name}</option>`).join('') +
-            `</optgroup>`;
-        });
-        posSel.innerHTML = '<option value="">— selecione o cargo —</option>' + groups.join('');
-      } else {
-        posSel.innerHTML = '<option value="">— selecione —</option>' +
-          state.positions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-      }
-
-      // Ao selecionar operador: exibe cargo e pré-seleciona no dropdown de cargos
-      userSel.addEventListener('change', () => {
-        const opt = userSel.options[userSel.selectedIndex];
-        const posId   = opt?.dataset?.position;
-        const posName = opt?.dataset?.positionName;
-        if (posName) {
-          roleDisplay.textContent = posName;
-          roleDisplay.style.display = 'block';
-        } else {
-          roleDisplay.style.display = 'none';
-        }
-        if (posId) posSel.value = posId;
+      // Agrupa por setor (position_name), ordenado alfabeticamente
+      const grouped = {};
+      availableOps.forEach(o => {
+        const sector = o.position_name || 'Outros';
+        if (!grouped[sector]) grouped[sector] = [];
+        grouped[sector].push(o);
       });
+
+      userSel.innerHTML = '<option value="">— selecione —</option>' +
+        Object.keys(grouped).sort().map(sector =>
+          `<optgroup label="${sector}">` +
+          grouped[sector].map(o =>
+            `<option value="${o.id}" data-position-id="${o.position_id || ''}">${o.name} — ${sector}</option>`
+          ).join('') +
+          `</optgroup>`
+        ).join('');
 
       document.getElementById('teamForm').reset();
       document.getElementById('teamError').style.display = 'none';
@@ -1189,11 +1157,13 @@
       err.style.display = 'none';
       btn.disabled = true; btn.textContent = 'Adicionando…';
       try {
+        const userOpt = document.getElementById('teamUser');
+        const selOpt  = userOpt.options[userOpt.selectedIndex];
         await AdminAPI.assignTeamMember({
           client_slug: state.currentSlug,
-          user_id: document.getElementById('teamUser').value,
-          position_id: document.getElementById('teamPosition').value,
-          notes: document.getElementById('teamNotes').value.trim(),
+          user_id:     userOpt.value,
+          position_id: selOpt?.dataset?.positionId || null,
+          notes:       document.getElementById('teamNotes').value.trim(),
         });
         toast('Integrante adicionado.');
         closeTeamModal();

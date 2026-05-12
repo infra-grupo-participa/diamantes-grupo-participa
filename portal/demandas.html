@@ -842,8 +842,9 @@
   <!-- Supabase + portal-api (guard de acesso) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
   <script src="../assets/js/supabase-config.js"></script>
-  <script src="../assets/js/demand-chat-api.js?v=20260512a"></script>
-  <script src="assets/portal-api.js?v=20260512a"></script>
+  <script src="../assets/js/demand-chat-api.js?v=20260512b"></script>
+  <script src="../assets/js/chat-composer.js?v=20260512b"></script>
+  <script src="assets/portal-api.js?v=20260512b"></script>
 
   <script>
     'use strict';
@@ -1028,12 +1029,15 @@
         const role = mine ? 'cliente' : (m.author_role === 'operator' ? 'equipe' : (m.author_role || 'equipe'));
         const avatarStyle = m.avatar_url ? `style="background:url('${m.avatar_url}') center/cover no-repeat;"` : '';
         const avatarText = m.avatar_url ? '' : initials(m.author_name);
+        const attHtml = window.ChatComposer ? ChatComposer.renderAttachmentsHtml(m.attachments) : '';
+        const bubbleHtml = m.content ? `<div class="msg-bubble">${escapeHtml(m.content)}</div>` : '';
         html.push(`
           <div class="msg ${mine ? 'mine' : ''}">
             <div class="avatar" ${avatarStyle}>${avatarText}</div>
             <div>
               <div class="msg-author">${m.author_name || 'Alguém'} <span style="color:var(--muted);font-weight:400">•</span> <span class="role">${role}</span></div>
-              <div class="msg-bubble">${escapeHtml(m.content || '')}</div>
+              ${bubbleHtml}
+              ${attHtml}
               <div class="msg-time" style="text-align:${mine ? 'right' : 'left'}">${fmtTime(m.created_at)}</div>
             </div>
           </div>
@@ -1167,7 +1171,16 @@
 
     async function loadMessages(demand_id) {
       try {
-        state.messages[demand_id] = await PortalAPI.listDemandMessages(demand_id);
+        const msgs = await PortalAPI.listDemandMessages(demand_id);
+        // Hidrata signed URLs para anexos que vieram só com `path`
+        if (window.ChatComposer) {
+          for (const m of msgs) {
+            if (Array.isArray(m.attachments) && m.attachments.length) {
+              m.attachments = await ChatComposer.hydrateAttachments(m.attachments);
+            }
+          }
+        }
+        state.messages[demand_id] = msgs;
         if (state.currentId === demand_id) renderChat();
       } catch (e) { console.error(e); }
     }
@@ -1194,29 +1207,25 @@
       });
     }
 
-    // ===== Composer =====
+    // ===== Composer (texto + anexos via ChatComposer) =====
     const composer = document.getElementById('composer');
     composer.addEventListener('input', () => {
       composer.style.height = 'auto';
       composer.style.height = Math.min(composer.scrollHeight, 140) + 'px';
     });
-    composer.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    });
-    document.querySelector('.composer-btn.send').addEventListener('click', sendMessage);
 
-    async function sendMessage() {
-      const text = composer.value.trim();
-      if (!text || !state.currentId) return;
-      try {
-        await PortalAPI.postDemandMessage(state.currentId, text);
-        composer.value = '';
-        composer.style.height = 'auto';
+    ChatComposer.attach({
+      textarea:  composer,
+      anchor:    document.querySelector('.composer-wrap'),
+      attachBtn: document.querySelector('.composer-btn.ghost'),
+      sendBtn:   document.querySelector('.composer-btn.send'),
+      getDemandId: () => state.currentId,
+      onSend: async ({ content, attachments }) => {
+        if (!state.currentId) return;
+        await PortalAPI.postDemandMessage(state.currentId, content, attachments);
         await loadMessages(state.currentId);
-      } catch (e) {
-        alert('Erro ao enviar: ' + (e.message || e));
-      }
-    }
+      },
+    });
 
     // ===== Filtros =====
     document.querySelectorAll('#filterTabs button').forEach(btn => {
