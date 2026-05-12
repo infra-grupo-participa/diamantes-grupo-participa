@@ -103,7 +103,14 @@
     try {
       await supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('auth_user_id', data.user.id);
     } catch (_) { /* ignore */ }
-    const redirect = user.role === 'admin' ? toAppUrl('admin/') : getClientUrl(user.clientSlug);
+    let redirect;
+    if (user.role === 'admin') {
+      redirect = toAppUrl('admin/');
+    } else if (user.role === 'operator') {
+      redirect = toAppUrl('operator/dashboard.html');
+    } else {
+      redirect = getClientUrl(user.clientSlug);
+    }
     return { ok: true, user, redirect };
   }
 

@@ -119,7 +119,16 @@
       return;
     }
 
-    if (sessionUser.role !== "admin") {
+    // Detecta área pela URL: /operator/ tem regras próprias (sem slug)
+    const isOperatorArea = /\/operator(\/|$)/.test(window.location.pathname);
+
+    if (sessionUser.role === "operator") {
+      if (!isOperatorArea || sessionUser.status !== "approved") {
+        await auth.clearSession();
+        window.location.replace(loginUrl);
+        return;
+      }
+    } else if (sessionUser.role !== "admin") {
       const isAuthorized = sessionUser.status === "approved" && sessionUser.clientSlug === currentSlug;
       if (!isAuthorized) {
         await auth.clearSession();
