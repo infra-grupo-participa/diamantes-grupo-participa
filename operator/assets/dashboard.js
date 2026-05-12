@@ -270,6 +270,50 @@
     if (btn) btn.addEventListener('click', () => OperatorAPI.logout());
   }
 
+  function renderPointsCard(kpi) {
+    if (!kpi) kpi = {};
+    const totalEl  = $('#pointsTotal');
+    const monthEl  = $('#pointsMonth');
+    const rankEl   = $('#pointsRank');
+    const ratEl    = $('#pointsRatings');
+    const metaEl   = $('#pointsMeta');
+    if (!totalEl) return;
+    totalEl.textContent = kpi.points_total ?? 0;
+    monthEl.textContent = `+${kpi.points_this_month ?? 0} pts`;
+    if (kpi.ranking_position && kpi.ranking_total) {
+      rankEl.textContent = `${kpi.ranking_position}º de ${kpi.ranking_total}`;
+    } else {
+      rankEl.textContent = '—';
+    }
+    if (kpi.rating_count && kpi.rating_count > 0) {
+      ratEl.textContent = `${fmtRating(kpi.rating_avg)} · ${kpi.rating_count} avaliação${kpi.rating_count === 1 ? '' : 'ões'}`;
+    } else {
+      ratEl.textContent = 'Sem avaliações';
+    }
+    metaEl.textContent = kpi.points_this_month > 0
+      ? `${kpi.points_this_month} pts conquistados este mês`
+      : 'Comece a entregar pra ganhar pontos';
+  }
+
+  function renderRatingsReceived(items) {
+    const wrap = $('#ratingsReceivedList');
+    if (!wrap) return;
+    if (!items || items.length === 0) {
+      wrap.innerHTML = `<div style="padding:18px; text-align:center; color:var(--muted); font-size:0.85rem;">Quando seus alunos avaliarem as demandas, as notas aparecem aqui.</div>`;
+      return;
+    }
+    wrap.innerHTML = items.map(r => `
+      <div class="rating-row">
+        <span class="score-pill">${r.score}/10</span>
+        <div>
+          <div class="rr-title">${escapeHtml(r.demand_title || '—')}</div>
+          <div class="rr-sub">${escapeHtml(r.client_display_name || '—')}</div>
+          ${r.comment ? `<div class="rr-comment">"${escapeHtml(r.comment)}"</div>` : ''}
+        </div>
+        <div class="rr-when">${fmtRelative(r.submitted_at)}</div>
+      </div>`).join('');
+  }
+
   async function bootstrap() {
     bindLogout();
     const me = await OperatorAPI.requireOperator();
@@ -291,6 +335,8 @@
     renderDemands(active);
     renderWorkload(dash.workload || [], dash.kpi?.active_total ?? active.length);
     renderUrgent(dash.urgent || []);
+    renderPointsCard(dash.kpi || {});
+    renderRatingsReceived(dash.recent_ratings_received || []);
     renderStudents(students);
     renderActivities(dash.recent || []);
   }
