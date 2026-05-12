@@ -445,6 +445,33 @@
     return data; // { status, approved, total_operators, finalized_at }
   }
 
+  // ============================================================
+  // Avaliações (cliente → operador)
+  // ============================================================
+
+  // Busca rating pending OU submitted da demanda. Retorna null se não existe.
+  async function getMyDemandRating(demand_id) {
+    const { data, error } = await client()
+      .from('ratings')
+      .select('id, score, comment, status, submitted_at')
+      .eq('demand_id', demand_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function submitClientRating(demand_id, score, comment) {
+    const { data, error } = await client().rpc('submit_client_rating', {
+      p_demand_id: demand_id,
+      p_score:     score,
+      p_comment:   comment || null,
+    });
+    if (error) throw error;
+    return data;
+  }
+
   async function logout() {
     clearCachedProfile();
     await client().auth.signOut();
@@ -477,6 +504,9 @@
     signDemandAttachment,
     finalizeMyPart,
     subscribeDemand,
+    // Avaliação
+    getMyDemandRating,
+    submitClientRating,
     // Sessão
     logout,
     getSlugFromUrl,

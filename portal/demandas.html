@@ -826,6 +826,8 @@
           <div class="steps" id="stepsList"></div>
         </div>
 
+        <div class="detail-section" id="ratingBanner" style="display:none;"></div>
+
         <div class="detail-section">
           <h3>Pessoas envolvidas <span class="small" id="teamMiniCount">—</span></h3>
           <div class="team-mini" id="teamMini"></div>
@@ -844,7 +846,7 @@
   <script src="../assets/js/supabase-config.js"></script>
   <script src="../assets/js/demand-chat-api.js?v=20260512b"></script>
   <script src="../assets/js/chat-composer.js?v=20260512b"></script>
-  <script src="assets/portal-api.js?v=20260512b"></script>
+  <script src="assets/portal-api.js?v=20260512d"></script>
 
   <script>
     'use strict';
@@ -923,6 +925,7 @@
       demands: [],
       members: {},     // demand_id → members[]
       messages: {},    // demand_id → messages[]
+      ratings: {},     // demand_id → rating row (ou null)
       me: null,
       unsubscribe: null,
     };
@@ -1110,6 +1113,33 @@
       }
       document.getElementById('stepsList').innerHTML = stepsHtml.join('');
 
+      // Banner de avaliação (quando done e há rating pending para essa demanda)
+      const rating = state.ratings[d.id];
+      const banner = document.getElementById('ratingBanner');
+      if (banner) {
+        if (d.status === 'done' && rating && rating.status === 'pending') {
+          banner.style.display = '';
+          banner.innerHTML = `
+            <div style="background:linear-gradient(135deg, #fff4e3, #ffeed1); border:1px solid #f29725; border-radius:14px; padding:14px 16px;">
+              <div style="font-weight:700; font-size:0.92rem; color:#5b3d10; margin-bottom:4px;">Como foi essa entrega?</div>
+              <div style="font-size:0.8rem; color:#7a5a2a; margin-bottom:10px;">Sua avaliação ajuda a equipe a crescer.</div>
+              <button id="openRatingModal" style="background:#F29725; color:#fff; border:none; padding:8px 16px; border-radius:10px; font-weight:600; font-size:0.84rem; cursor:pointer;">Avaliar agora</button>
+            </div>`;
+          const btn = document.getElementById('openRatingModal');
+          if (btn) btn.addEventListener('click', () => openRatingModal(d.id));
+        } else if (d.status === 'done' && rating && rating.status === 'submitted') {
+          banner.style.display = '';
+          banner.innerHTML = `
+            <div style="background:#f3faf5; border:1px solid #c8eed3; border-radius:14px; padding:12px 16px;">
+              <div style="font-weight:700; font-size:0.86rem; color:#15803d;">Você avaliou com ${rating.score}/10 ⭐</div>
+              ${rating.comment ? `<div style="font-size:0.78rem; color:#3a6b48; margin-top:4px; font-style:italic;">"${escapeHtml(rating.comment)}"</div>` : ''}
+            </div>`;
+        } else {
+          banner.style.display = 'none';
+          banner.innerHTML = '';
+        }
+      }
+
       // Equipe (operadores)
       const teamMini = document.getElementById('teamMini');
       teamMini.innerHTML = operators.map(m => {
@@ -1155,9 +1185,14 @@
     async function loadAll() {
       try {
         state.demands = await PortalAPI.listMyDemands();
-        // Carrega membros de cada demanda em paralelo (só pra mostrar categoria/equipe na lista)
+        // Carrega membros + ratings (apenas demandas done) em paralelo
         await Promise.all(state.demands.map(async d => {
           state.members[d.id] = await PortalAPI.getDemandMembers(d.id);
+          if (d.status === 'done') {
+            try {
+              state.ratings[d.id] = await PortalAPI.getMyDemandRating(d.id);
+            } catch (_) { state.ratings[d.id] = null; }
+          }
         }));
         if (state.demands.length > 0 && !state.currentId) state.currentId = state.demands[0].id;
         renderTabs(); renderList(); renderChat(); renderDetails();
@@ -1240,6 +1275,75 @@
       state.search = e.target.value;
       renderList();
     });
+
+    // ===== Modal Avaliação (cliente → operadores) =====
+    function openRatingModal(demand_id) {
+      const d = state.demands.find(x => x.id === demand_id);
+      if (!d) return;
+      const modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:300; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(3px);';
+      modal.innerHTML = `
+        <div style="background:#fff; border-radius:18px; width:100%; max-width:480px; box-shadow:var(--shadow-lg); overflow:hidden;">
+          <div style="padding:20px 24px; border-bottom:1px solid var(--border);">
+            <h3 style="margin:0 0 4px; font-size:1.1rem; font-weight:800;">Avalie essa demanda</h3>
+            <div style="font-size:0.84rem; color:var(--muted);">${escapeHtml(d.title)}</div>
+          </div>
+          <div style="padding:24px;">
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:10px;">Sua nota (1 a 10)</label>
+            <div id="rmScoreRow" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px;">
+              ${[1,2,3,4,5,6,7,8,9,10].map(n => `
+                <button type="button" data-score="${n}" style="width:36px; height:36px; border-radius:10px; border:1px solid var(--border-strong); background:#fff; font-weight:700; cursor:pointer; font-size:0.86rem;">${n}</button>
+              `).join('')}
+            </div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Comentário (opcional)</label>
+            <textarea id="rmComment" rows="3" class="search-input" style="padding:10px 12px; width:100%; min-height:80px; resize:vertical; font-size:0.86rem;" placeholder="Conte como foi sua experiência…"></textarea>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:18px;">
+              <button type="button" id="rmCancel" style="background:#fff; border:1px solid var(--border-strong); padding:10px 18px; border-radius:10px; font-weight:600; font-size:0.86rem; cursor:pointer;">Cancelar</button>
+              <button type="button" id="rmSubmit" disabled style="background:#F29725; color:#fff; border:none; padding:10px 18px; border-radius:10px; font-weight:700; font-size:0.86rem; cursor:not-allowed; opacity:0.5;">Enviar avaliação</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+
+      let selectedScore = null;
+      const submitBtn = modal.querySelector('#rmSubmit');
+      modal.querySelectorAll('[data-score]').forEach(b => {
+        b.addEventListener('click', () => {
+          selectedScore = parseInt(b.dataset.score, 10);
+          modal.querySelectorAll('[data-score]').forEach(x => {
+            const s = parseInt(x.dataset.score, 10);
+            const active = s === selectedScore;
+            x.style.background = active ? '#F29725' : '#fff';
+            x.style.color      = active ? '#fff'    : 'inherit';
+            x.style.borderColor = active ? '#F29725' : 'var(--border-strong)';
+          });
+          submitBtn.disabled = false;
+          submitBtn.style.cursor = 'pointer';
+          submitBtn.style.opacity = '1';
+        });
+      });
+
+      const close = () => modal.remove();
+      modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+      modal.querySelector('#rmCancel').addEventListener('click', close);
+      submitBtn.addEventListener('click', async () => {
+        if (selectedScore == null) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Enviando…';
+        try {
+          const comment = modal.querySelector('#rmComment').value.trim();
+          await PortalAPI.submitClientRating(demand_id, selectedScore, comment);
+          // Atualiza state e re-renderiza
+          state.ratings[demand_id] = await PortalAPI.getMyDemandRating(demand_id);
+          renderDetails();
+          close();
+        } catch (e) {
+          alert('Erro ao enviar avaliação: ' + (e.message || e));
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Enviar avaliação';
+        }
+      });
+    }
 
     // ===== Modal Nova Demanda =====
     function buildNewDemandModal() {
