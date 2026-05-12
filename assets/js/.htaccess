@@ -1,0 +1,15 @@
+# assets/js/.htaccess — JS compartilhado (auth, chat) sem cache agressivo
+# Mesma estratégia do portal/assets e operator/assets: cache-bust é via ?v=
+# no HTML; o LiteSpeed da Hostinger ignora query strings, então força
+# Cache-Control no-cache para revalidar a cada navegação.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js)$">
+        Header set Cache-Control "no-cache, must-revalidate, max-age=0"
+    </FilesMatch>
+</IfModule>
+<IfModule mod_expires.c>
+    <FilesMatch "\.(js)$">
+        ExpiresActive On
+        ExpiresDefault "access plus 0 seconds"
+    </FilesMatch>
+</IfModule>
