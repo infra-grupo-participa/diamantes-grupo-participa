@@ -429,6 +429,14 @@
 
         <div class="panel-card" style="padding-bottom:0;">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <h3 class="panel-card-title" style="margin:0;">Próximos vencimentos por serviço</h3>
+            <span class="meta" id="renewalsCount" style="font-size:0.74rem; color:var(--muted);">—</span>
+          </div>
+          <div id="renewalsList" style="max-height:360px; overflow-y:auto;"></div>
+        </div>
+
+        <div class="panel-card" style="padding-bottom:0;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
             <h3 class="panel-card-title" style="margin:0;">Histórico de cobranças</h3>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
               <select id="histMonth" class="search-input" style="padding:5px 10px; font-size:0.76rem; max-width:130px;"></select>
@@ -1082,12 +1090,61 @@
       document.querySelector('.user-pill .avatar').textContent = initials(profile.name || profile.email);
     }
 
+    // ===== Próximos vencimentos por serviço (v_service_renewals) =====
+    async function loadServiceRenewals() {
+      const el = document.getElementById('renewalsList');
+      const countEl = document.getElementById('renewalsCount');
+      if (!el) return;
+      try {
+        const supa = AdminAPI._client();
+        const { data, error } = await supa
+          .from('v_service_renewals')
+          .select('client_slug, client_display_name, service_type, access_until, days_left, monthly_value')
+          .order('access_until', { ascending: true })
+          .limit(40);
+        if (error) throw error;
+        const rows = data || [];
+        countEl.textContent = rows.length === 0 ? 'Nenhum' : `${rows.length} próximos`;
+        if (rows.length === 0) {
+          el.innerHTML = `<div style="text-align:center; padding:24px; color:var(--muted); font-size:0.84rem;">Nenhum serviço ativo com renovação próxima.</div>`;
+          return;
+        }
+        el.innerHTML = rows.map(r => {
+          const dl = Number.isFinite(r.days_left) ? r.days_left : null;
+          let whenHtml;
+          if (dl == null)       whenHtml = '<span class="due-when">—</span>';
+          else if (dl < 0)      whenHtml = `<span class="due-when" style="color:var(--danger);font-weight:600;">Atraso ${Math.abs(dl)}d</span>`;
+          else if (dl === 0)    whenHtml = `<span class="due-when" style="color:var(--danger);font-weight:600;">Hoje</span>`;
+          else if (dl <= 5)     whenHtml = `<span class="due-when" style="color:var(--warning);font-weight:600;">${dl}d</span>`;
+          else                  whenHtml = `<span class="due-when">${dl}d</span>`;
+          const dateStr = r.access_until ? fmtDate(r.access_until) : '—';
+          const value   = r.monthly_value != null ? `R$ ${Number(r.monthly_value).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '—';
+          return `
+            <div class="due-item">
+              <div class="avatar">${initials(r.client_display_name)}</div>
+              <div>
+                <div class="due-name">${escHtml(r.client_display_name || r.client_slug)}</div>
+                <div class="due-when">${escHtml(r.service_type || '')} · ${dateStr}</div>
+              </div>
+              <div class="due-amount">${value}<span class="due-amount-when">${whenHtml.replace(/<[^>]*>/g, '').trim()}</span></div>
+            </div>`;
+        }).join('');
+      } catch (e) {
+        console.error('loadServiceRenewals', e);
+        el.innerHTML = `<div style="text-align:center; padding:18px; color:var(--danger); font-size:0.82rem;">Falha ao carregar renovações.</div>`;
+      }
+    }
+
+    function escHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    }
+
     // ===== Init =====
     (async function init() {
       const profile = await AdminAPI.requireAdmin();
       if (!profile) return;
       await fillSession(profile);
-      await Promise.all([load(), loadStats()]);
+      await Promise.all([load(), loadStats(), loadServiceRenewals()]);
       // Histórico de cobranças (independente)
       await initHistFilters();
       renderHistList();
