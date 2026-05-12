@@ -675,7 +675,8 @@
             <select id="teamUser" class="search-input" style="padding-left:12px;" required>
               <option value="">— selecione —</option>
             </select>
-            <small style="color:var(--muted); font-size:0.74rem;">Apenas operadores aprovados aparecem aqui.</small>
+            <div id="teamUserRole" style="display:none; margin-top:6px; font-size:0.78rem; font-weight:600; color:var(--primary); padding:4px 8px; background:var(--primary-light, #eff6ff); border-radius:6px; width:fit-content;"></div>
+            <small style="color:var(--muted); font-size:0.74rem;">Apenas operadores com contrato ativo aparecem aqui.</small>
           </div>
           <div>
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Cargo na equipe deste aluno</label>
@@ -712,7 +713,7 @@
       page: 1, pageSize: 25, search: '', billingStatus: 'all',
       total: 0, currentSlug: null, editingSlug: null,
       positions: [], operators: [],
-      servicesBySlug: {},
+      servicesBySlug: {}, currentTeam: [],
     };
 
     // Mapa por setor (saída de canonicalServiceName = nome do setor)
@@ -934,6 +935,7 @@
           AdminAPI.getStudentServices(s.slug),
         ]);
         state.servicesBySlug[s.slug] = services;
+        state.currentTeam = team;
         renderTeam(team);
         renderServices(services);
       } catch (e) {
@@ -1118,11 +1120,20 @@
         activeServices = await AdminAPI.getClientActiveServices(state.currentSlug);
       } catch (e) { console.error(e); }
 
-      const userSel = document.getElementById('teamUser');
-      const posSel  = document.getElementById('teamPosition');
+      const userSel     = document.getElementById('teamUser');
+      const posSel      = document.getElementById('teamPosition');
+      const roleDisplay = document.getElementById('teamUserRole');
+
+      // IDs dos operadores já na equipe deste cliente (evita duplicatas)
+      const assignedIds = new Set((state.currentTeam || []).map(m => m.user_id));
+
+      const availableOps = state.operators.filter(o => !assignedIds.has(o.id));
 
       userSel.innerHTML = '<option value="">— selecione —</option>' +
-        state.operators.map(o => `<option value="${o.id}" data-position="${o.position_id || ''}">${o.name} (${o.email})</option>`).join('');
+        availableOps.map(o => `<option value="${o.id}" data-position="${o.position_id || ''}" data-position-name="${o.position_name || ''}">${o.name}</option>`).join('');
+
+      roleDisplay.style.display = 'none';
+      roleDisplay.textContent = '';
 
       // Monta optgroups por serviço ativo — filtra posições que correspondem ao serviço
       if (activeServices.length > 0) {
@@ -1144,11 +1155,18 @@
           state.positions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
       }
 
-      // Auto-pré-seleciona cargo do operador escolhido
+      // Ao selecionar operador: exibe cargo e pré-seleciona no dropdown de cargos
       userSel.addEventListener('change', () => {
         const opt = userSel.options[userSel.selectedIndex];
-        const pos = opt?.dataset?.position;
-        if (pos && !posSel.value) posSel.value = pos;
+        const posId   = opt?.dataset?.position;
+        const posName = opt?.dataset?.positionName;
+        if (posName) {
+          roleDisplay.textContent = posName;
+          roleDisplay.style.display = 'block';
+        } else {
+          roleDisplay.style.display = 'none';
+        }
+        if (posId) posSel.value = posId;
       });
 
       document.getElementById('teamForm').reset();
