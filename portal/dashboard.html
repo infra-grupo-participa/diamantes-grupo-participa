@@ -395,6 +395,25 @@
     .service-chip .dot {
       width: 8px; height: 8px;
       border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .service-chip.delinquent {
+      background: #fff5f5;
+      border-color: #fecaca;
+      color: #b91c1c;
+      opacity: 0.85;
+    }
+    .svc-section-label {
+      grid-column: 1 / -1;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      padding: 4px 0 2px;
+    }
+    .svc-section-label.delinquent {
+      color: #ef4444;
+      margin-top: 6px;
     }
 
     /* ============ TIMELINE de atividade ============ */
@@ -598,29 +617,27 @@
   <script>
     'use strict';
 
-    // ============ Mapeamento de serviço → ícone/cor visual ============
-    const SERVICE_COLOR_MAP = {
-      'WEBDESIGNER':     '#3b82f6',
-      'DESIGNER':        '#8b5cf6',
-      'ANÚNCIOS PAGOS':  '#0ea5e9',
-      'SOCIAL MEDIA':    '#ec4899',
-      'EDIÇÃO DE VÍDEO': '#eab308',
-      'AUTOMAÇÃO':       '#f97316',
-      'HOST':            '#10b981',
-      'COPY':            '#16a34a',
-      'COPYWRITER':      '#16a34a',
-    };
-    const SERVICE_LABEL = {
-      'WEBDESIGNER':     'Web-Designer',
-      'DESIGNER':        'Designer',
-      'ANÚNCIOS PAGOS':  'Anúncios pagos',
-      'SOCIAL MEDIA':    'Social Media',
-      'EDIÇÃO DE VÍDEO': 'Edição de Vídeo',
-      'AUTOMAÇÃO':       'Automação',
-      'HOST':            'Host',
-      'COPY':            'Copy',
-      'COPYWRITER':      'Copywriter',
-    };
+    // ============ Mapeamento de serviço → cor/label visual ============
+    // Cobre nomes legados (CAPS) e nomes Hotmart (mixed case + ano)
+    function canonicalService(raw) {
+      if (!raw) return { color: '#94a3b8', label: raw || '—' };
+      const u = raw.toUpperCase().trim();
+      if (u.includes('TRÁFEGO') || u.includes('TRAFEGO') || u.includes('GESTÃO DE TRÁFEGO') || u === 'ANÚNCIOS PAGOS' || u === 'ANUNCIOS PAGOS')
+        return { color: '#0ea5e9', label: 'Tráfego / Anúncios' };
+      if (u.includes('WEB DESIGN') || u === 'WEBDESIGNER' || u === 'WEB DESIGNER' || u.includes('HOST'))
+        return { color: '#3b82f6', label: 'Web Designer' };
+      if (u.includes('EDIÇÃO DE VÍDEO') || u.includes('EDICAO DE VIDEO') || u.includes('EDIÇÃO DE VIDEO') || u.includes('EDICAO DE VÍDEO'))
+        return { color: '#eab308', label: 'Edição de Vídeo' };
+      if (u.includes('REDES SOCIAIS') || u === 'SOCIAL MEDIA' || u === 'GESTÃO DE REDES SOCIAIS')
+        return { color: '#ec4899', label: 'Social Media' };
+      if (u.includes('DISPAROS') || u === 'AUTOMAÇÃO' || u === 'AUTOMACAO' || u.includes('GESTOR DE DISPAROS'))
+        return { color: '#f97316', label: 'Automação / Disparos' };
+      if (u.includes('DESIGN GRÁFICO') || u.includes('DESIGN GRAFICO') || u === 'DESIGNER' || u === 'DESIGN GRÁFICO')
+        return { color: '#8b5cf6', label: 'Design Gráfico' };
+      if (u.includes('COPYWRITER') || u === 'COPY' || u.includes('COPYWRITER'))
+        return { color: '#16a34a', label: 'Copywriter' };
+      return { color: '#94a3b8', label: raw };
+    }
 
     function initials(name) {
       return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
@@ -667,14 +684,14 @@
       // Highlight pills
       const team = data?.team || [];
       const services = data?.services || [];
-      const activeDemands = 0; // ainda sem fonte real (Etapa D)
+      const activeServices = services.filter(s => s.status === 'active');
       document.getElementById('highlightTitle').innerHTML =
         team.length === 0
           ? `Sua equipe ainda está sendo montada. Em breve te apresentamos todo mundo. ✨`
-          : `Sua equipe está pronta para te ajudar com <strong>${services.length} serviço${services.length === 1 ? '' : 's'}</strong> contratado${services.length === 1 ? '' : 's'}.`;
+          : `Sua equipe está pronta para te ajudar com <strong>${activeServices.length} serviço${activeServices.length === 1 ? '' : 's'}</strong> ativo${activeServices.length === 1 ? '' : 's'}.`;
       document.getElementById('highlightPills').innerHTML = `
         <span class="pill"><span class="pill-num">${team.length}</span> Integrantes</span>
-        <span class="pill"><span class="pill-num">${services.length}</span> Serviços ativos</span>
+        <span class="pill"><span class="pill-num">${activeServices.length}</span> Serviços ativos</span>
       `;
 
       // Equipe
@@ -699,16 +716,33 @@
         `).join('');
       }
 
-      // Serviços
+      // Serviços — separados por status
       const svcEl = document.getElementById('serviceGrid');
+      const delinquentServices = services.filter(s => s.status === 'delinquent');
+
+      function serviceChip(s, delinquent) {
+        const { color, label } = canonicalService(s.service_type);
+        if (delinquent) {
+          return `<div class="service-chip delinquent"><span class="dot" style="background:#ef4444;"></span>${label}</div>`;
+        }
+        return `<div class="service-chip"><span class="dot" style="background:${color};"></span>${label}</div>`;
+      }
+
       if (services.length === 0) {
         svcEl.innerHTML = `<div style="color:var(--muted); font-size:0.86rem; grid-column:1/-1;">Nenhum serviço ativo no momento.</div>`;
       } else {
-        svcEl.innerHTML = services.map(s => {
-          const color = SERVICE_COLOR_MAP[s.service_type] || '#94a3b8';
-          const label = SERVICE_LABEL[s.service_type] || s.service_type;
-          return `<div class="service-chip"><span class="dot" style="background:${color};"></span>${label}</div>`;
-        }).join('');
+        let html = '';
+        if (activeServices.length > 0) {
+          html += `<div class="svc-section-label">ATIVOS</div>`;
+          html += activeServices.map(s => serviceChip(s, false)).join('');
+        }
+        if (delinquentServices.length > 0) {
+          html += `<div class="svc-section-label delinquent">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;vertical-align:-2px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            AGUARDANDO PAGAMENTO</div>`;
+          html += delinquentServices.map(s => serviceChip(s, true)).join('');
+        }
+        svcEl.innerHTML = html;
       }
 
       // Demandas (placeholder honesto até Etapa D)
