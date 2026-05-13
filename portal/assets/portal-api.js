@@ -348,25 +348,29 @@
     const supabase = client();
     const me = await getMe();
     if (!me) throw new Error('Sessão expirada.');
-    // Operadores que estão na team_assignments do cliente OU todos os operadores aprovados
-    const { data, error } = await supabase
+    // Lê operadores via team_assignments.operator_id → portal.operators
+    const { data: assignments, error } = await supabase
       .from('team_assignments')
-      .select('user_id, position_id')
-      .eq('client_slug', me.client_slug);
+      .select('operator_id')
+      .eq('client_slug', me.client_slug)
+      .not('operator_id', 'is', null);
     if (error) throw error;
-    const userIds = (data || []).map(t => t.user_id);
-    if (userIds.length === 0) {
-      // Sem equipe atribuída — devolve operadores aprovados pro cliente escolher
+    const opIds = (assignments || []).map(t => t.operator_id).filter(Boolean);
+    if (opIds.length === 0) {
+      // Sem equipe atribuída — devolve todos os operadores ativos
       const { data: all } = await supabase
-        .from('users').select('id, name, email, position_id, metadata')
-        .eq('role', 'operator').eq('status', 'approved').order('name');
+        .from('operators')
+        .select('id, name, email, position_id, metadata')
+        .eq('status', 'active')
+        .eq('contract_active', true)
+        .order('name');
       return enrichOperators(all || []);
     }
-    const { data: users } = await supabase
-      .from('users')
+    const { data: ops } = await supabase
+      .from('operators')
       .select('id, name, email, position_id, metadata')
-      .in('id', userIds);
-    return enrichOperators(users || []);
+      .in('id', opIds);
+    return enrichOperators(ops || []);
   }
 
   async function enrichOperators(users) {
