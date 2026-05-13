@@ -660,7 +660,7 @@
         <nav class="nav">
           <a href="index.html" class="nav-item active">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Funcionários
+            Equipe
           </a>
           <a href="alunos-diamantes.html" class="nav-item">
             <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
@@ -696,17 +696,21 @@
     <main class="main">
       <div class="page-head">
         <div>
-          <h1 class="page-title">Funcionários</h1>
-          <p class="page-subtitle">Gerencie sua equipe e acompanhe o desempenho de cada membro.</p>
+          <h1 class="page-title">Equipe</h1>
+          <p class="page-subtitle">Gerencie administradores e equipe operacional ClickUp.</p>
         </div>
         <div class="page-actions">
           <button class="btn btn-ghost" id="btnExport">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Exportar planilha
           </button>
-          <button class="btn btn-primary" id="btnNew">
+          <button class="btn btn-primary" id="btnNewAdmin">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Criar funcionário
+            Novo admin
+          </button>
+          <button class="btn btn-primary" id="btnNewOperator" style="background:#6366f1;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Novo operador
           </button>
         </div>
       </div>
@@ -718,7 +722,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <div class="kpi-info">
-            <div class="kpi-label">Total de funcionários</div>
+            <div class="kpi-label">Admins / Operadores</div>
             <div class="kpi-value" id="kpiEmployees">—</div>
           </div>
         </div>
@@ -764,23 +768,28 @@
         </div>
       </div>
 
-      <!-- Tabela -->
-      <div class="table-card">
+      <!-- Abas Administradores / Equipe Operacional -->
+      <div style="display:flex; gap:0; border-bottom:2px solid var(--border); margin-bottom:20px;">
+        <button id="tabAdmins" class="tab-btn active" style="padding:10px 20px; background:transparent; border:none; border-bottom:2px solid #F29725; margin-bottom:-2px; font-weight:700; font-size:0.88rem; color:var(--text); cursor:pointer;">
+          Administradores
+        </button>
+        <button id="tabOperators" class="tab-btn" style="padding:10px 20px; background:transparent; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; font-weight:600; font-size:0.88rem; color:var(--muted); cursor:pointer;">
+          Equipe Operacional (ClickUp)
+        </button>
+      </div>
+
+      <!-- Tabela — Administradores -->
+      <div id="panelAdmins" class="table-card">
         <div class="table-head-bar">
           <div class="table-head-title">
-            <h2>Lista de funcionários</h2>
-            <p>Visualize e gerencie os acessos da sua equipe.</p>
+            <h2>Administradores</h2>
+            <p>Usuários com acesso ao painel admin.</p>
           </div>
           <div class="table-controls">
             <div class="search-input-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input class="search-input" id="searchInput" type="text" placeholder="Buscar por nome ou email" />
             </div>
-            <select class="search-input" id="roleFilter" style="max-width:160px; padding-left:12px;">
-              <option value="all">Função: Todos</option>
-              <option value="admin">Admin</option>
-              <option value="operator">Operador</option>
-            </select>
             <select class="search-input" id="statusFilter" style="max-width:170px; padding-left:12px;">
               <option value="all">Status: Todos</option>
               <option value="approved">Ativos</option>
@@ -795,12 +804,10 @@
           <table class="users-table">
             <thead>
               <tr>
-                <th>Funcionário</th>
+                <th>Administrador</th>
                 <th>Email</th>
-                <th>Função / Cargo</th>
-                <th>Avaliação geral</th>
-                <th style="text-align:center;">Alunos</th>
                 <th>Status</th>
+                <th>Último login</th>
                 <th style="text-align:right;">Ações</th>
               </tr>
             </thead>
@@ -821,14 +828,67 @@
           <div class="page-nav" id="pageNav"></div>
         </div>
       </div>
+
+      <!-- Tabela — Equipe Operacional -->
+      <div id="panelOperators" class="table-card" style="display:none;">
+        <div class="table-head-bar">
+          <div class="table-head-title">
+            <h2>Equipe Operacional</h2>
+            <p>Operadores que atuam via ClickUp. Sem acesso autenticado ao portal.</p>
+          </div>
+          <div class="table-controls">
+            <div class="search-input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input class="search-input" id="searchOpInput" type="text" placeholder="Buscar por nome ou email" />
+            </div>
+            <select class="search-input" id="statusOpFilter" style="max-width:170px; padding-left:12px;">
+              <option value="all">Status: Todos</option>
+              <option value="active">Ativos</option>
+              <option value="inactive">Inativos</option>
+              <option value="suspended">Suspensos</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>Operador</th>
+                <th>Email</th>
+                <th>Cargo</th>
+                <th>ClickUp ID</th>
+                <th>Avaliação</th>
+                <th style="text-align:center;">Alunos</th>
+                <th>Status</th>
+                <th style="text-align:right;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="operatorsTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span id="pgOpInfo">Carregando…</span>
+          <div class="page-size-wrap">
+            <span>Itens por página</span>
+            <select id="pgOpSize">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <div class="page-nav" id="pageOpNav"></div>
+        </div>
+      </div>
     </main>
   </div>
 
-  <!-- ============ MODAL: Criar/Editar funcionário ============ -->
+  <!-- ============ MODAL: Criar/Editar Admin ============ -->
   <div id="empModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:100; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; border-radius:16px; width:100%; max-width:480px; box-shadow:0 24px 48px rgba(15,23,42,0.20); overflow:hidden;">
       <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-        <h3 id="empModalTitle" style="margin:0; font-size:1.1rem; font-weight:700;">Criar funcionário</h3>
+        <h3 id="empModalTitle" style="margin:0; font-size:1.1rem; font-weight:700;">Criar administrador</h3>
         <button type="button" id="empModalClose" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:var(--muted);">×</button>
       </div>
       <form id="empForm" style="padding:24px;">
@@ -841,21 +901,6 @@
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">E-mail</label>
             <input id="empEmail" type="email" required class="search-input" style="padding-left:12px;" />
           </div>
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
-            <div>
-              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Função</label>
-              <select id="empRole" class="search-input" style="padding-left:12px;">
-                <option value="admin">Admin</option>
-                <option value="operator">Operador</option>
-              </select>
-            </div>
-            <div id="empPositionWrap">
-              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Cargo</label>
-              <select id="empPosition" class="search-input" style="padding-left:12px;">
-                <option value="">—</option>
-              </select>
-            </div>
-          </div>
           <div id="empPasswordWrap">
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Senha (mín. 8 caracteres)</label>
             <input id="empPassword" type="password" minlength="8" class="search-input" style="padding-left:12px;" />
@@ -865,7 +910,7 @@
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Status</label>
             <select id="empStatus" class="search-input" style="padding-left:12px;">
               <option value="approved">Ativo</option>
-              <option value="pending">Pendente (aguardando aprovação)</option>
+              <option value="pending">Pendente</option>
               <option value="disabled">Desabilitado</option>
               <option value="rejected">Rejeitado</option>
             </select>
@@ -875,6 +920,56 @@
         <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
           <button type="button" class="btn btn-ghost" id="empModalCancel">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="empSubmit">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MODAL: Criar/Editar Operador (sem senha) ============ -->
+  <div id="opModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:100; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; width:100%; max-width:480px; box-shadow:0 24px 48px rgba(15,23,42,0.20); overflow:hidden;">
+      <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="opModalTitle" style="margin:0; font-size:1.1rem; font-weight:700;">Novo operador</h3>
+        <button type="button" id="opModalClose" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:var(--muted);">×</button>
+      </div>
+      <form id="opForm" style="padding:24px;">
+        <p style="margin:0 0 14px; font-size:0.82rem; color:var(--muted); background:#f1f5f9; padding:10px 12px; border-radius:8px;">
+          Operadores não têm senha nem acesso ao portal — atuam exclusivamente no ClickUp.
+        </p>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Nome completo</label>
+            <input id="opName" type="text" required class="search-input" style="padding-left:12px;" />
+          </div>
+          <div>
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">E-mail (opcional)</label>
+            <input id="opEmail" type="email" class="search-input" style="padding-left:12px;" />
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px;">
+            <div>
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Cargo</label>
+              <select id="opPosition" class="search-input" style="padding-left:12px;">
+                <option value="">— sem cargo —</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">ClickUp User ID</label>
+              <input id="opClickupId" type="text" class="search-input" style="padding-left:12px;" placeholder="ex.: 12345678" />
+            </div>
+          </div>
+          <div id="opStatusWrap" style="display:none;">
+            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Status</label>
+            <select id="opStatus" class="search-input" style="padding-left:12px;">
+              <option value="active">Ativo</option>
+              <option value="inactive">Inativo</option>
+              <option value="suspended">Suspenso</option>
+            </select>
+          </div>
+        </div>
+        <div id="opError" style="color:var(--danger); font-size:0.82rem; margin-top:12px; display:none;"></div>
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:18px;">
+          <button type="button" class="btn btn-ghost" id="opModalCancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="opSubmit" style="background:#6366f1;">Salvar</button>
         </div>
       </form>
     </div>
@@ -891,7 +986,9 @@
   <script>
     'use strict';
 
-    const state = { page: 1, pageSize: 25, search: '', status: 'all', role: 'all', total: 0, editingId: null, positions: [] };
+    const state = { page: 1, pageSize: 25, search: '', status: 'all', total: 0, editingId: null, positions: [] };
+    const opState = { page: 1, pageSize: 25, search: '', status: 'all', total: 0, editingId: null };
+    let activeTab = 'admins';
 
     function initials(name) {
       return (name || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
@@ -964,15 +1061,13 @@
               <div class="avatar">${initials(u.name)}</div>
               <div class="user-cell-info">
                 <span class="user-cell-name">${u.name || '—'}</span>
-                <span class="user-cell-id">${u.last_login_at ? 'Último login ' + fmtDate(u.last_login_at) : 'Nunca acessou'}</span>
+                <span class="user-cell-id">Admin</span>
               </div>
             </div>
           </td>
           <td><span style="color:var(--text-secondary)">${u.email || '—'}</span></td>
-          <td>${roleBadge(u.role, u.position_name, u.position_color)}</td>
-          <td>${starsHtml(u.rating_avg)}</td>
-          <td style="text-align:center;"><span class="count-pill ${(u.students_count ?? 0) === 0 ? 'zero' : ''}">${u.students_count ?? 0}</span></td>
           <td>${statusCell(u.status)}</td>
+          <td><span style="color:var(--text-secondary); font-size:0.82rem;">${u.last_login_at ? fmtDate(u.last_login_at) : 'Nunca acessou'}</span></td>
           <td style="text-align:right;">
             <div class="row-actions" style="justify-content:flex-end;">
               <button class="icon-btn" data-action="edit" title="Editar">
@@ -985,6 +1080,45 @@
               </button>
               <button class="icon-btn danger" data-action="delete" title="Excluir acesso">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function opRowHtml(o) {
+      const statusMap = { active: { cls: 'approved', txt: 'Ativo' }, inactive: { cls: 'disabled', txt: 'Inativo' }, suspended: { cls: 'rejected', txt: 'Suspenso' } };
+      const s = statusMap[o.status] || { cls: 'pending', txt: o.status };
+      return `
+        <tr data-id="${o.id}">
+          <td>
+            <div class="user-cell">
+              <div class="avatar">${initials(o.name)}</div>
+              <div class="user-cell-info">
+                <span class="user-cell-name">${o.name || '—'}</span>
+                <span class="user-cell-id">ClickUp only</span>
+              </div>
+            </div>
+          </td>
+          <td><span style="color:var(--text-secondary)">${o.email || '—'}</span></td>
+          <td>${o.position_name ? `<span class="role-pill operator" style="background:${o.position_color || '#94a3b8'};"><span class="dot"></span>${o.position_name}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+          <td><code style="font-size:0.78rem; color:var(--text-secondary);">${o.clickup_user_id || '—'}</code></td>
+          <td>${starsHtml(o.rating_avg)}</td>
+          <td style="text-align:center;"><span class="count-pill ${(o.students_count ?? 0) === 0 ? 'zero' : ''}">${o.students_count ?? 0}</span></td>
+          <td><span class="status-cell ${s.cls}"><span class="dot"></span>${s.txt}</span></td>
+          <td style="text-align:right;">
+            <div class="row-actions" style="justify-content:flex-end;">
+              <button class="icon-btn" data-action="edit" title="Editar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+              </button>
+              <button class="icon-btn${o.status === 'inactive' ? '' : ' danger'}" data-action="toggleOp" title="${o.status === 'inactive' ? 'Ativar' : 'Inativar'}">
+                ${o.status === 'inactive'
+                  ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+                  : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>'}
+              </button>
+              <button class="icon-btn danger" data-action="deleteOp" title="Excluir operador">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
               </button>
             </div>
           </td>
@@ -1025,7 +1159,7 @@
     async function loadStats() {
       try {
         const s = await AdminAPI.getEmployeeStats();
-        document.getElementById('kpiEmployees').textContent    = s.employees;
+        document.getElementById('kpiEmployees').textContent    = `${s.admins || 0} / ${s.operators || 0}`;
         document.getElementById('kpiStudents').textContent     = s.students;
         document.getElementById('kpiRatings').textContent      = s.ratings.toLocaleString('pt-BR');
         document.getElementById('kpiRatingAvg').textContent    = s.ratingAvg.toFixed(2).replace('.', ',');
@@ -1037,33 +1171,125 @@
 
     async function load() {
       const tbody = document.getElementById('usersTableBody');
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
       try {
         const offset = (state.page - 1) * state.pageSize;
         const { data, count } = await AdminAPI.listEmployees({
-          search: state.search, status: state.status, role: state.role,
+          search: state.search, status: state.status, role: 'admin',
           limit: state.pageSize, offset,
         });
         state.total = count;
         if (data.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="7" style="padding:32px; text-align:center; color:var(--muted);">Nenhum funcionário encontrado.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="5" style="padding:32px; text-align:center; color:var(--muted);">Nenhum administrador encontrado.</td></tr>`;
         } else {
           tbody.innerHTML = data.map(rowHtml).join('');
         }
         renderPagination();
         attachRowHandlers(data);
       } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="7" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
         console.error(e);
+      }
+    }
+
+    async function loadOperators() {
+      const tbody = document.getElementById('operatorsTableBody');
+      tbody.innerHTML = `<tr><td colspan="8" style="padding:24px; text-align:center; color:var(--muted);">Carregando…</td></tr>`;
+      try {
+        const offset = (opState.page - 1) * opState.pageSize;
+        const { data, count } = await AdminAPI.listOperatorsAdmin({
+          search: opState.search, status: opState.status,
+          limit: opState.pageSize, offset,
+        });
+        opState.total = count;
+        if (data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" style="padding:32px; text-align:center; color:var(--muted);">Nenhum operador encontrado.</td></tr>`;
+        } else {
+          tbody.innerHTML = data.map(opRowHtml).join('');
+        }
+        renderOpPagination();
+        attachOpRowHandlers(data);
+      } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:24px; text-align:center; color:var(--danger);">Erro ao carregar: ${e.message || e}</td></tr>`;
+        console.error(e);
+      }
+    }
+
+    function renderOpPagination() {
+      const totalPages = Math.max(1, Math.ceil(opState.total / opState.pageSize));
+      const cur = opState.page;
+      const nav = document.getElementById('pageOpNav');
+      const btns = [];
+      btns.push(`<button class="page-btn" data-pg="prev" ${cur <= 1 ? 'disabled' : ''}>‹</button>`);
+      const start = Math.max(1, cur - 2);
+      const end = Math.min(totalPages, start + 4);
+      for (let i = start; i <= end; i++) {
+        btns.push(`<button class="page-btn ${i === cur ? 'active' : ''}" data-pg="${i}">${i}</button>`);
+      }
+      btns.push(`<button class="page-btn" data-pg="next" ${cur >= totalPages ? 'disabled' : ''}>›</button>`);
+      nav.innerHTML = btns.join('');
+      const first = opState.total === 0 ? 0 : (cur - 1) * opState.pageSize + 1;
+      const last  = Math.min(cur * opState.pageSize, opState.total);
+      document.getElementById('pgOpInfo').innerHTML =
+        `Mostrando <strong>${first}–${last}</strong> de <strong>${opState.total}</strong> operadores`;
+      nav.querySelectorAll('[data-pg]').forEach(b => {
+        b.addEventListener('click', () => {
+          const v = b.dataset.pg;
+          if (v === 'prev' && cur > 1) opState.page = cur - 1;
+          else if (v === 'next' && cur < totalPages) opState.page = cur + 1;
+          else if (/^\d+$/.test(v)) opState.page = parseInt(v, 10);
+          loadOperators();
+        });
+      });
+    }
+
+    function attachOpRowHandlers(data) {
+      const byId = Object.fromEntries(data.map(o => [o.id, o]));
+      document.querySelectorAll('#operatorsTableBody tr[data-id]').forEach(tr => {
+        const id = tr.dataset.id;
+        const o = byId[id];
+        tr.querySelector('[data-action="edit"]').addEventListener('click', () => openEditOpModal(o));
+        tr.querySelector('[data-action="toggleOp"]').addEventListener('click', () => toggleOpStatus(o));
+        tr.querySelector('[data-action="deleteOp"]').addEventListener('click', () => deleteOperatorRow(o));
+      });
+    }
+
+    async function toggleOpStatus(o) {
+      const next = o.status === 'inactive' ? 'active' : 'inactive';
+      const action = next === 'active' ? 'ativar' : 'inativar';
+      if (!confirm(`Tem certeza que deseja ${action} ${o.name}?`)) return;
+      try {
+        await AdminAPI.setOperatorStatus(o.id, next);
+        toast(next === 'active' ? 'Operador ativado.' : 'Operador inativado.');
+        await Promise.all([loadOperators(), loadStats()]);
+      } catch (e) {
+        toast('Erro: ' + (e.message || e), 'error');
+      }
+    }
+
+    async function deleteOperatorRow(o) {
+      const confirmText = prompt(
+        `ATENÇÃO: isso vai excluir DEFINITIVAMENTE o operador ${o.name}.\nPara confirmar, digite EXCLUIR:`
+      );
+      if (confirmText !== 'EXCLUIR') {
+        if (confirmText !== null) toast('Texto incorreto. Exclusão cancelada.', 'warning');
+        return;
+      }
+      try {
+        await AdminAPI.deleteOperator(o.id);
+        toast(`${o.name} foi excluído.`);
+        await Promise.all([loadOperators(), loadStats()]);
+      } catch (e) {
+        toast('Erro ao excluir: ' + (e.message || e), 'error');
       }
     }
 
     async function loadPositions() {
       try {
         state.positions = await AdminAPI.listPositions();
-        const sel = document.getElementById('empPosition');
-        sel.innerHTML = '<option value="">— selecione —</option>' +
+        const optsHtml = '<option value="">— sem cargo —</option>' +
           state.positions.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        document.getElementById('opPosition').innerHTML = optsHtml;
       } catch (e) {
         console.error(e);
       }
@@ -1119,43 +1345,31 @@
       }
     }
 
-    // ===== Modal =====
-    function syncPositionVisibility() {
-      const role = document.getElementById('empRole').value;
-      document.getElementById('empPositionWrap').style.display = role === 'operator' ? '' : 'none';
-    }
+    // ===== Modal Admin =====
     function openCreateModal() {
       state.editingId = null;
-      document.getElementById('empModalTitle').textContent = 'Criar funcionário';
+      document.getElementById('empModalTitle').textContent = 'Criar administrador';
       document.getElementById('empPasswordWrap').style.display = '';
       document.getElementById('empStatusWrap').style.display = 'none';
       document.getElementById('empForm').reset();
-      document.getElementById('empRole').value = 'admin';
-      document.getElementById('empPosition').value = '';
-      syncPositionVisibility();
       document.getElementById('empError').style.display = 'none';
       document.getElementById('empModal').style.display = 'flex';
       document.getElementById('empName').focus();
     }
     function openEditModal(u) {
       state.editingId = u.id;
-      document.getElementById('empModalTitle').textContent = 'Editar funcionário';
+      document.getElementById('empModalTitle').textContent = 'Editar administrador';
       document.getElementById('empPasswordWrap').style.display = 'none';
       document.getElementById('empStatusWrap').style.display = '';
       document.getElementById('empName').value = u.name || '';
       document.getElementById('empEmail').value = u.email || '';
-      document.getElementById('empRole').value = u.role || 'admin';
-      document.getElementById('empPosition').value = u.position_id || '';
       document.getElementById('empStatus').value = u.status || 'approved';
-      syncPositionVisibility();
       document.getElementById('empError').style.display = 'none';
       document.getElementById('empModal').style.display = 'flex';
     }
     function closeModal() { document.getElementById('empModal').style.display = 'none'; }
 
-    document.getElementById('empRole').addEventListener('change', syncPositionVisibility);
-
-    document.getElementById('btnNew').addEventListener('click', openCreateModal);
+    document.getElementById('btnNewAdmin').addEventListener('click', openCreateModal);
     document.getElementById('empModalClose').addEventListener('click', closeModal);
     document.getElementById('empModalCancel').addEventListener('click', closeModal);
     document.getElementById('empModal').addEventListener('click', (e) => {
@@ -1172,17 +1386,14 @@
       try {
         const name  = document.getElementById('empName').value.trim();
         const email = document.getElementById('empEmail').value.trim();
-        const role  = document.getElementById('empRole').value;
-        const position_id = role === 'operator' ? document.getElementById('empPosition').value || null : null;
-        if (role === 'operator' && !position_id) throw new Error('Selecione um cargo para o operador.');
         if (state.editingId) {
           const status = document.getElementById('empStatus').value;
-          await AdminAPI.updateEmployee(state.editingId, { name, email, status, role, position_id });
-          toast('Funcionário atualizado.');
+          await AdminAPI.updateEmployee(state.editingId, { name, email, status, role: 'admin' });
+          toast('Administrador atualizado.');
         } else {
           const password = document.getElementById('empPassword').value;
-          await AdminAPI.createEmployee({ name, email, password, role, position_id });
-          toast('Funcionário criado.');
+          await AdminAPI.createEmployee({ name, email, password, role: 'admin' });
+          toast('Administrador criado.');
         }
         closeModal();
         await Promise.all([load(), loadStats()]);
@@ -1195,7 +1406,90 @@
       }
     });
 
-    // ===== Filtros & busca =====
+    // ===== Modal Operador =====
+    function openCreateOpModal() {
+      opState.editingId = null;
+      document.getElementById('opModalTitle').textContent = 'Novo operador';
+      document.getElementById('opStatusWrap').style.display = 'none';
+      document.getElementById('opForm').reset();
+      document.getElementById('opError').style.display = 'none';
+      document.getElementById('opModal').style.display = 'flex';
+      document.getElementById('opName').focus();
+    }
+    function openEditOpModal(o) {
+      opState.editingId = o.id;
+      document.getElementById('opModalTitle').textContent = 'Editar operador';
+      document.getElementById('opStatusWrap').style.display = '';
+      document.getElementById('opName').value = o.name || '';
+      document.getElementById('opEmail').value = o.email || '';
+      document.getElementById('opPosition').value = o.position_id || '';
+      document.getElementById('opClickupId').value = o.clickup_user_id || '';
+      document.getElementById('opStatus').value = o.status || 'active';
+      document.getElementById('opError').style.display = 'none';
+      document.getElementById('opModal').style.display = 'flex';
+    }
+    function closeOpModal() { document.getElementById('opModal').style.display = 'none'; }
+
+    document.getElementById('btnNewOperator').addEventListener('click', openCreateOpModal);
+    document.getElementById('opModalClose').addEventListener('click', closeOpModal);
+    document.getElementById('opModalCancel').addEventListener('click', closeOpModal);
+    document.getElementById('opModal').addEventListener('click', (e) => {
+      if (e.target.id === 'opModal') closeOpModal();
+    });
+
+    document.getElementById('opForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('opSubmit');
+      const err = document.getElementById('opError');
+      err.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Salvando…';
+      try {
+        const name            = document.getElementById('opName').value.trim();
+        const email           = document.getElementById('opEmail').value.trim() || null;
+        const position_id     = document.getElementById('opPosition').value || null;
+        const clickup_user_id = document.getElementById('opClickupId').value.trim() || null;
+        if (opState.editingId) {
+          const status = document.getElementById('opStatus').value;
+          await AdminAPI.updateOperator(opState.editingId, { name, email, position_id, clickup_user_id, status });
+          toast('Operador atualizado.');
+        } else {
+          await AdminAPI.createOperator({ name, email, position_id, clickup_user_id });
+          toast('Operador criado.');
+        }
+        closeOpModal();
+        await Promise.all([loadOperators(), loadStats()]);
+      } catch (ex) {
+        err.style.display = 'block';
+        err.textContent = ex.message || String(ex);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Salvar';
+      }
+    });
+
+    // ===== Abas =====
+    document.getElementById('tabAdmins').addEventListener('click', () => {
+      activeTab = 'admins';
+      document.getElementById('tabAdmins').style.cssText += ';border-bottom-color:#F29725;font-weight:700;color:var(--text);';
+      document.getElementById('tabOperators').style.cssText += ';border-bottom-color:transparent;font-weight:600;color:var(--muted);';
+      document.getElementById('panelAdmins').style.display = '';
+      document.getElementById('panelOperators').style.display = 'none';
+      document.getElementById('btnNewAdmin').style.display = '';
+      document.getElementById('btnNewOperator').style.display = 'none';
+    });
+    document.getElementById('tabOperators').addEventListener('click', () => {
+      activeTab = 'operators';
+      document.getElementById('tabOperators').style.cssText += ';border-bottom-color:#6366f1;font-weight:700;color:var(--text);';
+      document.getElementById('tabAdmins').style.cssText += ';border-bottom-color:transparent;font-weight:600;color:var(--muted);';
+      document.getElementById('panelAdmins').style.display = 'none';
+      document.getElementById('panelOperators').style.display = '';
+      document.getElementById('btnNewAdmin').style.display = 'none';
+      document.getElementById('btnNewOperator').style.display = '';
+      loadOperators();
+    });
+
+    // ===== Filtros admins =====
     let searchTimer = null;
     document.getElementById('searchInput').addEventListener('input', (e) => {
       clearTimeout(searchTimer);
@@ -1210,15 +1504,31 @@
       state.page = 1;
       load();
     });
-    document.getElementById('roleFilter').addEventListener('change', (e) => {
-      state.role = e.target.value;
-      state.page = 1;
-      load();
-    });
     document.getElementById('pgSize').addEventListener('change', (e) => {
       state.pageSize = parseInt(e.target.value, 10) || 25;
       state.page = 1;
       load();
+    });
+
+    // ===== Filtros operadores =====
+    let searchOpTimer = null;
+    document.getElementById('searchOpInput').addEventListener('input', (e) => {
+      clearTimeout(searchOpTimer);
+      searchOpTimer = setTimeout(() => {
+        opState.search = e.target.value;
+        opState.page = 1;
+        loadOperators();
+      }, 280);
+    });
+    document.getElementById('statusOpFilter').addEventListener('change', (e) => {
+      opState.status = e.target.value;
+      opState.page = 1;
+      loadOperators();
+    });
+    document.getElementById('pgOpSize').addEventListener('change', (e) => {
+      opState.pageSize = parseInt(e.target.value, 10) || 25;
+      opState.page = 1;
+      loadOperators();
     });
 
     // ===== Exportar =====
@@ -1250,6 +1560,8 @@
       const profile = await AdminAPI.requireAdmin();
       if (!profile) return; // já redirecionou
       await fillSession(profile);
+      // Botão operador começa escondido (aba admins é padrão)
+      document.getElementById('btnNewOperator').style.display = 'none';
       await Promise.all([loadPositions(), load(), loadStats()]);
     })();
   </script>

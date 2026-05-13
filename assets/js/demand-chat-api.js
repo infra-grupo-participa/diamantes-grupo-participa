@@ -134,9 +134,33 @@
     return data?.signedUrl || null;
   }
 
+  async function postMessageWithClickup(demandId, content, attachments, userId, clientSlug) {
+    const saved = await postMessage(demandId, content, attachments, userId);
+
+    // Dispara sync para o ClickUp em background — falha não bloqueia o cliente
+    try {
+      const supabase = client();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        const body = { demand_id: demandId, client_slug: clientSlug, content, attachments: attachments || [] };
+        fetch('/api/clickup-comment.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + session.access_token,
+          },
+          body: JSON.stringify(body),
+        }).catch(() => {});
+      }
+    } catch (_) {}
+
+    return saved;
+  }
+
   window.DemandChatAPI = {
     listMessages,
     postMessage,
+    postMessageWithClickup,
     subscribe,
     uploadAttachment,
     signAttachment,

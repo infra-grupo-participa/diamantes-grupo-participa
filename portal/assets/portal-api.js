@@ -424,7 +424,8 @@
   async function postDemandMessage(demand_id, content, attachments = []) {
     const me = await getMe();
     if (!me) throw new Error('Sessão expirada.');
-    return chatApi().postMessage(demand_id, content, attachments, me.id);
+    const slug = me.client_slug || getSlugFromUrl() || '';
+    return chatApi().postMessageWithClickup(demand_id, content, attachments, me.id, slug);
   }
 
   function subscribeDemand(demand_id, callbacks) {

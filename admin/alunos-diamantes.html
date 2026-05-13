@@ -1165,7 +1165,7 @@
       const userSel = document.getElementById('teamUser');
 
       // IDs dos operadores já na equipe deste cliente (evita duplicatas)
-      const assignedIds = new Set((state.currentTeam || []).map(m => m.user_id));
+      const assignedIds = new Set((state.currentTeam || []).map(m => m.operator_id || m.user_id));
       const availableOps = state.operators.filter(o => !assignedIds.has(o.id));
 
       // Agrupa por setor (position_name), ordenado alfabeticamente
@@ -1209,7 +1209,7 @@
         const selOpt  = userOpt.options[userOpt.selectedIndex];
         await AdminAPI.assignTeamMember({
           client_slug: state.currentSlug,
-          user_id:     userOpt.value,
+          operator_id: userOpt.value,
           position_id: selOpt?.dataset?.positionId || null,
           notes:       document.getElementById('teamNotes').value.trim(),
         });

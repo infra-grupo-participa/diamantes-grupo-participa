@@ -158,13 +158,14 @@
     today.setHours(0, 0, 0, 0);
     const todayIso = today.toISOString();
 
-    const [employees, students, ratingsCount, ratingsScores, activeToday] = await Promise.all([
-      supabase.from('users').select('id', { count: 'exact', head: true }).in('role', ['admin', 'operator']),
+    const [admins, operators, students, ratingsCount, ratingsScores, activeToday] = await Promise.all([
+      supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'admin'),
+      supabase.from('operators').select('id', { count: 'exact', head: true }).eq('status', 'active'),
       supabase.from('clients').select('slug', { count: 'exact', head: true }),
       supabase.from('ratings').select('id', { count: 'exact', head: true }),
       supabase.from('ratings').select('score'),
       supabase.from('users').select('id', { count: 'exact', head: true })
-        .in('role', ['admin', 'operator']).gte('last_login_at', todayIso),
+        .eq('role', 'admin').gte('last_login_at', todayIso),
     ]);
 
     let avg = 0;
@@ -174,7 +175,9 @@
     }
 
     return {
-      employees:   employees.count || 0,
+      employees:   (admins.count || 0) + (operators.count || 0),
+      admins:      admins.count || 0,
+      operators:   operators.count || 0,
       students:    students.count  || 0,
       ratings:     ratingsCount.count || 0,
       ratingAvg:   Number(avg.toFixed(2)) || 0,
@@ -326,16 +329,71 @@
   }
 
   // =============================================================
+  // EQUIPE OPERACIONAL (portal.operators — sem Supabase Auth)
+  // =============================================================
+
+  async function listOperatorsAdmin({ search = '', status = 'all', limit = 25, offset = 0 } = {}) {
+    let q = client()
+      .from('v_operators')
+      .select('*', { count: 'exact' })
+      .order('name', { ascending: true });
+    if (status && status !== 'all') q = q.eq('status', status);
+    if (search && search.trim()) {
+      const s = search.trim().replace(/[%_]/g, '');
+      q = q.or(`name.ilike.%${s}%,email.ilike.%${s}%`);
+    }
+    q = q.range(offset, offset + limit - 1);
+    const { data, count, error } = await q;
+    if (error) throw error;
+    return { data: data || [], count: count || 0 };
+  }
+
+  async function createOperator({ name, email = null, position_id = null, clickup_user_id = null }) {
+    if (!name) throw new Error('Nome é obrigatório.');
+    const { data, error } = await client()
+      .from('operators')
+      .insert({ name, email: email || null, position_id: position_id || null, clickup_user_id: clickup_user_id || null })
+      .select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function updateOperator(id, patch) {
+    if (!id) throw new Error('id obrigatório');
+    const allowed = ['name', 'email', 'position_id', 'clickup_user_id', 'contract_active', 'status', 'metadata'];
+    const clean = {};
+    for (const k of allowed) if (patch[k] !== undefined) clean[k] = patch[k];
+    if (clean.email) clean.email = String(clean.email).trim().toLowerCase() || null;
+    clean.updated_at = new Date().toISOString();
+    const { data, error } = await client()
+      .from('operators').update(clean).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function setOperatorStatus(id, status) {
+    if (!['active', 'inactive', 'suspended'].includes(status)) throw new Error('status inválido');
+    return updateOperator(id, { status });
+  }
+
+  async function deleteOperator(id) {
+    if (!id) throw new Error('id obrigatório');
+    const { error } = await client().from('operators').delete().eq('id', id);
+    if (error) throw error;
+    return true;
+  }
+
+  // =============================================================
   // EQUIPE (team_assignments)
   // =============================================================
 
-  async function assignTeamMember({ client_slug, user_id, position_id, notes = '' }) {
-    if (!client_slug || !user_id || !position_id) throw new Error('client_slug, user_id e position_id são obrigatórios.');
+  async function assignTeamMember({ client_slug, operator_id, position_id, notes = '' }) {
+    if (!client_slug || !operator_id || !position_id) throw new Error('client_slug, operator_id e position_id são obrigatórios.');
     const supabase = client();
     const { data: profile } = await supabase.from('users')
       .select('id').eq('auth_user_id', (await supabase.auth.getSession()).data.session?.user.id).maybeSingle();
     const { data, error } = await supabase.from('team_assignments').insert({
-      client_slug, user_id, position_id, notes, assigned_by: profile?.id || null,
+      client_slug, operator_id, position_id, notes, assigned_by: profile?.id || null,
     }).select().single();
     if (error) throw error;
     return data;
@@ -348,14 +406,13 @@
     return true;
   }
 
-  // Listar operadores disponíveis pra atribuir como equipe (para o dropdown)
+  // Listar operadores disponíveis para atribuir como equipe (nova tabela portal.operators)
   async function listOperators() {
     const { data, error } = await client()
-      .from('users')
+      .from('operators')
       .select('id, name, email, position_id, positions(name)')
-      .eq('role', 'operator')
-      .eq('status', 'approved')
       .eq('contract_active', true)
+      .eq('status', 'active')
       .order('name', { ascending: true });
     if (error) throw error;
     return (data || []).map(o => ({
@@ -852,7 +909,13 @@
     updateStudent,
     deleteStudent,
     exportStudentsCsv,
-    // Equipe
+    // Equipe operacional (portal.operators)
+    listOperatorsAdmin,
+    createOperator,
+    updateOperator,
+    setOperatorStatus,
+    deleteOperator,
+    // Equipe (assignments)
     assignTeamMember,
     removeTeamMember,
     listOperators,

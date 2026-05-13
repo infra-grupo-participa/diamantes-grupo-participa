@@ -1,0 +1,6 @@
+# operator/.htaccess — área desativada (operadores migrados para ClickUp-only)
+# Redireciona qualquer acesso direto de volta para a raiz do portal.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ / [R=302,L]
+</IfModule>

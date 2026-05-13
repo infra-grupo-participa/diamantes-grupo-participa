@@ -106,8 +106,6 @@
     let redirect;
     if (user.role === 'admin') {
       redirect = toAppUrl('admin/');
-    } else if (user.role === 'operator') {
-      redirect = toAppUrl('operator/dashboard.html');
     } else {
       redirect = getClientUrl(user.clientSlug);
     }
