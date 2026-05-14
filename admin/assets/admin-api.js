@@ -387,15 +387,33 @@
   // EQUIPE (team_assignments)
   // =============================================================
 
-  async function assignTeamMember({ client_slug, operator_id, position_id, notes = '' }) {
-    if (!client_slug || !operator_id || !position_id) throw new Error('client_slug, operator_id e position_id são obrigatórios.');
+  async function assignTeamMember({ client_slug, operator_id, position_id = null, notes = '' }) {
+    if (!client_slug || !operator_id) throw new Error('client_slug e operator_id são obrigatórios.');
     const supabase = client();
+
+    // Se position_id não foi passado, resolve a partir do operador (setor essencial).
+    if (!position_id) {
+      const { data: op, error: opErr } = await supabase
+        .from('operators').select('position_id').eq('id', operator_id).maybeSingle();
+      if (opErr) throw opErr;
+      position_id = op?.position_id || null;
+      if (!position_id) throw new Error('Operador sem setor definido. Atribua um cargo na aba Equipe Operacional antes de vinculá-lo a um cliente.');
+    }
+
     const { data: profile } = await supabase.from('users')
       .select('id').eq('auth_user_id', (await supabase.auth.getSession()).data.session?.user.id).maybeSingle();
+
     const { data, error } = await supabase.from('team_assignments').insert({
       client_slug, operator_id, position_id, notes, assigned_by: profile?.id || null,
     }).select().single();
-    if (error) throw error;
+
+    if (error) {
+      // Constraint team_assignments_unique_client_position
+      if (error.code === '23505' && /unique_client_position/i.test(error.message || '')) {
+        throw new Error('Este setor já tem um operador atribuído a esse aluno. Remova o atual antes de adicionar outro.');
+      }
+      throw error;
+    }
     return data;
   }
 

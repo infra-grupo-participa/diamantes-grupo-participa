@@ -697,13 +697,7 @@
               <option value="">— selecione —</option>
             </select>
             <div id="teamUserRole" style="display:none; margin-top:6px; font-size:0.78rem; font-weight:600; color:var(--primary); padding:4px 8px; background:var(--primary-light, #eff6ff); border-radius:6px; width:fit-content;"></div>
-            <small style="color:var(--muted); font-size:0.74rem;">Apenas operadores com contrato ativo aparecem aqui.</small>
-          </div>
-          <div>
-            <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Cargo na equipe deste aluno</label>
-            <select id="teamPosition" class="search-input" style="padding-left:12px;" required>
-              <option value="">— selecione —</option>
-            </select>
+            <small style="color:var(--muted); font-size:0.74rem;">Apenas operadores com contrato ativo aparecem. Setores já atribuídos a este aluno ficam ocultos.</small>
           </div>
           <div>
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Notas (opcional)</label>
@@ -1164,9 +1158,20 @@
 
       const userSel = document.getElementById('teamUser');
 
-      // IDs dos operadores já na equipe deste cliente (evita duplicatas)
-      const assignedIds = new Set((state.currentTeam || []).map(m => m.operator_id || m.user_id));
-      const availableOps = state.operators.filter(o => !assignedIds.has(o.id));
+      // Operadores já na equipe deste cliente (não permite o mesmo de novo)
+      const assignedOpIds = new Set((state.currentTeam || []).map(m => m.operator_id || m.user_id));
+
+      // Setores já ocupados neste cliente — bloqueia adicionar outro
+      // operador do mesmo setor (regra: 1 operador por setor por aluno).
+      const occupiedSectors = new Set(
+        (state.currentTeam || [])
+          .map(m => m.position_id)
+          .filter(Boolean)
+      );
+
+      const availableOps = state.operators.filter(o =>
+        !assignedOpIds.has(o.id) && !occupiedSectors.has(o.position_id)
+      );
 
       // Agrupa por setor (position_name), ordenado alfabeticamente
       const grouped = {};
@@ -1176,14 +1181,18 @@
         grouped[sector].push(o);
       });
 
-      userSel.innerHTML = '<option value="">— selecione —</option>' +
-        Object.keys(grouped).sort().map(sector =>
-          `<optgroup label="${sector}">` +
-          grouped[sector].map(o =>
-            `<option value="${o.id}" data-position-id="${o.position_id || ''}">${o.name} — ${sector}</option>`
-          ).join('') +
-          `</optgroup>`
-        ).join('');
+      if (availableOps.length === 0) {
+        userSel.innerHTML = '<option value="">— nenhum operador disponível —</option>';
+      } else {
+        userSel.innerHTML = '<option value="">— selecione —</option>' +
+          Object.keys(grouped).sort().map(sector =>
+            `<optgroup label="${sector}">` +
+            grouped[sector].map(o =>
+              `<option value="${o.id}" data-position-id="${o.position_id || ''}">${o.name} — ${sector}</option>`
+            ).join('') +
+            `</optgroup>`
+          ).join('');
+      }
 
       document.getElementById('teamForm').reset();
       document.getElementById('teamError').style.display = 'none';
@@ -1206,11 +1215,10 @@
       btn.disabled = true; btn.textContent = 'Adicionando…';
       try {
         const userOpt = document.getElementById('teamUser');
-        const selOpt  = userOpt.options[userOpt.selectedIndex];
+        if (!userOpt.value) throw new Error('Selecione um operador.');
         await AdminAPI.assignTeamMember({
           client_slug: state.currentSlug,
           operator_id: userOpt.value,
-          position_id: selOpt?.dataset?.positionId || null,
           notes:       document.getElementById('teamNotes').value.trim(),
         });
         toast('Integrante adicionado.');
