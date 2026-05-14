@@ -486,8 +486,9 @@
 
   async function getSubscriptionStats() {
     const supabase = client();
-    const [paid, overdue, pending, canceled, sumPaid, dueSoon] = await Promise.all([
+    const [paid, partial, overdue, pending, canceled, sumActive, dueSoon] = await Promise.all([
       supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'paid'),
+      supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'partial'),
       supabase.from('subscriptions').select('id', { count: 'exact', head: true }).in('status', ['overdue', 'late']),
       supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'canceled'),
@@ -498,16 +499,21 @@
         .order('next_billing_date', { ascending: true }).limit(8),
     ]);
 
-    const mrr = (sumPaid.data || []).reduce((s, r) => s + Number(r.monthly_value || 0), 0);
-    const active = (paid.count || 0) + (pending.count || 0) + (overdue.count || 0);
-    const retention = active === 0 ? 0 : Math.round(((paid.count || 0) / active) * 100);
+    const mrr = (sumActive.data || []).reduce((s, r) => s + Number(r.monthly_value || 0), 0);
+    const paidCount    = paid.count    || 0;
+    const partialCount = partial.count || 0;
+    const overdueCount = overdue.count || 0;
+    const pendingCount = pending.count || 0;
+    const active = paidCount + partialCount + pendingCount + overdueCount;
+    const retention = active === 0 ? 0 : Math.round((paidCount / active) * 100);
 
     return {
       mrr,
       active,
-      paid: paid.count || 0,
-      late: overdue.count || 0,
-      pending: pending.count || 0,
+      paid: paidCount,
+      partial: partialCount,
+      late: overdueCount,
+      pending: pendingCount,
       canceled: canceled.count || 0,
       retention,
       dueSoon: dueSoon.data || [],

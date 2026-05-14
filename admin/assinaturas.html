@@ -704,7 +704,7 @@
         const s = await AdminAPI.getSubscriptionStats();
         document.getElementById('kpiMrr').textContent       = fmtBRL(s.mrr);
         document.getElementById('kpiActive').textContent    = s.active;
-        document.getElementById('kpiLate').textContent      = s.late;
+        document.getElementById('kpiLate').textContent      = (s.late || 0) + (s.partial || 0);
         document.getElementById('kpiPending').textContent   = s.pending;
         document.getElementById('kpiRetention').textContent = s.retention + '%';
 
@@ -716,7 +716,7 @@
         // Resumo de "a receber" e "inadimplência" (calculados a partir das linhas)
         const { data: all } = await AdminAPI.listSubscriptions({ limit: 1000, offset: 0 });
         const due  = all.filter(x => x.status === 'pending').reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
-        const late = all.filter(x => x.status === 'overdue' || x.status === 'late').reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
+        const late = all.filter(x => x.status === 'overdue' || x.status === 'late' || x.status === 'partial').reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
         const active = all.filter(x => x.status !== 'canceled');
         const avg = active.length ? active.reduce((acc, x) => acc + Number(x.monthly_value || 0), 0) / active.length : 0;
         document.getElementById('summaryDue').textContent  = fmtBRL(due);
