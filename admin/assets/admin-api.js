@@ -260,6 +260,13 @@
     return data || [];
   }
 
+  async function getStudentContractedPositions(slug) {
+    if (!slug) throw new Error('slug obrigatório');
+    const { data, error } = await client().rpc('get_student_contracted_positions', { p_slug: slug });
+    if (error) throw error;
+    return data || [];
+  }
+
   async function getStudentServices(slug) {
     const { data, error } = await client()
       .from('services')
@@ -920,6 +927,7 @@
     listStudents,
     getStudent,
     getStudentTeam,
+    getStudentContractedPositions,
     getStudentServices,
     getClientActiveServices,
     getStudentStats,

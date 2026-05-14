@@ -697,7 +697,7 @@
               <option value="">— selecione —</option>
             </select>
             <div id="teamUserRole" style="display:none; margin-top:6px; font-size:0.78rem; font-weight:600; color:var(--primary); padding:4px 8px; background:var(--primary-light, #eff6ff); border-radius:6px; width:fit-content;"></div>
-            <small style="color:var(--muted); font-size:0.74rem;">Apenas operadores com contrato ativo aparecem. Setores já atribuídos a este aluno ficam ocultos.</small>
+            <small style="color:var(--muted); font-size:0.74rem;">Apenas operadores com contrato ativo, de setores contratados pelo aluno e ainda não atribuídos.</small>
           </div>
           <div>
             <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Notas (opcional)</label>
@@ -974,18 +974,28 @@
         el.innerHTML = `<div style="color:var(--muted); font-size:0.84rem; padding:8px 0;">Nenhum integrante atribuído ainda.</div>`;
         return;
       }
-      el.innerHTML = team.map(m => `
+      el.innerHTML = team.map(m => {
+        const ravg = parseFloat(m.rating_avg) || 0;
+        const rcnt = parseInt(m.rating_count, 10) || 0;
+        const ratingHtml = rcnt > 0
+          ? `<span class="team-rating" title="${rcnt} avalia${rcnt === 1 ? 'ção' : 'ções'} deste aluno">
+               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.39 7.36H22l-6.18 4.49L18.18 22 12 17.27 5.82 22l2.36-8.15L2 9.36h7.61z"/></svg>
+               ${ravg.toFixed(2).replace('.', ',')} <span style="color:var(--muted); font-weight:500;">(${rcnt})</span>
+             </span>`
+          : `<span class="team-rating" style="color:var(--muted);" title="Sem avaliações ainda">— sem avaliações</span>`;
+        return `
         <div class="team-item" data-assignment="${m.assignment_id}">
           <div class="avatar">${initials(m.user_name)}</div>
           <div class="team-info">
             <div class="team-name">${m.user_name}</div>
             <div class="team-role" style="color:${m.position_color || 'var(--muted)'}; font-weight:600;">${m.position_name}</div>
+            ${ratingHtml}
           </div>
           <button class="icon-btn danger" data-action="remove-team" title="Remover">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-      `).join('');
+      `;}).join('');
       el.querySelectorAll('[data-action="remove-team"]').forEach(btn => {
         btn.addEventListener('click', async (e) => {
           e.stopPropagation();
@@ -1158,6 +1168,16 @@
 
       const userSel = document.getElementById('teamUser');
 
+      // Setores efetivamente contratados pelo aluno (services active/delinquent).
+      // Operadores de setores fora dessa lista NÃO devem aparecer.
+      let contractedSet = new Set();
+      try {
+        const contracted = await AdminAPI.getStudentContractedPositions(state.currentSlug);
+        contractedSet = new Set((contracted || []).map(c => c.position_id));
+      } catch (ex) {
+        console.error('Erro ao buscar setores contratados:', ex);
+      }
+
       // Operadores já na equipe deste cliente (não permite o mesmo de novo)
       const assignedOpIds = new Set((state.currentTeam || []).map(m => m.operator_id || m.user_id));
 
@@ -1169,8 +1189,13 @@
           .filter(Boolean)
       );
 
+      // Filtros: não atribuído + setor não ocupado + setor faz parte dos contratados.
+      // Se a lista de contratados vier vazia (erro/aluno sem services), libera tudo
+      // pra não travar a UI por erro de leitura.
       const availableOps = state.operators.filter(o =>
-        !assignedOpIds.has(o.id) && !occupiedSectors.has(o.position_id)
+        !assignedOpIds.has(o.id) &&
+        !occupiedSectors.has(o.position_id) &&
+        (contractedSet.size === 0 ? true : contractedSet.has(o.position_id))
       );
 
       // Agrupa por setor (position_name), ordenado alfabeticamente
