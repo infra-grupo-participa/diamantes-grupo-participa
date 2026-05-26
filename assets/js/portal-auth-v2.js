@@ -149,16 +149,17 @@
       const supabase = window.getSupabaseClient();
       supabase.auth.onAuthStateChange((event, session) => {
         if (!session?.user) { emit(null); return; }
-        // Emit imediato com dados do auth.user (sem profile) pra UI reagir
-        emit(formatUser(session.user, undefined));
-        // Profile fetch desacoplado
+        // Aguarda profile antes de emitir — evita emit com clientSlug vazio que
+        // pode causar redirect loop via redirectIfApproved em index.html.
         setTimeout(async () => {
           try {
             const profile = await fetchProfileSlug(supabase, session.user.id);
-            if (!profile) return;
-            const user = formatUser(session.user, profile.client_slug);
-            user.role = profile.role || user.role;
-            user.status = profile.status || user.status;
+            const user = formatUser(session.user, profile?.client_slug);
+            if (profile) {
+              user.role = profile.role || user.role;
+              user.status = profile.status || user.status;
+              if (profile.name) user.name = profile.name;
+            }
             emit(user);
           } catch (_) { /* ignore */ }
         }, 0);

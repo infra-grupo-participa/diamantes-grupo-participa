@@ -102,6 +102,7 @@
     if (error || !profile) {
       clearCachedProfile();
       cancelOverlay();
+      await supabase.auth.signOut();
       window.location.replace('/');
       return null;
     }
