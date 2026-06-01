@@ -122,9 +122,10 @@ $jwtSub        = (string)($claims['sub'] ?? '');
 $userMeta      = (array)($claims['user_metadata'] ?? []);
 $appMeta       = (array)($claims['app_metadata'] ?? []);
 
-$userRole      = (string)($userMeta['role'] ?? $appMeta['role'] ?? 'client');
-$userStatus    = (string)($userMeta['status'] ?? $appMeta['status'] ?? 'approved');
-$userClientSlug = (string)($userMeta['clientSlug'] ?? $appMeta['clientSlug'] ?? '');
+// Prioriza app_metadata (imutável pelo usuário) sobre user_metadata
+$userRole      = (string)($appMeta['role']       ?? $userMeta['role']       ?? 'client');
+$userStatus    = (string)($appMeta['status']     ?? $userMeta['status']     ?? 'approved');
+$userClientSlug = (string)($appMeta['clientSlug'] ?? $userMeta['clientSlug'] ?? '');
 
 // ── Authz ─────────────────────────────────────────────────────────────────────
 

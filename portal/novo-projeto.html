@@ -103,7 +103,7 @@
   <button class="btn-primary" id="btnCreate" onclick="createProject()">Continuar para o Briefing →</button>
 </div>
 
-<script src="/assets/js/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
 <script src="/assets/js/supabase-config.js"></script>
 <script src="/assets/js/portal-auth-v2.js"></script>
 
@@ -139,7 +139,7 @@ async function createProject() {
       p_title: title,
       p_service_type: selectedService,
     });
-    if (error) throw error;
+    if (error || !data) throw new Error('Não foi possível criar o projeto. Tente novamente.');
     window.location.href = '/portal/briefing.html?projeto=' + data.id;
   } catch (err) {
     const el = document.getElementById('apiError');

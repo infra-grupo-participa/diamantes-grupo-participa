@@ -1013,7 +1013,7 @@
       const search = state.search.toLowerCase();
       let items = state.demands;
       if (state.filter === 'in_progress')   items = items.filter(d => d.status === 'open' || d.status === 'in_progress' || d.status === 'review');
-      else if (state.filter === 'awaiting') items = items.filter(d => d.status === 'review');
+      else if (state.filter === 'awaiting') items = items.filter(d => d.status === 'review' || hasPendingBriefing(d));
       else if (state.filter === 'done')     items = items.filter(d => d.status === 'done');
       if (search) items = items.filter(d => (d.title || '').toLowerCase().includes(search));
       return items;

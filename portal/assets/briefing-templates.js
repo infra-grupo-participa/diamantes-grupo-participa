@@ -1178,6 +1178,9 @@ window.validateBriefing = function (serviceType, answers) {
       if (!val || !val.brand || !val.last4 || val.last4.length < 4 || !val.expiry) {
         missing.push(field.id);
       }
+    } else if (field.type === 'boolean') {
+      // false é uma resposta válida para boolean — só inválido se null/undefined
+      if (val === null || val === undefined) missing.push(field.id);
     } else if (val === null || val === undefined || val === '') {
       missing.push(field.id);
     }

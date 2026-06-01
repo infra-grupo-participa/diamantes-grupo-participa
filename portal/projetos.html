@@ -78,7 +78,14 @@
       <a href="projetos.html" class="active">Projetos</a>
       <a href="perfil.html">Meus dados</a>
     </nav>
-    <div></div>
+    <div class="user-chip" id="userChip" style="display:flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border-radius:999px;background:var(--surface);border:1px solid var(--border);cursor:pointer;position:relative;">
+      <div class="avatar" id="navAvatar" style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#fcd9a5,var(--accent));display:grid;place-items:center;color:#fff;font-weight:700;font-size:.78rem;flex-shrink:0;">?</div>
+      <span id="navName" style="font-weight:600;font-size:.85rem;">—</span>
+      <div id="userDropdown" style="display:none;position:absolute;top:calc(100% + 8px);right:0;min-width:180px;background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 40px rgba(85,60,30,.10);padding:6px;z-index:80;">
+        <a href="perfil.html" style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;font-size:.86rem;font-weight:500;color:var(--text-secondary);text-decoration:none;">Meus dados</a>
+        <button id="btnLogout" style="width:100%;display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;font-size:.86rem;font-weight:500;color:var(--text-secondary);background:transparent;border:none;cursor:pointer;text-align:left;">Sair</button>
+      </div>
+    </div>
   </div>
 </header>
 
@@ -93,7 +100,7 @@
   </div>
 </main>
 
-<script src="/assets/js/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
 <script src="/assets/js/supabase-config.js"></script>
 <script src="/assets/js/portal-auth-v2.js"></script>
 <script src="/portal/assets/briefing-templates.js"></script>
@@ -181,7 +188,12 @@ async function load() {
 }
 
 function openProject(id, briefingStatus) {
-  window.location.href = 'briefing.html?projeto=' + id;
+  if (briefingStatus === 'submitted') {
+    // Briefing já enviado — apenas exibe; futuramente abrirá tela de visualização
+    window.location.href = 'briefing.html?projeto=' + id;
+  } else {
+    window.location.href = 'briefing.html?projeto=' + id;
+  }
 }
 
 function escHtml(s) {
@@ -189,11 +201,24 @@ function escHtml(s) {
 }
 
 (async () => {
-  const user = await PortalAuth.init();
-  if (!user) { window.location.replace('/'); return; }
-  if (user.role === 'admin' || user.role === 'operator') {
-    window.location.replace('/admin/projetos.html'); return;
-  }
+  const profile = await PortalAPI.requireClient();
+  if (!profile) return;
+  const ini = (profile.name || '?').trim().split(/\s+/).slice(0,2).map(p => p[0]).join('').toUpperCase();
+  document.getElementById('navAvatar').textContent = ini;
+  document.getElementById('navName').textContent   = (profile.name || '').split(' ')[0];
+
+  const chip = document.getElementById('userChip');
+  const drop = document.getElementById('userDropdown');
+  chip.addEventListener('click', e => {
+    if (e.target.closest('#userDropdown')) return;
+    drop.style.display = drop.style.display === 'none' ? 'block' : 'none';
+  });
+  document.addEventListener('click', e => { if (!chip.contains(e.target)) drop.style.display = 'none'; });
+  document.getElementById('btnLogout').addEventListener('click', async () => {
+    if (!confirm('Sair?')) return;
+    try { await PortalAPI.logout(); } catch (_) {}
+  });
+
   await load();
 })();
 </script>

@@ -4,49 +4,185 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Projetos — Admin Diamantes</title>
-  <link rel="stylesheet" href="/assets/css/inter.css" />
-  <link rel="stylesheet" href="/admin/assets/admin.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    :root {
+      --bg: #f7f8fa; --surface: #ffffff; --sidebar-bg: #ffffff;
+      --border: #eef0f4; --border-strong: #e3e6ec;
+      --text: #0f172a; --text-secondary: #475569; --muted: #94a3b8;
+      --accent: #F29725; --accent-soft: #fff4e3; --accent-strong: #d97e0f;
+      --success: #16a34a; --danger: #ef4444;
+      --shadow-sm: 0 1px 2px rgba(15,23,42,.04);
+      --shadow-md: 0 4px 14px rgba(15,23,42,.06);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin:0; padding:0; height:100%;
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      color:var(--text); background:var(--bg); font-size:14px;
+      -webkit-font-smoothing:antialiased; }
+    button { font-family:inherit; cursor:pointer; }
+    input, select { font-family:inherit; }
+
+    /* ── Shell ─────────────────────────────────────────────── */
+    .app-shell { display:grid; grid-template-columns:248px 1fr; min-height:100vh; }
+
+    /* ── Sidebar ───────────────────────────────────────────── */
+    .sidebar {
+      background:var(--sidebar-bg); border-right:1px solid var(--border);
+      display:flex; flex-direction:column; padding:24px 16px; gap:20px;
+      position:sticky; top:0; height:100vh; overflow-y:auto;
+    }
+    .brand { display:flex; align-items:center; gap:10px; padding-bottom:4px; }
+    .brand-mark {
+      width:34px; height:34px; border-radius:10px; flex-shrink:0;
+      background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+      display:grid; place-items:center; color:#fff;
+    }
+    .brand-name { font-weight:800; font-size:1rem; letter-spacing:-.01em; }
+    .nav-section-label {
+      font-size:.65rem; font-weight:700; color:var(--muted);
+      text-transform:uppercase; letter-spacing:.08em; padding:0 6px 6px;
+    }
+    .nav { display:flex; flex-direction:column; gap:2px; }
+    .nav-item {
+      display:flex; align-items:center; gap:10px;
+      padding:9px 10px; border-radius:10px; color:var(--text-secondary);
+      font-size:.875rem; font-weight:500; text-decoration:none;
+      transition:background .12s, color .12s;
+    }
+    .nav-item:hover { background:var(--bg); color:var(--text); }
+    .nav-item.active { background:var(--accent-soft); color:var(--accent-strong); font-weight:600; }
+    .ico { width:16px; height:16px; flex-shrink:0; }
+    .sidebar-footer { margin-top:auto; display:flex; flex-direction:column; gap:8px; }
+    .user-pill {
+      display:flex; align-items:center; gap:10px;
+      background:var(--bg); border-radius:10px; padding:10px 12px;
+    }
+    .avatar {
+      width:32px; height:32px; border-radius:50%; flex-shrink:0;
+      background:linear-gradient(135deg,#fcd9a5,var(--accent));
+      display:grid; place-items:center; color:#fff; font-weight:700; font-size:.72rem;
+    }
+    .user-pill-name { font-size:.82rem; font-weight:600; }
+    .user-pill-role { font-size:.72rem; color:var(--muted); }
+    .logout-button {
+      display:flex; align-items:center; gap:8px; width:100%;
+      padding:9px 12px; border-radius:10px; border:none;
+      background:transparent; color:var(--muted); font-size:.84rem; font-weight:500;
+      transition:background .12s, color .12s;
+    }
+    .logout-button:hover { background:#fee2e2; color:var(--danger); }
+
+    /* ── Main ──────────────────────────────────────────────── */
+    .main { padding:32px 36px; overflow-y:auto; min-height:100vh; }
+    .page-head { margin-bottom:24px; }
+    .page-title { margin:0 0 4px; font-size:1.4rem; font-weight:800; letter-spacing:-.02em; }
+    .page-subtitle { margin:0; color:var(--text-secondary); font-size:.9rem; }
+
+    /* ── Filters + Table ───────────────────────────────────── */
+    .filters { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px; }
     .filter-select {
-      padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
-      font-size: 0.875rem; background: #fff; cursor: pointer;
+      padding:8px 12px; border:1.5px solid var(--border-strong); border-radius:8px;
+      font-size:.875rem; background:var(--surface); cursor:pointer; color:var(--text);
     }
-    .table-wrap { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #f8f8f8; padding: 12px 16px; text-align: left; font-size: 0.8rem;
-      font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; }
-    td { padding: 14px 16px; border-top: 1px solid #f0f0f0; font-size: 0.875rem; vertical-align: top; }
-    tr:hover td { background: #fafafa; }
-    .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
-    .badge-briefing  { background: #fff8e1; color: #e65100; }
-    .badge-active    { background: #e8f5e9; color: #2e7d32; }
-    .badge-completed { background: #e3f2fd; color: #1565c0; }
-    .badge-cancelled { background: #f5f5f5; color: #777; }
-    .badge-draft     { background: #fff3e0; color: #bf360c; }
-    .badge-submitted { background: #e8f5e9; color: #2e7d32; }
-    .service-label { font-size: 0.78rem; color: #888; }
+    .filter-select:focus { outline:none; border-color:var(--accent); }
+    .table-wrap {
+      background:var(--surface); border-radius:12px; overflow:hidden;
+      box-shadow:var(--shadow-md); border:1px solid var(--border);
+    }
+    table { width:100%; border-collapse:collapse; }
+    th {
+      background:var(--bg); padding:12px 16px; text-align:left;
+      font-size:.78rem; font-weight:600; color:var(--muted);
+      text-transform:uppercase; letter-spacing:.04em;
+    }
+    td { padding:14px 16px; border-top:1px solid var(--border); font-size:.875rem; vertical-align:top; }
+    tr:hover td { background:#fafbfc; }
+    .badge { display:inline-block; border-radius:6px; padding:2px 8px; font-size:.72rem; font-weight:600; }
+    .badge-briefing  { background:#fff8e1; color:#e65100; }
+    .badge-active    { background:#e8f5e9; color:#2e7d32; }
+    .badge-completed { background:#e3f2fd; color:#1565c0; }
+    .badge-cancelled { background:#f5f5f5; color:#777; }
+    .badge-draft     { background:#fff3e0; color:#bf360c; }
+    .badge-submitted { background:#e8f5e9; color:#2e7d32; }
     .progress-pill {
-      display: inline-flex; align-items: center; gap: 4px;
-      background: #f5f5f5; border-radius: 20px; padding: 3px 10px; font-size: 0.78rem; color: #555;
+      display:inline-flex; align-items:center; gap:4px;
+      background:var(--bg); border-radius:20px; padding:3px 10px;
+      font-size:.76rem; color:var(--text-secondary); margin-top:4px;
     }
-    .progress-pill .bar { width: 60px; height: 4px; background: #ddd; border-radius: 2px; overflow: hidden; }
-    .progress-pill .fill { height: 100%; background: #F29725; border-radius: 2px; }
+    .progress-pill .bar { width:56px; height:4px; background:var(--border-strong); border-radius:2px; overflow:hidden; }
+    .progress-pill .fill { height:100%; background:var(--accent); border-radius:2px; }
     .btn-view {
-      background: none; border: 1.5px solid #ddd; border-radius: 6px;
-      padding: 5px 12px; font-size: 0.8rem; cursor: pointer; color: #555;
+      background:none; border:1.5px solid var(--border-strong); border-radius:6px;
+      padding:5px 12px; font-size:.8rem; cursor:pointer; color:var(--text-secondary);
     }
-    .btn-view:hover { border-color: #F29725; color: #c07000; }
-    .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+    .btn-view:hover { border-color:var(--accent); color:var(--accent-strong); }
+    .service-label { font-size:.78rem; color:var(--muted); }
+    .empty-state { text-align:center; padding:60px 20px; color:var(--muted); }
+
+    @media (max-width:900px) {
+      .app-shell { grid-template-columns:1fr; }
+      .sidebar { position:static; height:auto; }
+      .main { padding:20px; }
+    }
   </style>
 </head>
 <body>
-<div id="root">
-  <div id="sidebar-placeholder"></div>
-  <div class="main-content">
-    <div class="page-header">
-      <h1>Projetos</h1>
-      <p>Briefings de abertura enviados pelos clientes.</p>
+<div class="app-shell">
+
+  <!-- ── Sidebar ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+      </div>
+      <div class="brand-name">Diamantes</div>
+    </div>
+
+    <div>
+      <div class="nav-section-label">Geral</div>
+      <nav class="nav">
+        <a href="index.html" class="nav-item">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Equipe
+        </a>
+        <a href="alunos-diamantes.html" class="nav-item">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M11 3 8 9l4 12 4-12-3-6"/><path d="M2 9h20"/></svg>
+          Alunos Diamantes
+        </a>
+        <a href="assinaturas.html" class="nav-item">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Assinaturas
+        </a>
+        <a href="projetos.html" class="nav-item active">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Projetos / Briefings
+        </a>
+      </nav>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <div class="avatar" id="sidebarAvatar">AD</div>
+        <div>
+          <div class="user-pill-name" id="sidebarUserName">Admin</div>
+          <div class="user-pill-role" id="sidebarUserEmail">—</div>
+        </div>
+      </div>
+      <button class="logout-button" id="btnLogout">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sair do admin
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────────── -->
+  <main class="main">
+    <div class="page-head">
+      <h1 class="page-title">Projetos / Briefings</h1>
+      <p class="page-subtitle">Briefings de abertura enviados pelos clientes.</p>
     </div>
 
     <div class="filters">
@@ -90,30 +226,32 @@
         </tbody>
       </table>
     </div>
-  </div>
+  </main>
 </div>
 
 <!-- Modal de visualização do briefing -->
-<div id="briefingModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; overflow-y:auto;">
-  <div style="max-width:700px; margin:40px auto; background:#fff; border-radius:16px; overflow:hidden;">
+<div id="briefingModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; overflow-y:auto;">
+  <div style="max-width:700px; margin:40px auto; background:#fff; border-radius:16px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.2);">
     <div style="padding:20px 24px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
       <div>
         <div id="modalTitle" style="font-size:1.1rem; font-weight:700;"></div>
         <div id="modalMeta" style="font-size:0.8rem; color:#888; margin-top:2px;"></div>
       </div>
-      <button onclick="closeModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#aaa;">×</button>
+      <button id="btnCloseModal" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#aaa;line-height:1;">×</button>
     </div>
     <div id="modalBody" style="padding:24px; max-height:70vh; overflow-y:auto;"></div>
   </div>
 </div>
 
-<script src="/assets/js/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
 <script src="/assets/js/supabase-config.js"></script>
 <script src="/assets/js/portal-auth-v2.js"></script>
 <script src="/portal/assets/briefing-templates.js"></script>
 <script src="/admin/assets/admin-api.js"></script>
 
 <script>
+'use strict';
+
 const SERVICE_LABELS = {
   anuncios_pagos:        '📣 Anúncios Pagos',
   design_grafico:        '🎨 Design Gráfico',
@@ -122,9 +260,14 @@ const SERVICE_LABELS = {
   web_design_automacao:  '💻 Web Design / Auto.',
 };
 
+// Mapa de projetos para lookup seguro no modal (evita JSON no onclick = XSS)
+const projectsMap = {};
+
 async function loadProjects() {
   const supabase = window.getSupabaseClient();
-  let q = supabase.from('projects').select('*, clients(display_name)').order('created_at', { ascending: false });
+  let q = supabase.from('projects')
+    .select('*, clients(display_name)')
+    .order('created_at', { ascending: false });
 
   const svc = document.getElementById('filterService').value;
   const sta = document.getElementById('filterStatus').value;
@@ -135,38 +278,44 @@ async function loadProjects() {
 
   const { data, error } = await q;
   const tbody = document.getElementById('tableBody');
+
   if (error || !data || !data.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum projeto encontrado.</td></tr>';
     return;
   }
 
+  // Armazena no map para uso seguro no modal
+  data.forEach(p => { projectsMap[p.id] = p; });
+
   tbody.innerHTML = data.map(p => {
-    const tpl = window.BRIEFING_TEMPLATES[p.service_type];
+    const tpl      = window.BRIEFING_TEMPLATES[p.service_type];
     const progress = tpl ? calcProgress(tpl, p.briefing || {}) : null;
-    const clientName = p.clients?.display_name || p.client_slug;
-    const date = new Date(p.created_at).toLocaleDateString('pt-BR');
+    const client   = escHtml(p.clients?.display_name || p.client_slug);
+    const date     = new Date(p.created_at).toLocaleDateString('pt-BR');
+    const svcLabel = SERVICE_LABELS[p.service_type] || p.service_type;
 
     return `<tr>
       <td><strong>${escHtml(p.title)}</strong></td>
-      <td>${escHtml(clientName)}</td>
-      <td><span class="service-label">${SERVICE_LABELS[p.service_type] || p.service_type}</span></td>
+      <td>${client}</td>
+      <td><span class="service-label">${escHtml(svcLabel)}</span></td>
       <td>
-        <span class="badge badge-${p.briefing_status}">${p.briefing_status === 'submitted' ? 'Enviado' : 'Rascunho'}</span>
-        ${progress !== null ? `<div class="progress-pill" style="margin-top:4px">
-          <div class="bar"><div class="fill" style="width:${progress}%"></div></div>
-          ${progress}%
-        </div>` : ''}
+        <span class="badge badge-${p.briefing_status === 'submitted' ? 'submitted' : 'draft'}">
+          ${p.briefing_status === 'submitted' ? 'Enviado' : 'Rascunho'}
+        </span>
+        ${progress !== null ? `
+          <div class="progress-pill">
+            <div class="bar"><div class="fill" style="width:${progress}%"></div></div>
+            ${progress}%
+          </div>` : ''}
       </td>
-      <td><span class="badge badge-${p.status}">${statusLabel(p.status)}</span></td>
+      <td><span class="badge badge-${escHtml(p.status)}">${escHtml(statusLabel(p.status))}</span></td>
       <td>${date}</td>
-      <td><button class="btn-view" onclick='openModal(${JSON.stringify(p)})'>Ver briefing</button></td>
+      <td><button class="btn-view" data-project-id="${escHtml(p.id)}">Ver briefing</button></td>
     </tr>`;
   }).join('');
 }
 
 function calcProgress(tpl, answers) {
-  const req = window.getBriefingRequiredFields(tpl.sections[0] ? tpl.sections[0].fields[0] && tpl : null);
-  if (!req) return null;
   const all = tpl.sections.flatMap(s => s.fields.filter(f => f.priority === 'red'));
   if (!all.length) return 100;
   const filled = all.filter(f => {
@@ -184,30 +333,42 @@ function statusLabel(s) {
 function openModal(p) {
   document.getElementById('modalTitle').textContent = p.title;
   document.getElementById('modalMeta').textContent =
-    (SERVICE_LABELS[p.service_type] || p.service_type) + ' · ' + p.client_slug;
+    (SERVICE_LABELS[p.service_type] || p.service_type) + ' · ' + (p.clients?.display_name || p.client_slug);
 
-  const tpl = window.BRIEFING_TEMPLATES[p.service_type];
+  const tpl     = window.BRIEFING_TEMPLATES[p.service_type];
   const answers = p.briefing || {};
 
   let html = '';
   if (!tpl) {
-    html = '<p>Template não disponível para este serviço.</p>';
+    html = '<p style="color:#aaa;text-align:center;padding:20px;">Template não disponível para este serviço.</p>';
   } else {
     tpl.sections.forEach(s => {
+      const filledFields = s.fields.filter(f => {
+        if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return false;
+        const v = answers[f.id];
+        return v !== null && v !== undefined && v !== '';
+      });
+      if (!filledFields.length) return;
+
       html += `<div style="margin-bottom:20px;">
-        <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#333;">${s.icon} ${s.title}</div>`;
-      s.fields.forEach(f => {
-        const val = answers[f.id];
-        if (val === null || val === undefined || val === '') return;
-        html += `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:0.85rem;">
-          <span style="color:#888;min-width:200px;">${escHtml(f.label)}</span>
-          <span style="color:#1a1a1a;font-weight:500;">${escHtml(String(val === true ? 'Sim' : val === false ? 'Não' : val))}</span>
+        <div style="font-weight:700;font-size:.95rem;margin-bottom:10px;color:#333;padding-bottom:6px;border-bottom:2px solid #f0f0f0;">${escHtml(s.title)}</div>`;
+      filledFields.forEach(f => {
+        const raw = answers[f.id];
+        let display;
+        if (f.type === 'card' && typeof raw === 'object' && raw) {
+          display = `${raw.brand || ''} **** ${raw.last4 || ''}  val. ${raw.expiry || ''}`;
+        } else {
+          display = raw === true ? 'Sim' : raw === false ? 'Não' : String(raw);
+        }
+        html += `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:.85rem;">
+          <span style="color:#888;min-width:220px;flex-shrink:0;">${escHtml(f.label)}</span>
+          <span style="color:#1a1a1a;font-weight:500;">${escHtml(display)}</span>
         </div>`;
       });
       html += '</div>';
     });
-    if (!html.includes('<span style="color:#1a1a1a')) {
-      html = '<p style="color:#aaa;text-align:center;padding:20px">Briefing ainda não preenchido.</p>';
+    if (!html) {
+      html = '<p style="color:#aaa;text-align:center;padding:20px;">Briefing ainda não preenchido.</p>';
     }
   }
 
@@ -220,12 +381,38 @@ function closeModal() {
 }
 
 function escHtml(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s || '').replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
+// Event delegation para abrir modal — evita onclick com JSON (XSS)
+document.getElementById('tableBody').addEventListener('click', e => {
+  const btn = e.target.closest('.btn-view[data-project-id]');
+  if (!btn) return;
+  const p = projectsMap[btn.dataset.projectId];
+  if (p) openModal(p);
+});
+
+document.getElementById('briefingModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('briefingModal')) closeModal();
+});
+document.getElementById('btnCloseModal').addEventListener('click', closeModal);
+
+// ── Bootstrap ─────────────────────────────────────────────
 (async () => {
-  const user = await PortalAuth.init();
-  if (!user || user.role !== 'admin') { window.location.replace('/'); return; }
+  const user = await AdminAPI.requireAdmin();
+  if (!user) return;
+
+  const ini = (user.name || 'AD').trim().split(/\s+/).slice(0,2).map(p => p[0]).join('').toUpperCase();
+  document.getElementById('sidebarAvatar').textContent  = ini;
+  document.getElementById('sidebarUserName').textContent = user.name  || 'Admin';
+  document.getElementById('sidebarUserEmail').textContent = user.email || '';
+
+  document.getElementById('btnLogout').addEventListener('click', async () => {
+    if (!confirm('Tem certeza que deseja sair?')) return;
+    try { await AdminAPI.logout(); } catch (_) {}
+  });
+
   await loadProjects();
 })();
 </script>

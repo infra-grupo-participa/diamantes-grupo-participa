@@ -16,7 +16,7 @@
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Origin: https://diamantes.grupoparticipa.app.br');
 header('Access-Control-Allow-Headers: Authorization, Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
@@ -150,6 +150,11 @@ if (empty($_FILES['pdf']) || $_FILES['pdf']['error'] !== UPLOAD_ERR_OK) {
 $pdfFile = $_FILES['pdf'];
 if ($pdfFile['size'] > 20 * 1024 * 1024) {
     json_out(['ok' => false, 'error' => 'PDF muito grande (máx 20 MB).'], 400);
+}
+$finfo = new finfo(FILEINFO_MIME_TYPE);
+$realMime = $finfo->file($pdfFile['tmp_name']);
+if ($realMime !== 'application/pdf') {
+    json_out(['ok' => false, 'error' => 'Apenas arquivos PDF são aceitos.'], 400);
 }
 
 // ── Caller ────────────────────────────────────────────────────────────────────

@@ -449,6 +449,7 @@ const SVG_ICONS = {
 };
 function icon(name) { return SVG_ICONS[name] || ''; }
 
+let activeSectionIdx = 0;  // índice da seção ativa na sidebar
 const params      = new URLSearchParams(location.search);
 const PROJECT_ID  = params.get('projeto');
 const DEMAND_ID   = params.get('demanda');
