@@ -391,15 +391,16 @@
     }));
   }
 
-  async function createDemand({ title, description, operator_ids, starts_at, ends_at }) {
+  async function createDemand({ title, description, operator_ids, service_type, starts_at, ends_at }) {
     if (!title || !title.trim()) throw new Error('Título obrigatório.');
     if (!operator_ids || operator_ids.length === 0) throw new Error('Selecione pelo menos um operador.');
     const { data, error } = await client().rpc('create_demand', {
-      p_title:       title.trim(),
-      p_description: description || null,
-      p_operators:   operator_ids,
-      p_starts_at:   starts_at || null,
-      p_ends_at:     ends_at   || null,
+      p_title:        title.trim(),
+      p_description:  description || null,
+      p_operators:    operator_ids,
+      p_service_type: service_type || null,
+      p_starts_at:    starts_at || null,
+      p_ends_at:      ends_at   || null,
     });
     if (error) throw error;
     return data;

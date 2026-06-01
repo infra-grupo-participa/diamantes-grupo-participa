@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Novo Projeto — Diamantes</title>
+  <link rel="stylesheet" href="/assets/css/inter.css" />
+  <link rel="stylesheet" href="/portal/assets/portal.css" />
+  <style>
+    body { background: #f5f5f5; min-height: 100vh; }
+    .page-wrap { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
+    h1 { font-size: 1.5rem; font-weight: 700; color: #1a1a1a; margin-bottom: 6px; }
+    .subtitle { color: #666; font-size: 0.95rem; margin-bottom: 32px; }
+
+    .service-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+    .service-card {
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 20px 16px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      background: #fff;
+      text-align: left;
+    }
+    .service-card:hover { border-color: #F29725; background: #fffbf4; }
+    .service-card.selected { border-color: #F29725; background: #fffbf4; }
+    .service-card .icon { font-size: 2rem; margin-bottom: 10px; }
+    .service-card .name { font-weight: 600; font-size: 0.95rem; color: #1a1a1a; }
+    .service-card .desc { font-size: 0.8rem; color: #888; margin-top: 4px; }
+
+    .field-group { margin-bottom: 24px; }
+    label { display: block; font-size: 0.875rem; font-weight: 600; color: #333; margin-bottom: 6px; }
+    input[type=text] {
+      width: 100%; padding: 10px 14px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 0.95rem; outline: none; transition: border-color .15s;
+      box-sizing: border-box;
+    }
+    input[type=text]:focus { border-color: #F29725; }
+
+    .btn-primary {
+      background: #F29725; color: #fff; border: none; border-radius: 8px;
+      padding: 12px 28px; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: background .15s; width: 100%;
+    }
+    .btn-primary:hover { background: #d9841a; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-back {
+      background: none; border: none; color: #888; font-size: 0.875rem; cursor: pointer;
+      padding: 0; margin-bottom: 20px; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-back:hover { color: #333; }
+    .error-msg { color: #e53935; font-size: 0.85rem; margin-top: 8px; display: none; }
+    .loading { opacity: .5; pointer-events: none; }
+  </style>
+</head>
+<body>
+<div id="app" class="page-wrap">
+  <button class="btn-back" onclick="history.back()">← Voltar</button>
+  <h1>Novo Projeto</h1>
+  <p class="subtitle">Escolha o tipo de serviço e dê um nome ao projeto. Em seguida, você preencherá o briefing de abertura para que a equipe tenha tudo o que precisa para começar.</p>
+
+  <div class="service-grid" id="serviceGrid">
+    <div class="service-card" data-value="anuncios_pagos" onclick="selectService(this)">
+      <div class="icon">📣</div>
+      <div class="name">Anúncios Pagos</div>
+      <div class="desc">Meta Ads · Google Ads · YouTube</div>
+    </div>
+    <div class="service-card" data-value="design_grafico" onclick="selectService(this)">
+      <div class="icon">🎨</div>
+      <div class="name">Design Gráfico</div>
+      <div class="desc">Criativos · Identidade visual</div>
+    </div>
+    <div class="service-card" data-value="edicao_video" onclick="selectService(this)">
+      <div class="icon">🎬</div>
+      <div class="name">Edição de Vídeo</div>
+      <div class="desc">Reels · VSL · YouTube</div>
+    </div>
+    <div class="service-card" data-value="social_media" onclick="selectService(this)">
+      <div class="icon">📱</div>
+      <div class="name">Social Media / Copy</div>
+      <div class="desc">Conteúdo orgânico · Calendário</div>
+    </div>
+    <div class="service-card" data-value="web_design_automacao" onclick="selectService(this)">
+      <div class="icon">💻</div>
+      <div class="name">Web Design / Automação</div>
+      <div class="desc">Landing pages · Integrações</div>
+    </div>
+  </div>
+
+  <div class="field-group">
+    <label for="projectTitle">Nome do Projeto *</label>
+    <input type="text" id="projectTitle" placeholder='Ex.: Seminário Tributário Jun/26' maxlength="120" />
+    <p class="error-msg" id="titleError">Preencha o nome do projeto.</p>
+    <p class="error-msg" id="serviceError">Selecione um tipo de serviço.</p>
+    <p class="error-msg" id="apiError"></p>
+  </div>
+
+  <button class="btn-primary" id="btnCreate" onclick="createProject()">Continuar para o Briefing →</button>
+</div>
+
+<script src="/assets/js/supabase.min.js"></script>
+<script src="/assets/js/supabase-config.js"></script>
+<script src="/assets/js/portal-auth-v2.js"></script>
+
+<script>
+let selectedService = null;
+
+function selectService(el) {
+  document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedService = el.dataset.value;
+  document.getElementById('serviceError').style.display = 'none';
+}
+
+async function createProject() {
+  const title = document.getElementById('projectTitle').value.trim();
+  let ok = true;
+
+  document.getElementById('titleError').style.display = 'none';
+  document.getElementById('serviceError').style.display = 'none';
+  document.getElementById('apiError').style.display = 'none';
+
+  if (!title) { document.getElementById('titleError').style.display = 'block'; ok = false; }
+  if (!selectedService) { document.getElementById('serviceError').style.display = 'block'; ok = false; }
+  if (!ok) return;
+
+  const btn = document.getElementById('btnCreate');
+  btn.disabled = true;
+  btn.textContent = 'Criando...';
+
+  try {
+    const supabase = window.getSupabaseClient();
+    const { data, error } = await supabase.rpc('create_project', {
+      p_title: title,
+      p_service_type: selectedService,
+    });
+    if (error) throw error;
+    window.location.href = '/portal/briefing.html?projeto=' + data.id;
+  } catch (err) {
+    const el = document.getElementById('apiError');
+    el.textContent = err.message || 'Erro ao criar projeto. Tente novamente.';
+    el.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Continuar para o Briefing →';
+  }
+}
+
+(async () => {
+  const user = await PortalAuth.init();
+  if (!user || user.role === 'admin' || user.role === 'operator') {
+    window.location.replace('/');
+  }
+})();
+</script>
+</body>
+</html>

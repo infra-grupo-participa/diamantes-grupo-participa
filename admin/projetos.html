@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Projetos — Admin Diamantes</title>
+  <link rel="stylesheet" href="/assets/css/inter.css" />
+  <link rel="stylesheet" href="/admin/assets/admin.css" />
+  <style>
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .filter-select {
+      padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 0.875rem; background: #fff; cursor: pointer;
+    }
+    .table-wrap { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8f8f8; padding: 12px 16px; text-align: left; font-size: 0.8rem;
+      font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; }
+    td { padding: 14px 16px; border-top: 1px solid #f0f0f0; font-size: 0.875rem; vertical-align: top; }
+    tr:hover td { background: #fafafa; }
+    .badge { display: inline-block; border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
+    .badge-briefing  { background: #fff8e1; color: #e65100; }
+    .badge-active    { background: #e8f5e9; color: #2e7d32; }
+    .badge-completed { background: #e3f2fd; color: #1565c0; }
+    .badge-cancelled { background: #f5f5f5; color: #777; }
+    .badge-draft     { background: #fff3e0; color: #bf360c; }
+    .badge-submitted { background: #e8f5e9; color: #2e7d32; }
+    .service-label { font-size: 0.78rem; color: #888; }
+    .progress-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #f5f5f5; border-radius: 20px; padding: 3px 10px; font-size: 0.78rem; color: #555;
+    }
+    .progress-pill .bar { width: 60px; height: 4px; background: #ddd; border-radius: 2px; overflow: hidden; }
+    .progress-pill .fill { height: 100%; background: #F29725; border-radius: 2px; }
+    .btn-view {
+      background: none; border: 1.5px solid #ddd; border-radius: 6px;
+      padding: 5px 12px; font-size: 0.8rem; cursor: pointer; color: #555;
+    }
+    .btn-view:hover { border-color: #F29725; color: #c07000; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
+  </style>
+</head>
+<body>
+<div id="root">
+  <div id="sidebar-placeholder"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <h1>Projetos</h1>
+      <p>Briefings de abertura enviados pelos clientes.</p>
+    </div>
+
+    <div class="filters">
+      <select class="filter-select" id="filterService" onchange="loadProjects()">
+        <option value="">Todos os serviços</option>
+        <option value="anuncios_pagos">Anúncios Pagos</option>
+        <option value="design_grafico">Design Gráfico</option>
+        <option value="edicao_video">Edição de Vídeo</option>
+        <option value="social_media">Social Media / Copy</option>
+        <option value="web_design_automacao">Web Design / Automação</option>
+      </select>
+      <select class="filter-select" id="filterStatus" onchange="loadProjects()">
+        <option value="">Todos os status</option>
+        <option value="briefing">Briefing pendente</option>
+        <option value="active">Ativo</option>
+        <option value="completed">Concluído</option>
+        <option value="cancelled">Cancelado</option>
+      </select>
+      <select class="filter-select" id="filterBriefing" onchange="loadProjects()">
+        <option value="">Qualquer briefing</option>
+        <option value="draft">Rascunho</option>
+        <option value="submitted">Enviado</option>
+      </select>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Projeto</th>
+            <th>Cliente</th>
+            <th>Serviço</th>
+            <th>Briefing</th>
+            <th>Status</th>
+            <th>Criado em</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="7" class="empty-state">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de visualização do briefing -->
+<div id="briefingModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; overflow-y:auto;">
+  <div style="max-width:700px; margin:40px auto; background:#fff; border-radius:16px; overflow:hidden;">
+    <div style="padding:20px 24px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div id="modalTitle" style="font-size:1.1rem; font-weight:700;"></div>
+        <div id="modalMeta" style="font-size:0.8rem; color:#888; margin-top:2px;"></div>
+      </div>
+      <button onclick="closeModal()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#aaa;">×</button>
+    </div>
+    <div id="modalBody" style="padding:24px; max-height:70vh; overflow-y:auto;"></div>
+  </div>
+</div>
+
+<script src="/assets/js/supabase.min.js"></script>
+<script src="/assets/js/supabase-config.js"></script>
+<script src="/assets/js/portal-auth-v2.js"></script>
+<script src="/portal/assets/briefing-templates.js"></script>
+<script src="/admin/assets/admin-api.js"></script>
+
+<script>
+const SERVICE_LABELS = {
+  anuncios_pagos:        '📣 Anúncios Pagos',
+  design_grafico:        '🎨 Design Gráfico',
+  edicao_video:          '🎬 Edição de Vídeo',
+  social_media:          '📱 Social Media',
+  web_design_automacao:  '💻 Web Design / Auto.',
+};
+
+async function loadProjects() {
+  const supabase = window.getSupabaseClient();
+  let q = supabase.from('projects').select('*, clients(display_name)').order('created_at', { ascending: false });
+
+  const svc = document.getElementById('filterService').value;
+  const sta = document.getElementById('filterStatus').value;
+  const brf = document.getElementById('filterBriefing').value;
+  if (svc) q = q.eq('service_type', svc);
+  if (sta) q = q.eq('status', sta);
+  if (brf) q = q.eq('briefing_status', brf);
+
+  const { data, error } = await q;
+  const tbody = document.getElementById('tableBody');
+  if (error || !data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">Nenhum projeto encontrado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.map(p => {
+    const tpl = window.BRIEFING_TEMPLATES[p.service_type];
+    const progress = tpl ? calcProgress(tpl, p.briefing || {}) : null;
+    const clientName = p.clients?.display_name || p.client_slug;
+    const date = new Date(p.created_at).toLocaleDateString('pt-BR');
+
+    return `<tr>
+      <td><strong>${escHtml(p.title)}</strong></td>
+      <td>${escHtml(clientName)}</td>
+      <td><span class="service-label">${SERVICE_LABELS[p.service_type] || p.service_type}</span></td>
+      <td>
+        <span class="badge badge-${p.briefing_status}">${p.briefing_status === 'submitted' ? 'Enviado' : 'Rascunho'}</span>
+        ${progress !== null ? `<div class="progress-pill" style="margin-top:4px">
+          <div class="bar"><div class="fill" style="width:${progress}%"></div></div>
+          ${progress}%
+        </div>` : ''}
+      </td>
+      <td><span class="badge badge-${p.status}">${statusLabel(p.status)}</span></td>
+      <td>${date}</td>
+      <td><button class="btn-view" onclick='openModal(${JSON.stringify(p)})'>Ver briefing</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function calcProgress(tpl, answers) {
+  const req = window.getBriefingRequiredFields(tpl.sections[0] ? tpl.sections[0].fields[0] && tpl : null);
+  if (!req) return null;
+  const all = tpl.sections.flatMap(s => s.fields.filter(f => f.priority === 'red'));
+  if (!all.length) return 100;
+  const filled = all.filter(f => {
+    if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return true;
+    const v = answers[f.id];
+    return v !== null && v !== undefined && v !== '';
+  });
+  return Math.round(filled.length / all.length * 100);
+}
+
+function statusLabel(s) {
+  return { briefing: 'Briefing', active: 'Ativo', completed: 'Concluído', cancelled: 'Cancelado' }[s] || s;
+}
+
+function openModal(p) {
+  document.getElementById('modalTitle').textContent = p.title;
+  document.getElementById('modalMeta').textContent =
+    (SERVICE_LABELS[p.service_type] || p.service_type) + ' · ' + p.client_slug;
+
+  const tpl = window.BRIEFING_TEMPLATES[p.service_type];
+  const answers = p.briefing || {};
+
+  let html = '';
+  if (!tpl) {
+    html = '<p>Template não disponível para este serviço.</p>';
+  } else {
+    tpl.sections.forEach(s => {
+      html += `<div style="margin-bottom:20px;">
+        <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px;color:#333;">${s.icon} ${s.title}</div>`;
+      s.fields.forEach(f => {
+        const val = answers[f.id];
+        if (val === null || val === undefined || val === '') return;
+        html += `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:0.85rem;">
+          <span style="color:#888;min-width:200px;">${escHtml(f.label)}</span>
+          <span style="color:#1a1a1a;font-weight:500;">${escHtml(String(val === true ? 'Sim' : val === false ? 'Não' : val))}</span>
+        </div>`;
+      });
+      html += '</div>';
+    });
+    if (!html.includes('<span style="color:#1a1a1a')) {
+      html = '<p style="color:#aaa;text-align:center;padding:20px">Briefing ainda não preenchido.</p>';
+    }
+  }
+
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('briefingModal').style.display = 'block';
+}
+
+function closeModal() {
+  document.getElementById('briefingModal').style.display = 'none';
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+(async () => {
+  const user = await PortalAuth.init();
+  if (!user || user.role !== 'admin') { window.location.replace('/'); return; }
+  await loadProjects();
+})();
+</script>
+</body>
+</html>

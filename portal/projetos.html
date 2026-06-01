@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meus Projetos — Diamantes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fdfaf5; --surface: #ffffff; --border: #f1ebe0;
+      --text: #1a1410; --text-secondary: #5b524a; --muted: #9c8f81;
+      --accent: #F29725; --accent-soft: #fff4e3; --accent-strong: #d97e0f;
+      --shadow-sm: 0 1px 2px rgba(85,60,30,.04);
+      --shadow-md: 0 4px 16px rgba(85,60,30,.06);
+    }
+    * { box-sizing: border-box; }
+    html,body { margin:0;padding:0;font-family:'Inter',-apple-system,sans-serif;color:var(--text);
+      background:radial-gradient(1200px 600px at 90% -10%,rgba(242,151,37,.10),transparent 60%),
+      radial-gradient(900px 500px at -10% 30%,rgba(242,151,37,.06),transparent 60%),var(--bg);
+      background-attachment:fixed;-webkit-font-smoothing:antialiased;font-size:14px; }
+    button { font-family:inherit;cursor:pointer; }
+
+    .topbar { max-width:1100px;margin:0 auto;padding:20px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px; }
+    .brand { display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem; }
+    .brand-mark { width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--accent),var(--accent-strong));display:grid;place-items:center;color:#fff; }
+    .topnav { display:flex;gap:4px;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px;box-shadow:var(--shadow-sm); }
+    .topnav a { padding:8px 18px;border-radius:999px;color:var(--text-secondary);text-decoration:none;font-weight:500;font-size:.875rem;transition:background .12s,color .12s; }
+    .topnav a:hover { background:var(--bg);color:var(--text); }
+    .topnav a.active { background:var(--text);color:#fff; }
+
+    .main { max-width:1100px;margin:0 auto;padding:0 28px 60px; }
+    .page-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:28px; }
+    .page-header h1 { font-size:1.4rem;font-weight:800;margin:0; }
+    .btn-new { background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 22px;font-size:.9rem;font-weight:600;display:flex;align-items:center;gap:7px;transition:background .15s; }
+    .btn-new:hover { background:var(--accent-strong); }
+
+    .projects-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px; }
+    .project-card { background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;transition:box-shadow .15s,transform .12s; }
+    .project-card:hover { box-shadow:var(--shadow-md);transform:translateY(-1px); }
+    .card-service { display:flex;align-items:center;gap:8px;margin-bottom:12px; }
+    .service-icon { font-size:1.3rem; }
+    .service-tag { font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em; }
+    .card-title { font-size:1rem;font-weight:700;color:var(--text);margin:0 0 8px; }
+    .card-meta { font-size:.8rem;color:var(--muted); }
+    .card-footer { display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding-top:14px;border-top:1px solid var(--border); }
+    .status-badge { display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600; }
+    .badge-briefing  { background:#fff8e1;color:#e65100; }
+    .badge-active    { background:#e8f5e9;color:#2e7d32; }
+    .badge-completed { background:#e3f2fd;color:#1565c0; }
+    .badge-cancelled { background:#f5f5f5;color:#777; }
+    .progress-wrap { display:flex;align-items:center;gap:8px; }
+    .progress-bar { width:80px;height:5px;background:#e8e0d4;border-radius:3px;overflow:hidden; }
+    .progress-bar .fill { height:100%;background:var(--accent);border-radius:3px;transition:width .3s; }
+    .progress-pct { font-size:.75rem;color:var(--muted); }
+    .briefing-pill { display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:600; }
+    .pill-draft     { background:#fff3e0;color:#bf360c; }
+    .pill-submitted { background:#e8f5e9;color:#2e7d32; }
+    .btn-open { background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-size:.8rem;font-weight:500;color:var(--text-secondary);transition:border-color .12s; }
+    .btn-open:hover { border-color:var(--accent);color:var(--accent-strong); }
+
+    .empty-state { text-align:center;padding:80px 20px;color:var(--muted); }
+    .empty-state .icon { font-size:2.5rem;margin-bottom:12px; }
+    .empty-state h2 { font-size:1.1rem;color:var(--text);margin:0 0 8px; }
+    .empty-state p { font-size:.875rem;margin:0 0 20px; }
+  </style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">💎</div>
+      Diamantes
+    </div>
+    <nav class="topnav">
+      <a href="dashboard.html">Início</a>
+      <a href="demandas.html">Demandas</a>
+      <a href="projetos.html" class="active">Projetos</a>
+      <a href="perfil.html">Meus dados</a>
+    </nav>
+    <div></div>
+  </div>
+</header>
+
+<main class="main">
+  <div class="page-header">
+    <h1>Meus Projetos</h1>
+    <button class="btn-new" onclick="window.location.href='novo-projeto.html'">+ Novo Projeto</button>
+  </div>
+
+  <div id="projectsGrid" class="projects-grid">
+    <div style="color:var(--muted);font-size:.875rem">Carregando...</div>
+  </div>
+</main>
+
+<script src="/assets/js/supabase.min.js"></script>
+<script src="/assets/js/supabase-config.js"></script>
+<script src="/assets/js/portal-auth-v2.js"></script>
+<script src="/portal/assets/briefing-templates.js"></script>
+<script src="/portal/assets/portal-api.js"></script>
+
+<script>
+const SERVICE_LABELS = {
+  anuncios_pagos:       { label: 'Anúncios Pagos',        icon: '📣' },
+  design_grafico:       { label: 'Design Gráfico',         icon: '🎨' },
+  edicao_video:         { label: 'Edição de Vídeo',        icon: '🎬' },
+  social_media:         { label: 'Social Media / Copy',   icon: '📱' },
+  web_design_automacao: { label: 'Web Design / Automação', icon: '💻' },
+};
+const STATUS_LABELS = {
+  briefing:  { label: 'Aguardando briefing', cls: 'badge-briefing' },
+  active:    { label: 'Ativo',               cls: 'badge-active'   },
+  completed: { label: 'Concluído',           cls: 'badge-completed'},
+  cancelled: { label: 'Cancelado',           cls: 'badge-cancelled'},
+};
+
+function calcProgress(serviceType, answers) {
+  const tpl = window.BRIEFING_TEMPLATES[serviceType];
+  if (!tpl) return null;
+  const all = tpl.sections.flatMap(s => s.fields.filter(f => f.priority === 'red'));
+  if (!all.length) return 100;
+  const filled = all.filter(f => {
+    if (f.dependsOn && (answers || {})[f.dependsOn.field] !== f.dependsOn.value) return true;
+    const v = (answers || {})[f.id];
+    return v !== null && v !== undefined && v !== '';
+  });
+  return Math.round(filled.length / all.length * 100);
+}
+
+async function load() {
+  const supabase = window.getSupabaseClient();
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  const grid = document.getElementById('projectsGrid');
+
+  if (error || !data || !data.length) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="icon">📁</div>
+        <h2>Nenhum projeto ainda</h2>
+        <p>Crie um projeto para fornecer o contexto completo antes de abrir demandas.</p>
+        <button class="btn-new" onclick="window.location.href='novo-projeto.html'">+ Novo Projeto</button>
+      </div>`;
+    return;
+  }
+
+  grid.innerHTML = data.map(p => {
+    const svc     = SERVICE_LABELS[p.service_type] || { label: p.service_type, icon: '📋' };
+    const sts     = STATUS_LABELS[p.status] || { label: p.status, cls: 'badge-briefing' };
+    const pct     = calcProgress(p.service_type, p.briefing);
+    const date    = new Date(p.created_at).toLocaleDateString('pt-BR');
+
+    return `
+    <div class="project-card" onclick="openProject('${p.id}', '${p.briefing_status}')">
+      <div class="card-service">
+        <span class="service-icon">${svc.icon}</span>
+        <span class="service-tag">${svc.label}</span>
+      </div>
+      <div class="card-title">${escHtml(p.title)}</div>
+      <div class="card-meta">Criado em ${date}</div>
+      <div class="card-footer">
+        <div>
+          <span class="status-badge ${sts.cls}">${sts.label}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          ${pct !== null && p.briefing_status !== 'submitted' ? `
+            <div class="progress-wrap">
+              <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+              <span class="progress-pct">${pct}%</span>
+            </div>` : ''}
+          <span class="briefing-pill ${p.briefing_status === 'submitted' ? 'pill-submitted' : 'pill-draft'}">
+            ${p.briefing_status === 'submitted' ? '✓ Briefing enviado' : '✏️ Rascunho'}
+          </span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openProject(id, briefingStatus) {
+  window.location.href = 'briefing.html?projeto=' + id;
+}
+
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+(async () => {
+  const user = await PortalAuth.init();
+  if (!user) { window.location.replace('/'); return; }
+  if (user.role === 'admin' || user.role === 'operator') {
+    window.location.replace('/admin/projetos.html'); return;
+  }
+  await load();
+})();
+</script>
+</body>
+</html>
