@@ -602,12 +602,19 @@ function renderField(f) {
     ).join('');
     input = `<select class="field-input" id="field-${f.id}" onchange="setValue('${f.id}', this.value)">
       <option value="">— Selecione —</option>${opts}</select>`;
+  } else if (f.type === 'phone') {
+    const val = answers[f.id] != null ? String(answers[f.id]) : '';
+    const ph = escHtml(f.placeholder || f.hint || '(11) 99999-9999');
+    input = `<input class="field-input" id="field-${f.id}" type="tel" value="${escHtml(val)}"
+      placeholder="${ph}" inputmode="tel"
+      oninput="formatPhone(this); setValue('${f.id}', this.value)" />`;
   } else {
     const val = answers[f.id] != null ? String(answers[f.id]) : '';
     const type = f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : f.type === 'url' ? 'url' : f.type === 'date' ? 'date' : 'text';
     const roAttr = f.readonly ? 'readonly tabindex="-1"' : '';
+    const ph = escHtml(f.placeholder || f.hint || '');
     input = `<input class="field-input" id="field-${f.id}" type="${type}" value="${escHtml(val)}"
-      placeholder="${escHtml(f.hint || '')}" ${roAttr}
+      placeholder="${ph}" ${roAttr}
       oninput="setValue('${f.id}', this.value)" />`;
   }
 
@@ -621,7 +628,7 @@ function renderField(f) {
           : `<span class="priority-tag ${f.priority}">${PRIORITY_LABELS[f.priority] || ''}</span>`
         }
       </div>
-      ${f.hint && f.type !== 'boolean' && f.type !== 'select' ? `<div class="field-hint">${escHtml(f.hint)}</div>` : ''}
+      ${f.hint ? `<div class="field-hint">${escHtml(f.hint)}</div>` : ''}
       ${input}
       <div class="field-error" id="err-${f.id}">Campo obrigatório</div>
     </div>`;
@@ -642,6 +649,13 @@ function formatExpiry(input) {
   let v = input.value.replace(/[^0-9]/g, '').slice(0, 4);
   if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
   input.value = v;
+}
+
+function formatPhone(input) {
+  let v = input.value.replace(/\D/g, '').slice(0, 11);
+  if (v.length <= 2)      { input.value = v.length ? '(' + v : v; return; }
+  if (v.length <= 7)      { input.value = '(' + v.slice(0,2) + ') ' + v.slice(2); return; }
+  input.value = '(' + v.slice(0,2) + ') ' + v.slice(2, (v.length === 11 ? 7 : 6)) + '-' + v.slice(v.length === 11 ? 7 : 6);
 }
 
 // ── Auto-fill gestor da carteira (usa equipe do cliente) ─────────────

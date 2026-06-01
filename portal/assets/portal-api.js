@@ -310,39 +310,67 @@
 
   async function getDemandMembers(demand_id) {
     const supabase = client();
-    const { data: members, error } = await supabase
+    const result = [];
+
+    // 1. Clientes via demand_members → portal.users
+    const { data: memberRows, error } = await supabase
       .from('demand_members')
       .select('id, user_id, role, approved_finish, approved_at, added_at')
-      .eq('demand_id', demand_id);
+      .eq('demand_id', demand_id)
+      .neq('role', 'operator');  // operadores ficam em demand_operators
     if (error) throw error;
-    if (!members || members.length === 0) return [];
-    const ids = members.map(m => m.user_id);
-    const { data: users } = await supabase
-      .from('users')
-      .select('id, name, email, role, position_id, metadata')
-      .in('id', ids);
-    const usersById = Object.fromEntries((users || []).map(u => [u.id, u]));
-    // Junta position name
-    const positionIds = [...new Set((users || []).map(u => u.position_id).filter(Boolean))];
-    let positionsById = {};
-    if (positionIds.length) {
-      const { data: positions } = await supabase
-        .from('positions').select('id, name, color').in('id', positionIds);
-      positionsById = Object.fromEntries((positions || []).map(p => [p.id, p]));
+
+    if (memberRows?.length) {
+      const ids = memberRows.map(m => m.user_id);
+      const { data: users } = await supabase
+        .from('users').select('id, name, email, role, position_id, metadata').in('id', ids);
+      const usersById = Object.fromEntries((users || []).map(u => [u.id, u]));
+      for (const m of memberRows) {
+        const u = usersById[m.user_id] || {};
+        result.push({ ...m, user_name: u.name, user_email: u.email, user_role: u.role,
+          avatar_url: u.metadata?.avatar_url || null, position_name: null, position_color: null });
+      }
     }
-    return members.map(m => {
-      const u = usersById[m.user_id] || {};
-      const p = positionsById[u.position_id] || null;
-      return {
-        ...m,
-        user_name: u.name,
-        user_email: u.email,
-        user_role: u.role,
-        avatar_url: u.metadata?.avatar_url || null,
-        position_name: p?.name || null,
-        position_color: p?.color || null,
-      };
-    });
+
+    // 2. Operadores via demand_operators → portal.operators
+    const { data: opRows } = await supabase
+      .from('demand_operators')
+      .select('id, operator_id, role, added_at')
+      .eq('demand_id', demand_id);
+
+    if (opRows?.length) {
+      const opIds = opRows.map(r => r.operator_id);
+      const { data: ops } = await supabase
+        .from('operators').select('id, name, email, position_id, metadata').in('id', opIds);
+      const opsById = Object.fromEntries((ops || []).map(o => [o.id, o]));
+      const posIds = [...new Set((ops || []).map(o => o.position_id).filter(Boolean))];
+      let posById = {};
+      if (posIds.length) {
+        const { data: positions } = await supabase
+          .from('positions').select('id, name, color').in('id', posIds);
+        posById = Object.fromEntries((positions || []).map(p => [p.id, p]));
+      }
+      for (const r of opRows) {
+        const o = opsById[r.operator_id] || {};
+        const p = posById[o.position_id] || null;
+        result.push({
+          id: r.id,
+          user_id: r.operator_id,  // sintético: operator_id como user_id para compatibilidade de display
+          role: 'operator',
+          approved_finish: false,
+          approved_at: null,
+          added_at: r.added_at,
+          user_name: o.name,
+          user_email: o.email,
+          user_role: 'operator',
+          avatar_url: o.metadata?.avatar_url || null,
+          position_name: p?.name || null,
+          position_color: p?.color || null,
+        });
+      }
+    }
+
+    return result;
   }
 
   async function listOperatorsForClient() {
