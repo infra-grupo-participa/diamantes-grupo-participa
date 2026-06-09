@@ -1506,16 +1506,9 @@
     }
 
     // ===== Modal Nova Demanda (wizard 2 steps) =====
-    const ND_SERVICES = [
-      { value: 'anuncios_pagos',       icon: '📣', label: 'Anúncios Pagos',        desc: 'Meta Ads · Google Ads · YouTube' },
-      { value: 'design_grafico',       icon: '🎨', label: 'Design Gráfico',         desc: 'Criativos · Identidade visual' },
-      { value: 'edicao_video',         icon: '🎬', label: 'Edição de Vídeo',        desc: 'Reels · VSL · YouTube' },
-      { value: 'social_media',         icon: '📱', label: 'Social Media / Copy',    desc: 'Conteúdo orgânico · Calendário' },
-      { value: 'web_design_automacao', icon: '💻', label: 'Web Design / Automação', desc: 'Landing pages · Integrações' },
-    ];
-
     let ndStep = 1;
-    let ndService = null;
+    let ndMode = null;        // 'simple' | 'project'
+    let ndProjectId = null;
 
     function buildNewDemandModal() {
       const modal = document.createElement('div');
@@ -1531,19 +1524,30 @@
             <button type="button" id="ndClose" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:var(--muted);">×</button>
           </div>
 
-          <!-- Step 1: Serviço -->
+          <!-- Step 1: Modo do chamado -->
           <div id="ndStep1" style="padding:20px 24px; max-height:70vh; overflow-y:auto;">
-            <p style="font-size:0.84rem; color:var(--text-secondary); margin:0 0 16px;">Qual área vai trabalhar nessa demanda?</p>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;" id="ndServiceGrid">
-              ${ND_SERVICES.map(s => `
-                <div class="nd-svc-card" data-value="${s.value}"
-                  style="border:2px solid var(--border); border-radius:12px; padding:14px 12px; cursor:pointer; transition:border-color .12s,background .12s;"
-                  onclick="ndSelectService('${s.value}', this)">
-                  <div style="font-size:1.4rem; margin-bottom:6px;">${s.icon}</div>
-                  <div style="font-weight:600; font-size:0.875rem; color:var(--text);">${s.label}</div>
-                  <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">${s.desc}</div>
-                </div>
-              `).join('')}
+            <p style="font-size:0.84rem; color:var(--text-secondary); margin:0 0 16px;">Como você quer abrir esse chamado?</p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+              <div class="nd-mode-card" data-mode="simple"
+                style="border:2px solid var(--border); border-radius:12px; padding:16px 14px; cursor:pointer; transition:border-color .12s,background .12s;"
+                onclick="ndSelectMode('simple', this)">
+                <div style="font-size:1.4rem; margin-bottom:6px;">⚡</div>
+                <div style="font-weight:600; font-size:0.875rem; color:var(--text);">Chamado simples</div>
+                <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">Pedido avulso e rápido, sem projeto.</div>
+              </div>
+              <div class="nd-mode-card" data-mode="project"
+                style="border:2px solid var(--border); border-radius:12px; padding:16px 14px; cursor:pointer; transition:border-color .12s,background .12s;"
+                onclick="ndSelectMode('project', this)">
+                <div style="font-size:1.4rem; margin-bottom:6px;">📁</div>
+                <div style="font-weight:600; font-size:0.875rem; color:var(--text);">Chamado de projeto</div>
+                <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">Vinculado a um evento — a equipe já vê o briefing.</div>
+              </div>
+            </div>
+            <div id="ndProjectWrap" style="display:none; margin-top:16px;">
+              <label style="display:block; font-size:0.82rem; font-weight:600; margin-bottom:6px;">Projeto (evento)</label>
+              <select id="ndProject" class="search-input" style="padding-left:12px; width:100%;" onchange="ndOnProjectChange()">
+                <option value="">Carregando projetos…</option>
+              </select>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
               <button type="button" id="ndCancel" style="padding:10px 16px; border-radius:10px; font-weight:600; font-size:0.88rem; border:1.5px solid var(--border-strong); background:#fff; cursor:pointer;">Cancelar</button>
@@ -1596,26 +1600,58 @@
     }
     const newDemandModal = buildNewDemandModal();
 
-    function ndSelectService(value, el) {
-      ndService = value;
-      document.querySelectorAll('.nd-svc-card').forEach(c => {
+    function ndUpdateNext() {
+      const btn = document.getElementById('ndNext');
+      const ok = ndMode === 'simple' || (ndMode === 'project' && ndProjectId);
+      btn.disabled = !ok;
+      btn.style.opacity = ok ? '1' : '0.4';
+    }
+
+    async function ndSelectMode(mode, el) {
+      ndMode = mode;
+      ndProjectId = null;
+      document.querySelectorAll('.nd-mode-card').forEach(c => {
         c.style.borderColor = 'var(--border)';
         c.style.background  = '#fff';
       });
       el.style.borderColor = 'var(--accent)';
       el.style.background  = 'var(--accent-soft)';
-      const btn = document.getElementById('ndNext');
-      btn.disabled = false;
-      btn.style.opacity = '1';
+
+      const wrap = document.getElementById('ndProjectWrap');
+      if (mode === 'project') {
+        wrap.style.display = 'block';
+        const sel = document.getElementById('ndProject');
+        sel.innerHTML = '<option value="">Carregando projetos…</option>';
+        try {
+          const projects = (await PortalAPI.listMyProjects())
+            .filter(p => p.status === 'active' || p.status === 'briefing');
+          if (!projects.length) {
+            sel.innerHTML = '<option value="">Nenhum projeto ativo — crie um em Projetos</option>';
+          } else {
+            sel.innerHTML = '<option value="">— Selecione o projeto —</option>' +
+              projects.map(p => `<option value="${p.id}">${(p.title || 'Evento').replace(/</g,'&lt;')}</option>`).join('');
+          }
+        } catch (e) {
+          sel.innerHTML = '<option value="">Erro ao carregar projetos</option>';
+        }
+      } else {
+        wrap.style.display = 'none';
+      }
+      ndUpdateNext();
+    }
+
+    function ndOnProjectChange() {
+      ndProjectId = document.getElementById('ndProject').value || null;
+      ndUpdateNext();
     }
 
     async function ndGoStep2() {
-      if (!ndService) return;
+      if (!ndMode) return;
+      if (ndMode === 'project' && !ndProjectId) return;
       document.getElementById('ndStep1').style.display = 'none';
       document.getElementById('ndStep2').style.display = 'block';
       document.getElementById('ndStepLabel').textContent = 'Passo 2 de 2 — Detalhes e equipe';
-      const svc = ND_SERVICES.find(s => s.value === ndService);
-      if (svc) document.getElementById('ndTitle_h').textContent = svc.icon + ' ' + svc.label;
+      document.getElementById('ndTitle_h').textContent = ndMode === 'project' ? '📁 Chamado de projeto' : '⚡ Chamado simples';
 
       const opsWrap = document.getElementById('ndOperators');
       opsWrap.innerHTML = '<div style="color:var(--muted); font-size:0.84rem; padding:8px;">Carregando operadores…</div>';
@@ -1643,21 +1679,32 @@
     function ndGoStep1() {
       document.getElementById('ndStep2').style.display = 'none';
       document.getElementById('ndStep1').style.display = 'block';
-      document.getElementById('ndStepLabel').textContent = 'Passo 1 de 2 — Tipo de serviço';
+      document.getElementById('ndStepLabel').textContent = 'Passo 1 de 2 — Modo do chamado';
       document.getElementById('ndTitle_h').textContent = 'Nova demanda';
     }
 
     async function openNewDemand() {
-      ndService = null;
+      // Gate: Briefing Básico
+      try {
+        if (!(await PortalAPI.isBaseReady())) {
+          if (confirm('Você precisa concluir o Briefing Básico antes de abrir chamados. Ir para o Briefing Básico agora?')) {
+            window.location.href = 'briefing-basico.html';
+          }
+          return;
+        }
+      } catch (_) { /* falha de rede: segue */ }
+
+      ndMode = null; ndProjectId = null;
       ndGoStep1();
-      document.querySelectorAll('.nd-svc-card').forEach(c => {
+      document.querySelectorAll('.nd-mode-card').forEach(c => {
         c.style.borderColor = 'var(--border)';
         c.style.background  = '#fff';
       });
+      document.getElementById('ndProjectWrap').style.display = 'none';
       const btn = document.getElementById('ndNext');
       if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
       document.getElementById('ndTitle_h').textContent = 'Nova demanda';
-      document.getElementById('ndStepLabel').textContent = 'Passo 1 de 2 — Tipo de serviço';
+      document.getElementById('ndStepLabel').textContent = 'Passo 1 de 2 — Modo do chamado';
       newDemandModal.style.display = 'flex';
     }
 
@@ -1682,13 +1729,9 @@
         const ends_at   = document.getElementById('ndEnd').value || null;
         if (!title) throw new Error('Informe um título.');
         if (operator_ids.length === 0) throw new Error('Selecione pelo menos um operador.');
-        const created = await PortalAPI.createDemand({ title, description, operator_ids, service_type: ndService, starts_at, ends_at });
+        const project_id = ndMode === 'project' ? ndProjectId : null;
+        const created = await PortalAPI.createDemand({ title, description, operator_ids, project_id, starts_at, ends_at });
         closeNewDemand();
-        // Se o serviço tem template de briefing → vai direto para o preenchimento
-        if (ndService && window.BRIEFING_TEMPLATES && window.BRIEFING_TEMPLATES[ndService]) {
-          window.location.href = 'briefing.html?demanda=' + created.id;
-          return;
-        }
         await loadAll();
         state.currentId = created.id;
         renderList(); renderChat(); renderDetails();

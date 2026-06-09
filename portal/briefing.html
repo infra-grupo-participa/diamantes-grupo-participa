@@ -3,427 +3,146 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Briefing de Abertura — Diamantes</title>
+  <title>Briefing do Projeto — Diamantes</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
     :root {
-      --accent:       #F29725;
-      --accent-soft:  #FFF7EC;
-      --accent-dark:  #C97A10;
-      --bg:           #F7F5F2;
-      --surface:      #FFFFFF;
-      --border:       #EAE4DB;
-      --text:         #1A1410;
-      --text-2:       #5C5248;
-      --text-3:       #9C8F85;
-      --sidebar-bg:   #18181B;
-      --sidebar-text: #A1A1AA;
-      --sidebar-act:  #F29725;
-      --red:          #DC2626;
-      --red-soft:     #FEF2F2;
-      --yellow:       #D97706;
-      --yellow-soft:  #FFFBEB;
-      --green:        #16A34A;
-      --green-soft:   #F0FDF4;
-      --radius-sm:    6px;
-      --radius-md:    10px;
-      --radius-lg:    14px;
-      --shadow-sm:    0 1px 3px rgba(0,0,0,.06);
-      --shadow-md:    0 4px 16px rgba(0,0,0,.08);
+      --accent:#F29725; --accent-soft:#FFF7EC; --accent-dark:#C97A10;
+      --bg:#F7F5F2; --surface:#FFFFFF; --border:#EAE4DB;
+      --text:#1A1410; --text-2:#5C5248; --text-3:#9C8F85;
+      --sidebar-bg:#18181B; --sidebar-text:#A1A1AA;
+      --red:#DC2626; --red-soft:#FEF2F2; --yellow:#D97706; --yellow-soft:#FFFBEB;
+      --green:#16A34A; --green-soft:#F0FDF4;
+      --radius-md:10px; --radius-lg:14px; --shadow-sm:0 1px 3px rgba(0,0,0,.06);
     }
-
-    html, body {
-      min-height: 100vh;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 14px;
-      color: var(--text);
-      background: var(--bg);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── Layout ─────────────────────────────────────────── */
-    .layout { display: flex; min-height: 100vh; }
-
-    .sidebar {
-      width: 256px; min-height: 100vh;
-      background: var(--sidebar-bg);
-      position: fixed; top: 0; left: 0;
-      display: flex; flex-direction: column;
-      overflow-y: auto; z-index: 20;
-    }
-
-    .sidebar-header {
-      padding: 20px 20px 18px;
-      border-bottom: 1px solid rgba(255,255,255,.07);
-    }
-    .sidebar-brand {
-      display: flex; align-items: center; gap: 10px;
-    }
-    .sidebar-brand-mark {
-      width: 30px; height: 30px; border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-      display: grid; place-items: center; flex-shrink: 0;
-    }
-    .sidebar-brand-name {
-      font-size: 0.9rem; font-weight: 700; color: #fff; letter-spacing: -.01em;
-    }
-    .sidebar-brand-sub {
-      font-size: 0.7rem; color: var(--sidebar-text); margin-top: 1px;
-    }
-
-    .sidebar-progress {
-      padding: 16px 20px 0;
-    }
-    .sidebar-progress-label {
-      font-size: 0.68rem; font-weight: 600; color: var(--sidebar-text);
-      text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px;
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .sidebar-progress-label span { color: var(--accent); }
-    .progress-track {
-      height: 3px; background: rgba(255,255,255,.1); border-radius: 2px; margin-bottom: 16px;
-    }
-    .progress-fill {
-      height: 100%; background: var(--accent); border-radius: 2px;
-      transition: width .4s ease;
-    }
-
-    .sidebar-section-label {
-      font-size: 0.65rem; font-weight: 600; color: rgba(255,255,255,.3);
-      text-transform: uppercase; letter-spacing: .1em;
-      padding: 0 20px 8px;
-    }
-
-    .sidebar-nav { flex: 1; padding-bottom: 20px; }
-
-    .nav-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 9px 20px; cursor: pointer;
-      color: var(--sidebar-text); font-size: 0.82rem; font-weight: 500;
-      border-left: 2px solid transparent;
-      transition: background .12s, color .12s, border-color .12s;
-      position: relative;
-    }
-    .nav-item:hover { background: rgba(255,255,255,.05); color: #fff; }
-    .nav-item.active {
-      color: var(--accent); border-left-color: var(--accent);
-      background: rgba(242,151,37,.1);
-    }
-    .nav-item.done { color: rgba(255,255,255,.7); }
-    .nav-item .nav-icon {
-      width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center;
-      background: rgba(255,255,255,.06); flex-shrink: 0; color: inherit;
-    }
-    .nav-item.active .nav-icon { background: rgba(242,151,37,.15); color: var(--accent); }
-    .nav-item.done .nav-icon { background: rgba(22,163,74,.12); color: #4ade80; }
-    .nav-item .nav-label { flex: 1; line-height: 1.3; }
-    .nav-item .nav-check {
-      width: 16px; height: 16px; border-radius: 50%;
-      display: grid; place-items: center; flex-shrink: 0;
-      color: #4ade80; opacity: 0;
-    }
-    .nav-item.done .nav-check { opacity: 1; }
-
-    /* ── Main ───────────────────────────────────────────── */
-    .main {
-      margin-left: 256px; flex: 1;
-      padding: 36px 48px 100px;
-      max-width: calc(100% - 256px);
-    }
-
-    .page-header { margin-bottom: 32px; }
-    .page-header-top {
-      display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
-    }
-    .page-back {
-      display: inline-flex; align-items: center; gap: 5px;
-      color: var(--text-3); font-size: 0.8rem; text-decoration: none; cursor: pointer;
-      transition: color .12s;
-    }
-    .page-back:hover { color: var(--text-2); }
-    .page-title {
-      font-size: 1.4rem; font-weight: 700; color: var(--text);
-      letter-spacing: -.02em; line-height: 1.2;
-    }
-    .page-meta {
-      font-size: 0.82rem; color: var(--text-3);
-      display: flex; align-items: center; gap: 8px;
-    }
-    .page-meta .sep { color: var(--border); }
-    .page-meta .badge-svc {
-      display: inline-flex; align-items: center; gap: 5px;
-      background: var(--accent-soft); color: var(--accent-dark);
-      border-radius: 20px; padding: 2px 10px; font-size: 0.75rem; font-weight: 600;
-    }
-
-    /* ── Submitted ──────────────────────────────────────── */
-    .submitted-banner {
-      display: flex; align-items: flex-start; gap: 14px;
-      background: var(--green-soft); border: 1px solid #86efac;
-      border-radius: var(--radius-lg); padding: 18px 20px; margin-bottom: 28px;
-    }
-    .submitted-banner .sb-icon {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: #dcfce7; display: grid; place-items: center;
-      color: var(--green); flex-shrink: 0;
-    }
-    .submitted-banner strong { font-size: 0.9rem; font-weight: 700; color: #15803d; display: block; margin-bottom: 3px; }
-    .submitted-banner p { font-size: 0.8rem; color: #166534; }
-
-    /* ── Validation bar ─────────────────────────────────── */
-    .validation-bar {
-      display: none;
-      background: #FFF7ED; border: 1px solid #FDBA74;
-      border-radius: var(--radius-md); padding: 14px 16px;
-      font-size: 0.83rem; color: #9A3412; margin-bottom: 20px;
-    }
-    .validation-bar strong { display: block; margin-bottom: 6px; }
-    .validation-bar ul { margin-left: 18px; }
-    .validation-bar li { margin-bottom: 3px; }
-
-    /* ── Section panel ──────────────────────────────────── */
-    .section-panel {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 28px 32px;
-      margin-bottom: 16px;
-      box-shadow: var(--shadow-sm);
-    }
-    .section-panel-header {
-      display: flex; align-items: center; gap: 12px; margin-bottom: 24px;
-      padding-bottom: 18px; border-bottom: 1px solid var(--border);
-    }
-    .section-icon {
-      width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
-      background: var(--accent-soft); color: var(--accent-dark);
-      display: grid; place-items: center;
-    }
-    .section-title { font-size: 1rem; font-weight: 700; color: var(--text); }
-    .section-num-badge {
-      margin-left: auto; font-size: 0.7rem; font-weight: 600;
-      color: var(--text-3); background: var(--bg);
-      border: 1px solid var(--border); border-radius: 20px;
-      padding: 2px 10px;
-    }
-
-    .section-notice {
-      display: flex; align-items: flex-start; gap: 10px;
-      border-radius: var(--radius-md); padding: 12px 14px;
-      font-size: 0.82rem; margin-bottom: 20px; line-height: 1.5;
-    }
-    .section-notice.warn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
-    .section-notice.info { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
-    .section-notice svg { flex-shrink: 0; margin-top: 1px; }
-
-    /* ── Fields ─────────────────────────────────────────── */
-    .field-row { margin-bottom: 22px; }
-    .field-row:last-child { margin-bottom: 0; }
-
-    .field-top {
-      display: flex; align-items: center; gap: 7px; margin-bottom: 7px;
-    }
-    .field-label-text {
-      font-size: 0.84rem; font-weight: 600; color: var(--text); flex: 1;
-    }
-    .priority-dot {
-      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    }
-    .priority-dot.red    { background: var(--red); }
-    .priority-dot.yellow { background: var(--yellow); }
-    .priority-dot.green  { background: var(--green); }
-
-    .priority-tag {
-      font-size: 0.67rem; font-weight: 700; letter-spacing: .04em;
-      text-transform: uppercase; border-radius: 4px; padding: 2px 6px;
-    }
-    .priority-tag.red    { background: var(--red-soft);    color: var(--red); }
-    .priority-tag.yellow { background: var(--yellow-soft); color: var(--yellow); }
-    .priority-tag.green  { background: var(--green-soft);  color: var(--green); }
-
-    .field-hint { font-size: 0.76rem; color: var(--text-3); margin-bottom: 7px; line-height: 1.4; }
-
-    .field-input {
-      width: 100%; padding: 10px 13px;
-      border: 1.5px solid var(--border); border-radius: var(--radius-md);
-      font-size: 0.875rem; font-family: inherit; color: var(--text);
-      background: var(--surface); outline: none;
-      transition: border-color .14s, box-shadow .14s;
-      -webkit-appearance: none;
-    }
-    .field-input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(242,151,37,.12);
-    }
-    .field-input.error { border-color: var(--red); }
-    .field-input::placeholder { color: var(--text-3); }
-
-    textarea.field-input { resize: vertical; min-height: 80px; line-height: 1.5; }
-    select.field-input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239C8F85' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; cursor: pointer; }
-
-    .field-error { font-size: 0.77rem; color: var(--red); margin-top: 5px; display: none; }
-
-    .toggle-group { display: flex; gap: 8px; }
-    .toggle-btn {
-      flex: 1; padding: 10px 16px;
-      border: 1.5px solid var(--border); border-radius: var(--radius-md);
-      background: var(--bg); cursor: pointer;
-      font-size: 0.84rem; font-weight: 500; font-family: inherit;
-      color: var(--text-2); text-align: center;
-      transition: border-color .13s, background .13s, color .13s;
-    }
-    .toggle-btn:hover { border-color: var(--accent); color: var(--text); }
-    .toggle-btn.active {
-      border-color: var(--accent); background: var(--accent-soft);
-      color: var(--accent-dark); font-weight: 600;
-    }
-
-    /* ── Bottom bar ─────────────────────────────────────── */
-    .bottom-bar {
-      position: fixed; bottom: 0; left: 256px; right: 0; z-index: 20;
-      background: rgba(255,255,255,.92); backdrop-filter: blur(12px);
-      border-top: 1px solid var(--border);
-      padding: 14px 48px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .save-status {
-      font-size: 0.78rem; color: var(--text-3);
-      display: flex; align-items: center; gap: 6px;
-    }
-    .save-status.saving { color: var(--accent); }
-    .save-status.saved  { color: var(--green); }
-    .save-status svg { width: 13px; height: 13px; }
-
-    .btn-group { display: flex; gap: 10px; align-items: center; }
-    .btn-ghost {
-      background: none; border: 1.5px solid var(--border); color: var(--text-2);
-      border-radius: var(--radius-md); padding: 9px 18px;
-      font-size: 0.84rem; font-weight: 500; font-family: inherit; cursor: pointer;
-      transition: border-color .12s, color .12s;
-      display: flex; align-items: center; gap: 7px;
-    }
-    .btn-ghost:hover { border-color: var(--text-3); color: var(--text); }
-    .btn-send {
-      background: var(--accent); color: #fff; border: none;
-      border-radius: var(--radius-md); padding: 10px 22px;
-      font-size: 0.875rem; font-weight: 700; font-family: inherit; cursor: pointer;
-      transition: background .14s; display: flex; align-items: center; gap: 8px;
-      box-shadow: 0 2px 8px rgba(242,151,37,.35);
-    }
-    .btn-send:hover { background: var(--accent-dark); }
-    .btn-send:disabled { background: #D1CBC3; box-shadow: none; cursor: not-allowed; }
-
-    /* ── Card compound input ────────────────────────────── */
-    .card-input-wrap {
-      display: grid; grid-template-columns: 1fr 100px 90px; gap: 8px;
-    }
-    .card-input-wrap .field-input { width: 100%; }
-    .card-input-label {
-      font-size: 0.7rem; font-weight: 600; color: var(--text-3);
-      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px;
-    }
-
-    /* ── Readonly field ──────────────────────────────────── */
-    .field-input[readonly] {
-      background: var(--bg); color: var(--text-2);
-      border-color: var(--border); cursor: default;
-    }
-    .readonly-badge {
-      font-size: 0.68rem; font-weight: 600; color: var(--text-3);
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 4px; padding: 2px 7px; letter-spacing: .03em;
-    }
-
-    /* ── Responsive ─────────────────────────────────────── */
-    @media (max-width: 768px) {
-      .sidebar { display: none; }
-      .main { margin-left: 0; max-width: 100%; padding: 20px 16px 100px; }
-      .bottom-bar { left: 0; padding: 12px 16px; }
-    }
+    html, body { min-height:100vh; font-family:'Inter',sans-serif; font-size:14px; color:var(--text); background:var(--bg); -webkit-font-smoothing:antialiased; }
+    .layout { display:flex; min-height:100vh; }
+    .sidebar { width:256px; min-height:100vh; background:var(--sidebar-bg); position:fixed; top:0; left:0; display:flex; flex-direction:column; overflow-y:auto; z-index:20; }
+    .sidebar-header { padding:20px 20px 18px; border-bottom:1px solid rgba(255,255,255,.07); }
+    .sidebar-brand { display:flex; align-items:center; gap:10px; }
+    .sidebar-brand-mark { width:30px; height:30px; border-radius:8px; background:linear-gradient(135deg,var(--accent),var(--accent-dark)); display:grid; place-items:center; flex-shrink:0; }
+    .sidebar-brand-name { font-size:.9rem; font-weight:700; color:#fff; }
+    .sidebar-brand-sub { font-size:.7rem; color:var(--sidebar-text); margin-top:1px; }
+    .sidebar-progress { padding:16px 20px 0; }
+    .sidebar-progress-label { font-size:.68rem; font-weight:600; color:var(--sidebar-text); text-transform:uppercase; letter-spacing:.07em; margin-bottom:8px; display:flex; justify-content:space-between; }
+    .sidebar-progress-label span { color:var(--accent); }
+    .progress-track { height:3px; background:rgba(255,255,255,.1); border-radius:2px; margin-bottom:16px; }
+    .progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .4s ease; }
+    .sidebar-section-label { font-size:.65rem; font-weight:600; color:rgba(255,255,255,.3); text-transform:uppercase; letter-spacing:.1em; padding:0 20px 8px; }
+    .sidebar-nav { flex:1; padding-bottom:20px; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:9px 20px; cursor:pointer; color:var(--sidebar-text); font-size:.82rem; font-weight:500; border-left:2px solid transparent; transition:.12s; }
+    .nav-item:hover { background:rgba(255,255,255,.05); color:#fff; }
+    .nav-item.active { color:var(--accent); border-left-color:var(--accent); background:rgba(242,151,37,.1); }
+    .nav-item.done { color:rgba(255,255,255,.7); }
+    .nav-item .nav-icon { width:28px; height:28px; border-radius:6px; display:grid; place-items:center; background:rgba(255,255,255,.06); flex-shrink:0; }
+    .nav-item.active .nav-icon { background:rgba(242,151,37,.15); color:var(--accent); }
+    .nav-item.done .nav-icon { background:rgba(22,163,74,.12); color:#4ade80; }
+    .nav-item.access .nav-icon { background:rgba(255,255,255,.04); }
+    .nav-item .nav-label { flex:1; line-height:1.3; }
+    .main { margin-left:256px; flex:1; padding:36px 48px 100px; max-width:calc(100% - 256px); }
+    .page-header { margin-bottom:28px; }
+    .page-back { display:inline-flex; align-items:center; gap:5px; color:var(--text-3); font-size:.8rem; text-decoration:none; cursor:pointer; background:none; border:none; }
+    .page-back:hover { color:var(--text-2); }
+    .page-title { font-size:1.4rem; font-weight:700; letter-spacing:-.02em; line-height:1.2; margin-top:10px; }
+    .page-meta { font-size:.82rem; color:var(--text-3); margin-top:6px; }
+    .submitted-banner { display:flex; gap:14px; background:var(--green-soft); border:1px solid #86efac; border-radius:var(--radius-lg); padding:16px 18px; margin-bottom:24px; }
+    .submitted-banner .sb-icon { width:34px; height:34px; border-radius:50%; background:#dcfce7; color:var(--green); display:grid; place-items:center; flex-shrink:0; }
+    .submitted-banner strong { display:block; font-size:.88rem; color:#15803d; margin-bottom:2px; }
+    .submitted-banner p { font-size:.8rem; color:#166534; }
+    .validation-bar { display:none; background:#FFF7ED; border:1px solid #FDBA74; border-radius:var(--radius-md); padding:14px 16px; font-size:.83rem; color:#9A3412; margin-bottom:20px; }
+    .validation-bar strong { display:block; margin-bottom:6px; }
+    .validation-bar ul { margin-left:18px; }
+    .grp-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin:26px 0 10px; }
+    .section-panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:26px 30px; margin-bottom:16px; box-shadow:var(--shadow-sm); }
+    .section-panel.access { background:#FCFBF9; }
+    .section-panel-header { display:flex; align-items:center; gap:12px; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--border); }
+    .section-icon { width:38px; height:38px; border-radius:10px; flex-shrink:0; background:var(--accent-soft); color:var(--accent-dark); display:grid; place-items:center; }
+    .section-title { font-size:1rem; font-weight:700; }
+    .section-num-badge { margin-left:auto; font-size:.7rem; font-weight:600; color:var(--text-3); background:var(--bg); border:1px solid var(--border); border-radius:20px; padding:2px 10px; }
+    .section-notice { display:flex; gap:10px; border-radius:var(--radius-md); padding:12px 14px; font-size:.82rem; margin-bottom:18px; line-height:1.5; }
+    .section-notice.warn { background:#FFFBEB; border:1px solid #FDE68A; color:#92400E; }
+    .section-notice.info { background:#EFF6FF; border:1px solid #BFDBFE; color:#1E40AF; }
+    .field-row { margin-bottom:20px; }
+    .field-top { display:flex; align-items:center; gap:7px; margin-bottom:7px; }
+    .field-label-text { font-size:.84rem; font-weight:600; flex:1; }
+    .priority-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .priority-dot.red{background:var(--red);} .priority-dot.yellow{background:var(--yellow);} .priority-dot.green{background:var(--green);}
+    .priority-tag { font-size:.67rem; font-weight:700; text-transform:uppercase; border-radius:4px; padding:2px 6px; }
+    .priority-tag.red{background:var(--red-soft);color:var(--red);} .priority-tag.yellow{background:var(--yellow-soft);color:var(--yellow);} .priority-tag.green{background:var(--green-soft);color:var(--green);}
+    .field-hint { font-size:.76rem; color:var(--text-3); margin-bottom:7px; line-height:1.4; }
+    .field-input { width:100%; padding:10px 13px; border:1.5px solid var(--border); border-radius:var(--radius-md); font-size:.875rem; font-family:inherit; color:var(--text); background:var(--surface); outline:none; transition:.14s; -webkit-appearance:none; }
+    .field-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(242,151,37,.12); }
+    .field-input.error { border-color:var(--red); }
+    .field-input[readonly] { background:var(--bg); color:var(--text-2); cursor:default; }
+    textarea.field-input { resize:vertical; min-height:80px; line-height:1.5; }
+    select.field-input { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239C8F85' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; padding-right:34px; cursor:pointer; }
+    .toggle-group { display:flex; gap:8px; }
+    .toggle-btn { flex:1; padding:10px 16px; border:1.5px solid var(--border); border-radius:var(--radius-md); background:var(--bg); cursor:pointer; font-size:.84rem; font-weight:500; font-family:inherit; color:var(--text-2); text-align:center; transition:.13s; }
+    .toggle-btn:hover { border-color:var(--accent); color:var(--text); }
+    .toggle-btn.active { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-dark); font-weight:600; }
+    .readonly-badge { font-size:.68rem; font-weight:600; color:var(--text-3); background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:2px 7px; }
+    .field-error { font-size:.77rem; color:var(--red); margin-top:5px; display:none; }
+    .card-input-wrap { display:grid; grid-template-columns:1fr 100px 90px; gap:8px; }
+    .card-input-label { font-size:.7rem; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px; }
+    .bottom-bar { position:fixed; bottom:0; left:256px; right:0; z-index:20; background:rgba(255,255,255,.92); backdrop-filter:blur(12px); border-top:1px solid var(--border); padding:14px 48px; display:flex; align-items:center; justify-content:space-between; }
+    .save-status { font-size:.78rem; color:var(--text-3); display:flex; align-items:center; gap:6px; }
+    .save-status.saving{color:var(--accent);} .save-status.saved{color:var(--green);}
+    .btn-group { display:flex; gap:10px; align-items:center; }
+    .btn-ghost { background:none; border:1.5px solid var(--border); color:var(--text-2); border-radius:var(--radius-md); padding:9px 18px; font-size:.84rem; font-weight:500; font-family:inherit; cursor:pointer; }
+    .btn-ghost:hover { border-color:var(--text-3); color:var(--text); }
+    .btn-send { background:var(--accent); color:#fff; border:none; border-radius:var(--radius-md); padding:10px 22px; font-size:.875rem; font-weight:700; font-family:inherit; cursor:pointer; transition:.14s; display:flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(242,151,37,.35); }
+    .btn-send:hover { background:var(--accent-dark); }
+    .btn-send:disabled { background:#D1CBC3; box-shadow:none; cursor:not-allowed; }
+    @media (max-width:768px){ .sidebar{display:none;} .main{margin-left:0;max-width:100%;padding:20px 16px 100px;} .bottom-bar{left:0;padding:12px 16px;} }
   </style>
 </head>
 <body>
 <div class="layout">
-
-  <!-- ── Sidebar ──────────────────────────────────────── -->
-  <nav class="sidebar" id="sidebar">
+  <nav class="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-brand">
-        <div class="sidebar-brand-mark">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        </div>
-        <div>
-          <div class="sidebar-brand-name">Diamantes</div>
-          <div class="sidebar-brand-sub">Briefing de Abertura</div>
-        </div>
+        <div class="sidebar-brand-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <div><div class="sidebar-brand-name">Diamantes</div><div class="sidebar-brand-sub" id="brandSub">Briefing do Projeto</div></div>
       </div>
     </div>
-
     <div class="sidebar-progress">
-      <div class="sidebar-progress-label">
-        Progresso <span id="progressPct">0%</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-fill" id="progressFill" style="width:0%"></div>
-      </div>
+      <div class="sidebar-progress-label">Progresso <span id="progressPct">0%</span></div>
+      <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
     </div>
-
     <div class="sidebar-section-label">Seções</div>
     <div class="sidebar-nav" id="sidebarNav"></div>
   </nav>
 
-  <!-- ── Main ─────────────────────────────────────────── -->
   <main class="main">
-
     <div class="page-header">
-      <button class="page-back" id="btnBack" onclick="goBack()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-        <span id="backLabel">Voltar para demandas</span>
-      </button>
-      <h1 class="page-title" id="pageTitle" style="margin-top:10px;">Briefing de Abertura</h1>
-      <div class="page-meta" id="pageMeta">
-        <span>Carregando...</span>
-      </div>
+      <button class="page-back" onclick="goBack()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg><span id="backLabel">Voltar para projetos</span></button>
+      <h1 class="page-title" id="pageTitle">Briefing</h1>
+      <div class="page-meta" id="pageMeta">Carregando...</div>
     </div>
 
     <div id="submittedBanner" class="submitted-banner" style="display:none">
-      <div class="sb-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      </div>
-      <div>
-        <strong>Briefing enviado para a equipe!</strong>
-        <p>A equipe recebeu o contexto completo e já pode começar a trabalhar nessa demanda.</p>
-      </div>
+      <div class="sb-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div><strong>Briefing enviado para a equipe!</strong><p>A equipe recebeu o contexto completo e já pode começar a trabalhar.</p></div>
     </div>
 
     <div id="validationBar" class="validation-bar"></div>
     <div id="sections"></div>
     <div style="height:64px"></div>
-
   </main>
 
-  <!-- ── Bottom bar ──────────────────────────────────── -->
   <div class="bottom-bar">
-    <div class="save-status" id="saveStatus">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <span id="saveStatusText">—</span>
-    </div>
+    <div class="save-status" id="saveStatus"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span id="saveStatusText">—</span></div>
     <div class="btn-group">
-      <button class="btn-ghost" onclick="goBack()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Salvar e sair
-      </button>
+      <button class="btn-ghost" onclick="goBack()">Salvar e sair</button>
       <button class="btn-send" id="btnSubmit" onclick="submitBriefing()">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         Enviar para a Equipe
       </button>
     </div>
   </div>
-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.min.js" integrity="sha384-2zrRDgDHSYB/GN3nFW3fsZXoxEhKIr3N2h63Tc6DEOB9JJdFIu8xMJT2Cph/gBil" crossorigin="anonymous"></script>
@@ -432,703 +151,357 @@
 <script src="../assets/js/portal-auth-v2.js"></script>
 <script src="assets/briefing-templates.js"></script>
 <script>
-// ── SVG Icon library ─────────────────────────────────────
 const SVG_ICONS = {
-  user: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
-  target: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
-  search: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
-  'credit-card': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
-  cpu: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>`,
-  'bar-chart': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>`,
-  'trending-up': `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
-  layers: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
-  check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
-  warn: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
-  info: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
-  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  user:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  target:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+  search:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  'credit-card':`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>`,
+  cpu:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>`,
+  'bar-chart':`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>`,
+  layers:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>`,
+  calendar:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  lock:`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  check:`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  warn:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  info:`<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
 };
-function icon(name) { return SVG_ICONS[name] || ''; }
+function icon(n){ return SVG_ICONS[n] || SVG_ICONS.cpu; }
+function escHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-let activeSectionIdx = 0;  // índice da seção ativa na sidebar
-const params      = new URLSearchParams(location.search);
-const PROJECT_ID  = params.get('projeto');
-const DEMAND_ID   = params.get('demanda');
-const ENTITY_ID   = PROJECT_ID || DEMAND_ID;
-const IS_PROJECT  = !!PROJECT_ID;
-let demand        = null;
-let answers       = {};
-let saveTimer     = null;
+const params     = new URLSearchParams(location.search);
+const PROJECT_ID = params.get('projeto');
+const DEMAND_ID  = params.get('demanda');
+const IS_PROJECT = !!PROJECT_ID;
+const ENTITY_ID  = PROJECT_ID || DEMAND_ID;
 
-function goBack() { window.location.href = IS_PROJECT ? 'projetos.html' : 'demandas.html'; }
+let supabase;
+let entity   = null;
+let services = [];      // projeto: serviços do evento
+let baseAccess = {};    // projeto: acessos herdados (read-only)
+let model    = {};      // projeto: {general:{}, services:{}} | demanda: flat
+let demandService = null;
+let units    = [];      // unidades de render
+let unitIdx  = {};      // key -> unit
+let saveTimer = null;
 
-if (!ENTITY_ID) { window.location.replace('demandas.html'); }
+function goBack(){ window.location.href = IS_PROJECT ? 'projetos.html' : 'demandas.html'; }
+if (!ENTITY_ID) window.location.replace('demandas.html');
 
-// ── Init ─────────────────────────────────────────────────────────
-async function init() {
+// ── value accessors ──────────────────────────────────────────
+function readVal(u, fid){
+  if (!IS_PROJECT) return model[fid];
+  if (u.kind === 'general') return (model.general || {})[fid];
+  if (u.kind === 'access')  return ((baseAccess[u.service] || {}))[fid];
+  return (((model.services || {})[u.service]) || {})[fid];
+}
+function writeVal(u, fid, value){
+  if (!IS_PROJECT) { model[fid] = value; return; }
+  if (u.kind === 'general') { model.general = model.general || {}; model.general[fid] = value; return; }
+  model.services = model.services || {};
+  model.services[u.service] = model.services[u.service] || {};
+  model.services[u.service][fid] = value;
+}
+
+async function init(){
   const user = await PortalAuth.init();
   if (!user) { window.location.replace('/'); return; }
+  supabase = window.getSupabaseClient();
 
-  const supabase = window.getSupabaseClient();
-  let data, error;
   if (IS_PROJECT) {
-    ({ data, error } = await supabase
-      .from('projects')
-      .select('id, title, service_type, briefing, briefing_status, client_slug')
-      .eq('id', ENTITY_ID)
-      .single());
+    const { data, error } = await supabase.from('projects')
+      .select('id, title, services, briefing, briefing_status, client_slug').eq('id', ENTITY_ID).single();
+    if (error || !data) { alert('Projeto não encontrado.'); return goBack(); }
+    entity = data;
+    services = (data.services && data.services.length) ? data.services
+             : (data.service_type ? [data.service_type] : []);
+    model = Object.assign({ general:{}, services:{} }, data.briefing || {});
+    model.general = model.general || {}; model.services = model.services || {};
+    // acessos herdados
+    try { const cb = await supabase.rpc('get_client_briefing'); baseAccess = (cb.data && cb.data.access) || {}; } catch(_) {}
+    buildProjectUnits();
   } else {
-    ({ data, error } = await supabase
-      .from('demands')
-      .select('id, title, service_type, briefing, briefing_status, client_slug')
-      .eq('id', ENTITY_ID)
-      .single());
+    const { data, error } = await supabase.from('demands')
+      .select('id, title, service_type, briefing, briefing_status, client_slug').eq('id', ENTITY_ID).single();
+    if (error || !data) { alert('Demanda não encontrada.'); return goBack(); }
+    entity = data; demandService = data.service_type;
+    model = Object.assign({}, data.briefing || {});
+    const tpl = window.BRIEFING_TEMPLATES[demandService];
+    if (!tpl) { alert('Sem template de briefing.'); return goBack(); }
+    document.getElementById('brandSub').textContent = 'Briefing de Abertura';
+    document.getElementById('backLabel').textContent = 'Voltar para demandas';
+    units = tpl.sections.map((s,i) => ({ key:'d'+i, kind:'demand', title:s.title, icon:s.icon, alert:s.alert, hint:s.hint, fields:s.fields, readonly:false }));
   }
 
-  if (error || !data) {
-    alert(IS_PROJECT ? 'Projeto não encontrado.' : 'Demanda não encontrada.');
-    window.location.replace(IS_PROJECT ? 'projetos.html' : 'demandas.html');
-    return;
-  }
-
-  demand  = data;
-  answers = Object.assign({}, demand.briefing || {});
-
-  document.getElementById('pageTitle').textContent = demand.title;
-
-  const tpl = window.BRIEFING_TEMPLATES[demand.service_type];
-  if (!tpl) {
-    alert('Este ' + (IS_PROJECT ? 'projeto' : 'demanda') + ' não tem template de briefing configurado.');
-    window.location.replace(IS_PROJECT ? 'projetos.html' : 'demandas.html');
-    return;
-  }
-
-  // Atualiza rótulo do botão voltar conforme o contexto
-  const backLbl = document.getElementById('backLabel');
-  if (backLbl) backLbl.textContent = IS_PROJECT ? 'Voltar para projetos' : 'Voltar para demandas';
-
+  document.getElementById('pageTitle').textContent = entity.title;
   document.getElementById('pageMeta').textContent =
-    tpl.label + ' · ' + (demand.briefing_status === 'submitted' ? 'Briefing enviado' : 'Preencher briefing');
+    (IS_PROJECT ? servicesLabel() : (window.BRIEFING_TEMPLATES[demandService]||{}).label) + ' · ' +
+    (entity.briefing_status === 'submitted' ? 'Briefing enviado' : 'Preencher briefing');
 
-  if (demand.briefing_status === 'submitted') {
+  if (entity.briefing_status === 'submitted') {
     document.getElementById('submittedBanner').style.display = 'flex';
-    document.getElementById('btnSubmit').disabled = true;
-    document.getElementById('btnSubmit').textContent = 'Já enviado';
+    const b = document.getElementById('btnSubmit'); b.disabled = true; b.textContent = 'Já enviado';
   }
 
-  renderSidebar(tpl);
-  renderSections(tpl);
-  updateProgress(tpl);
-  scrollToSection(0);
-
-  // Auto-fill campos marcados como auto
-  await autoFillAccountManager();
+  units.forEach(u => unitIdx[u.key] = u);
+  renderSidebar(); renderSections(); updateProgress();
 }
 
-// ── Render sidebar ────────────────────────────────────────────────
-function renderSidebar(tpl) {
-  const nav = document.getElementById('sidebarNav');
-  nav.innerHTML = tpl.sections.map((s, i) => `
-    <div class="nav-item ${i === 0 ? 'active' : ''}" id="nav-${i}" onclick="scrollToSection(${i})">
-      <div class="nav-icon">${icon(s.icon)}</div>
-      <span class="nav-label">${s.title}</span>
-      <span class="nav-check" id="status-${i}">${icon('check')}</span>
-    </div>
-  `).join('');
+function servicesLabel(){ return services.map(s => window.BRIEFING_SERVICE_LABELS[s]||s).join(' · ') || 'Evento'; }
+
+function buildProjectUnits(){
+  units = [];
+  units.push({ key:'general', kind:'general', title:'Dados do evento', icon:'calendar', fields:window.getGeneralFields(), readonly:false });
+  services.forEach(svc => {
+    const lbl = window.BRIEFING_SERVICE_LABELS[svc] || svc;
+    window.getProjectSections(svc).forEach((sec,i) => units.push({
+      key:'p_'+svc+'_'+i, kind:'service', service:svc, group:lbl + ' — campanha',
+      title:sec.title, icon:sec.icon, alert:sec.alert, hint:sec.hint, fields:sec.fields, readonly:false
+    }));
+    window.getBaseSections(svc).forEach((sec,i) => units.push({
+      key:'a_'+svc+'_'+i, kind:'access', service:svc, group:lbl + ' — acessos (já cadastrados)',
+      title:sec.title, icon:'lock', fields:sec.fields, readonly:true
+    }));
+  });
 }
 
-// ── Render sections ───────────────────────────────────────────────
-function renderSections(tpl) {
-  const container = document.getElementById('sections');
-  container.innerHTML = tpl.sections.map((s, si) => `
-    <div class="section-panel" id="section-${si}" data-section="${s.id}">
-      <div class="section-panel-header">
-        <div class="section-icon">${icon(s.icon)}</div>
-        <div class="section-title">${s.title}</div>
-        <div class="section-num-badge">${si + 1} / ${tpl.sections.length}</div>
-      </div>
-      ${s.alert ? `<div class="section-notice warn">${icon('warn')} <span>${s.alert}</span></div>` : ''}
-      ${s.hint  ? `<div class="section-notice info">${icon('info')} <span>${s.hint}</span></div>`  : ''}
-      ${s.fields.map(f => renderField(f)).join('')}
-    </div>
-  `).join('');
+// ── render ───────────────────────────────────────────────────
+function renderSidebar(){
+  document.getElementById('sidebarNav').innerHTML = units.map((u,i) => `
+    <div class="nav-item ${i===0?'active':''} ${u.readonly?'access':''}" id="nav-${i}" onclick="scrollToUnit(${i})">
+      <div class="nav-icon">${icon(u.icon)}</div>
+      <span class="nav-label">${escHtml(u.title)}</span>
+    </div>`).join('');
 }
 
-function renderField(f) {
-  const PRIORITY_LABELS = { red: 'Obrigatório', yellow: 'Importante', green: 'Recomendado' };
+function renderSections(){
+  let lastGroup = null, html = '';
+  units.forEach((u,i) => {
+    if (u.group && u.group !== lastGroup) { html += `<div class="grp-label">${escHtml(u.group)}</div>`; lastGroup = u.group; }
+    html += `
+      <div class="section-panel ${u.readonly?'access':''}" id="unit-${i}">
+        <div class="section-panel-header"><div class="section-icon">${icon(u.icon)}</div><div class="section-title">${escHtml(u.title)}</div>
+          ${u.readonly?'<span class="section-num-badge">Somente leitura</span>':''}</div>
+        ${u.alert ? `<div class="section-notice warn">${icon('warn')} <span>${escHtml(u.alert)}</span></div>` : ''}
+        ${u.hint ? `<div class="section-notice info">${icon('info')} <span>${escHtml(u.hint)}</span></div>` : ''}
+        ${u.readonly && (!u.fields || !u.fields.length) ? `<div class="field-hint">Nenhum acesso cadastrado para este serviço.</div>` : ''}
+        ${u.fields.map(f => renderField(u, f)).join('')}
+      </div>`;
+  });
+  document.getElementById('sections').innerHTML = html;
+  units.forEach(u => u.fields.forEach(f => applyDependent(u, f)));
+}
+
+function renderField(u, f){
+  const PR = { red:'Obrigatório', yellow:'Importante', green:'Recomendado' };
   const hidden = f.dependsOn ? 'style="display:none"' : '';
-
+  const cur = readVal(u, f.id);
+  const ro  = u.readonly;
+  const dom = u.key + '-' + f.id;
   let input = '';
-  if (f.type === 'card') {
-    // Compound card input: brand + last4 + expiry
-    const stored = answers[f.id] || {};
-    const brand   = escHtml(stored.brand  || '');
-    const last4   = escHtml(stored.last4  || '');
-    const expiry  = escHtml(stored.expiry || '');
-    const brands  = ['Visa','Mastercard','Elo','American Express','Hipercard','Outro'];
-    const opts    = brands.map(b => `<option value="${b}" ${brand === b ? 'selected' : ''}>${b}</option>`).join('');
-    input = `
-      <div class="card-input-wrap">
-        <div>
-          <div class="card-input-label">Bandeira</div>
-          <select class="field-input" id="field-${f.id}-brand" onchange="setCardValue('${f.id}')">
-            <option value="">Selecione</option>${opts}
-          </select>
-        </div>
-        <div>
-          <div class="card-input-label">Últimos 4 dígitos</div>
-          <input class="field-input" id="field-${f.id}-last4" type="text"
-            inputmode="numeric" maxlength="4" placeholder="1234"
-            value="${last4}"
-            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4); setCardValue('${f.id}')" />
-        </div>
-        <div>
-          <div class="card-input-label">Validade</div>
-          <input class="field-input" id="field-${f.id}-expiry" type="text"
-            inputmode="numeric" maxlength="5" placeholder="MM/AA"
-            value="${expiry}"
-            oninput="formatExpiry(this); setCardValue('${f.id}')" />
-        </div>
-      </div>`;
-  } else if (f.type === 'boolean') {
-    const yesActive = answers[f.id] === true  ? 'active' : '';
-    const noActive  = answers[f.id] === false ? 'active' : '';
-    input = `
-      <div class="toggle-group" id="toggle-${f.id}">
-        <button class="toggle-btn ${yesActive}" onclick="setBool('${f.id}', true)">Sim</button>
-        <button class="toggle-btn ${noActive}"  onclick="setBool('${f.id}', false)">Não</button>
-      </div>`;
-  } else if (f.type === 'select') {
-    const opts = (f.options || []).map(o =>
-      `<option value="${o}" ${answers[f.id] === o ? 'selected' : ''}>${o}</option>`
-    ).join('');
-    input = `<select class="field-input" id="field-${f.id}" onchange="setValue('${f.id}', this.value)">
-      <option value="">— Selecione —</option>${opts}</select>`;
-  } else if (f.type === 'phone') {
-    const val = answers[f.id] != null ? String(answers[f.id]) : '';
-    const ph = escHtml(f.placeholder || f.hint || '(11) 99999-9999');
-    input = `<input class="field-input" id="field-${f.id}" type="tel" value="${escHtml(val)}"
-      placeholder="${ph}" inputmode="tel"
-      oninput="formatPhone(this); setValue('${f.id}', this.value)" />`;
-  } else {
-    const val = answers[f.id] != null ? String(answers[f.id]) : '';
-    const type = f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : f.type === 'url' ? 'url' : f.type === 'date' ? 'date' : 'text';
-    const roAttr = f.readonly ? 'readonly tabindex="-1"' : '';
-    const ph = escHtml(f.placeholder || f.hint || '');
-    input = `<input class="field-input" id="field-${f.id}" type="${type}" value="${escHtml(val)}"
-      placeholder="${ph}" ${roAttr}
-      oninput="setValue('${f.id}', this.value)" />`;
-  }
 
-  return `
-    <div class="field-row" id="row-${f.id}" ${hidden}>
-      <div class="field-top">
-        <div class="priority-dot ${f.priority}"></div>
-        <span class="field-label-text">${escHtml(f.label)}</span>
-        ${f.readonly
-          ? `<span class="readonly-badge">Automático</span>`
-          : `<span class="priority-tag ${f.priority}">${PRIORITY_LABELS[f.priority] || ''}</span>`
-        }
-      </div>
-      ${f.hint ? `<div class="field-hint">${escHtml(f.hint)}</div>` : ''}
-      ${input}
-      <div class="field-error" id="err-${f.id}">Campo obrigatório</div>
-    </div>`;
-}
-
-// ── Card compound helpers ─────────────────────────────────────────
-function setCardValue(fieldId) {
-  const brand  = document.getElementById('field-' + fieldId + '-brand')?.value  || '';
-  const last4  = document.getElementById('field-' + fieldId + '-last4')?.value  || '';
-  const expiry = document.getElementById('field-' + fieldId + '-expiry')?.value || '';
-  answers[fieldId] = { brand, last4, expiry };
-  const tpl = window.BRIEFING_TEMPLATES[demand.service_type];
-  updateProgress(tpl);
-  scheduleSave();
-}
-
-function formatExpiry(input) {
-  let v = input.value.replace(/[^0-9]/g, '').slice(0, 4);
-  if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
-  input.value = v;
-}
-
-function formatPhone(input) {
-  let v = input.value.replace(/\D/g, '').slice(0, 11);
-  if (v.length <= 2)      { input.value = v.length ? '(' + v : v; return; }
-  if (v.length <= 7)      { input.value = '(' + v.slice(0,2) + ') ' + v.slice(2); return; }
-  input.value = '(' + v.slice(0,2) + ') ' + v.slice(2, (v.length === 11 ? 7 : 6)) + '-' + v.slice(v.length === 11 ? 7 : 6);
-}
-
-// ── Auto-fill gestor da carteira (usa equipe do cliente) ─────────────
-async function autoFillAccountManager() {
-  try {
-    const supabase = window.getSupabaseClient();
-    const slug = demand?.client_slug;
-    if (!slug) return;
-
-    const { data: assignments } = await supabase
-      .from('team_assignments')
-      .select('operators(name, positions(name))')
-      .eq('client_slug', slug);
-
-    if (!assignments?.length) return;
-
-    // Prefere o gestor de tráfego; fallback: primeiro da equipe
-    let manager = assignments.find(a =>
-      (a.operators?.positions?.name || '').toLowerCase().includes('tráfego') ||
-      (a.operators?.positions?.name || '').toLowerCase().includes('trafego')
-    );
-    if (!manager) manager = assignments[0];
-
-    const name = manager?.operators?.name;
-    if (!name) return;
-
-    answers['account_manager'] = name;
-    const el = document.getElementById('field-account_manager');
-    if (el) el.value = name;
-  } catch (_) {}
-}
-
-// ── Field value handlers ──────────────────────────────────────────
-function setValue(fieldId, value) {
-  const tpl = window.BRIEFING_TEMPLATES[demand.service_type];
-  const field = tpl.sections.flatMap(s => s.fields).find(f => f.id === fieldId);
-  answers[fieldId] = field && field.type === 'number' ? (value === '' ? null : Number(value)) : value;
-  clearError(fieldId);
-  updateDependents(tpl, fieldId);
-  updateProgress(tpl);
-  scheduleSave();
-}
-
-function setBool(fieldId, value) {
-  answers[fieldId] = value;
-  const btns = document.querySelectorAll(`#toggle-${fieldId} .toggle-btn`);
-  btns[0].classList.toggle('active', value === true);
-  btns[1].classList.toggle('active', value === false);
-  clearError(fieldId);
-  const tpl = window.BRIEFING_TEMPLATES[demand.service_type];
-  updateDependents(tpl, fieldId);
-  updateProgress(tpl);
-  scheduleSave();
-}
-
-function updateDependents(tpl, changedId) {
-  tpl.sections.flatMap(s => s.fields)
-    .filter(f => f.dependsOn && f.dependsOn.field === changedId)
-    .forEach(f => {
-      const row = document.getElementById('row-' + f.id);
-      if (!row) return;
-      const show = answers[changedId] === f.dependsOn.value;
-      row.style.display = show ? '' : 'none';
-      if (!show) { answers[f.id] = null; }
-    });
-}
-
-function clearError(fieldId) {
-  const el = document.getElementById('err-' + fieldId);
-  if (el) el.style.display = 'none';
-  const inp = document.getElementById('field-' + fieldId);
-  if (inp) inp.classList.remove('error');
-}
-
-// ── Progress & sidebar status ─────────────────────────────────────
-function updateProgress(tpl) {
-  const allRequired = window.getBriefingRequiredFields(demand.service_type);
-  const filled = allRequired.filter(f => {
-    if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return true;
-    const v = answers[f.id];
-    return v !== null && v !== undefined && v !== '';
-  });
-  const pct = allRequired.length ? Math.round(filled.length / allRequired.length * 100) : 100;
-  document.getElementById('progressFill').style.width = pct + '%';
-  const pctEl = document.getElementById('progressPct');
-  if (pctEl) pctEl.textContent = pct + '%';
-
-  // section statuses
-  tpl.sections.forEach((s, i) => {
-    const redFields = s.fields.filter(f => f.priority === 'red');
-    const allFilled = redFields.every(f => {
-      if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return true;
-      const v = answers[f.id];
-      return v !== null && v !== undefined && v !== '';
-    });
-    const navItem = document.getElementById('nav-' + i);
-    if (navItem) navItem.classList.toggle('done', allFilled && redFields.length > 0);
-  });
-}
-
-// ── Auto-save ─────────────────────────────────────────────────────
-function scheduleSave() {
-  clearTimeout(saveTimer);
-  setSaveStatus('saving', 'Salvando...');
-  saveTimer = setTimeout(saveDraft, 1200);
-}
-
-async function saveDraft() {
-  if (demand.briefing_status === 'submitted') return;
-  try {
-    const supabase = window.getSupabaseClient();
-    let error;
-    if (IS_PROJECT) {
-      ({ error } = await supabase.rpc('save_briefing_draft', {
-        p_project_id: ENTITY_ID,
-        p_answers:    answers,
-      }));
+  if (f.type === 'boolean') {
+    if (ro) {
+      input = `<input class="field-input" readonly tabindex="-1" value="${cur===true?'Sim':cur===false?'Não':'—'}" />`;
     } else {
-      ({ error } = await supabase.rpc('save_demand_briefing', {
-        p_demand_id: ENTITY_ID,
-        p_answers:   answers,
-        p_submit:    false,
-      }));
+      const y = cur===true?'active':'', n = cur===false?'active':'';
+      input = `<div class="toggle-group"><button class="toggle-btn ${y}" onclick="setBool('${u.key}','${f.id}',true)">Sim</button>
+        <button class="toggle-btn ${n}" onclick="setBool('${u.key}','${f.id}',false)">Não</button></div>`;
     }
-    if (error) throw error;
-    setSaveStatus('saved', 'Rascunho salvo ✓');
-    setTimeout(() => setSaveStatus('', '—'), 3000);
-  } catch (e) {
-    setSaveStatus('', 'Erro ao salvar');
+  } else if (f.type === 'select') {
+    if (ro) { input = `<input class="field-input" readonly tabindex="-1" value="${escHtml(cur||'—')}" />`; }
+    else {
+      const opts = (f.options||[]).map(o => `<option value="${escHtml(o)}" ${cur===o?'selected':''}>${escHtml(o)}</option>`).join('');
+      input = `<select class="field-input" onchange="setVal('${u.key}','${f.id}',this.value)"><option value="">— Selecione —</option>${opts}</select>`;
+    }
+  } else {
+    const t = f.type==='number'?'number':f.type==='url'?'url':f.type==='date'?'date':f.type==='email'?'email':'text';
+    const roAttr = ro ? 'readonly tabindex="-1"' : `oninput="setVal('${u.key}','${f.id}',this.value)"`;
+    input = `<input class="field-input" id="fld-${dom}" type="${t}" value="${escHtml(cur!=null?String(cur):'')}" placeholder="${escHtml(f.placeholder||'')}" ${roAttr} />`;
   }
+
+  return `<div class="field-row" id="row-${dom}" ${hidden}>
+    <div class="field-top"><div class="priority-dot ${f.priority}"></div><span class="field-label-text">${escHtml(f.label)}</span>
+      ${ro?'<span class="readonly-badge">Do Briefing Básico</span>':`<span class="priority-tag ${f.priority}">${PR[f.priority]||''}</span>`}</div>
+    ${f.hint ? `<div class="field-hint">${escHtml(f.hint)}</div>` : ''}
+    ${input}
+    <div class="field-error" id="err-${dom}">Campo obrigatório</div></div>`;
 }
 
-function setSaveStatus(cls, msg) {
-  const el   = document.getElementById('saveStatus');
-  const text = document.getElementById('saveStatusText');
-  el.className = 'save-status ' + cls;
-  if (text) text.textContent = msg;
+function setVal(key, fid, value){
+  const u = unitIdx[key]; const f = u.fields.find(x => x.id===fid);
+  writeVal(u, fid, f && f.type==='number' ? (value===''?null:Number(value)) : value);
+  clearErr(key, fid); updateDependents(u, fid); updateProgress(); scheduleSave();
+}
+function setBool(key, fid, value){
+  const u = unitIdx[key]; writeVal(u, fid, value);
+  document.querySelectorAll(`#row-${key}-${fid} .toggle-btn`).forEach((b,i)=>b.classList.toggle('active', i===0?value===true:value===false));
+  clearErr(key, fid); updateDependents(u, fid); updateProgress(); scheduleSave();
+}
+function updateDependents(u, changedId){
+  u.fields.filter(f => f.dependsOn && f.dependsOn.field===changedId).forEach(f => {
+    const row = document.getElementById(`row-${u.key}-${f.id}`); if (!row) return;
+    const show = readVal(u, changedId) === f.dependsOn.value;
+    row.style.display = show ? '' : 'none';
+    if (!show) writeVal(u, f.id, null);
+  });
+}
+function applyDependent(u, f){
+  if (!f.dependsOn) return;
+  const row = document.getElementById(`row-${u.key}-${f.id}`);
+  if (row) row.style.display = (readVal(u, f.dependsOn.field) === f.dependsOn.value) ? '' : 'none';
+}
+function clearErr(key, fid){
+  const e = document.getElementById(`err-${key}-${fid}`); if (e) e.style.display='none';
+  const i = document.getElementById(`fld-${key}-${fid}`); if (i) i.classList.remove('error');
 }
 
-// ── Submit ────────────────────────────────────────────────────────
-async function submitBriefing() {
-  const tpl = window.BRIEFING_TEMPLATES[demand.service_type];
-  const { valid, missing } = window.validateBriefing(demand.service_type, answers);
+function updateProgress(){
+  // só conta unidades editáveis (general + service); acessos são read-only
+  let total = 0, filled = 0;
+  units.filter(u => !u.readonly).forEach(u => {
+    u.fields.filter(f => f.priority==='red').forEach(f => {
+      if (f.dependsOn && readVal(u, f.dependsOn.field) !== f.dependsOn.value) return;
+      total++;
+      const v = readVal(u, f.id);
+      if (!(v===null || v===undefined || v==='')) filled++;
+    });
+  });
+  const pct = total ? Math.round(filled/total*100) : 100;
+  document.getElementById('progressFill').style.width = pct+'%';
+  document.getElementById('progressPct').textContent = pct+'%';
+  units.forEach((u,i) => {
+    if (u.readonly) return;
+    const reds = u.fields.filter(f => f.priority==='red');
+    const ok = reds.length>0 && reds.every(f => {
+      if (f.dependsOn && readVal(u, f.dependsOn.field) !== f.dependsOn.value) return true;
+      const v = readVal(u, f.id); return !(v===null||v===undefined||v==='');
+    });
+    const n = document.getElementById('nav-'+i); if (n) n.classList.toggle('done', ok);
+  });
+}
 
-  if (!valid) {
-    const bar = document.getElementById('validationBar');
-    bar.style.display = 'block';
+function scrollToUnit(i){
+  document.querySelectorAll('.nav-item').forEach((el,j)=>el.classList.toggle('active', i===j));
+  const el = document.getElementById('unit-'+i); if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── save / submit ────────────────────────────────────────────
+function setSave(cls,msg){ const el=document.getElementById('saveStatus'); el.className='save-status '+cls; document.getElementById('saveStatusText').textContent=msg; }
+function scheduleSave(){ clearTimeout(saveTimer); setSave('saving','Salvando...'); saveTimer=setTimeout(saveDraft,1200); }
+async function saveDraft(){
+  if (entity.briefing_status === 'submitted') return;
+  try {
+    let error;
+    if (IS_PROJECT) ({ error } = await supabase.rpc('save_project_briefing', { p_project_id: ENTITY_ID, p_answers: { general: model.general, services: model.services } }));
+    else ({ error } = await supabase.rpc('save_demand_briefing', { p_demand_id: ENTITY_ID, p_answers: model, p_submit: false }));
+    if (error) throw error;
+    setSave('saved','Rascunho salvo ✓'); setTimeout(()=>setSave('','—'),3000);
+  } catch(e){ setSave('','Erro ao salvar'); }
+}
+
+async function submitBriefing(){
+  let missing = [];
+  if (IS_PROJECT) {
+    const r = window.validateProjectBriefing(services, { general: model.general, services: model.services });
+    missing = r.missing.map(m => {
+      // localiza a unidade/campo p/ destacar
+      let u, f;
+      if (m.scope === 'general') { u = unitIdx['general']; f = u.fields.find(x=>x.id===m.field); }
+      else { u = units.find(x => x.kind==='service' && x.service===m.scope && x.fields.some(y=>y.id===m.field)); f = u && u.fields.find(x=>x.id===m.field); }
+      return { u, f, label: (f?f.label:m.field) };
+    });
+  } else {
+    const r = window.validateBriefing(demandService, model);
+    const tpl = window.BRIEFING_TEMPLATES[demandService];
+    missing = r.missing.map(id => { const u=units.find(x=>x.fields.some(y=>y.id===id)); const f=u&&u.fields.find(x=>x.id===id); return { u, f, label:(f?f.label:id) }; });
+  }
+
+  if (missing.length) {
+    const bar = document.getElementById('validationBar'); bar.style.display='block';
     bar.innerHTML = '<strong>⚠️ Preencha os campos obrigatórios (🔴) antes de enviar:</strong><ul>' +
-      missing.map(id => {
-        const field = tpl.sections.flatMap(s => s.fields).find(f => f.id === id);
-        const errEl = document.getElementById('err-' + id);
-        if (errEl) errEl.style.display = 'block';
-        const inp = document.getElementById('field-' + id);
-        if (inp) inp.classList.add('error');
-        return `<li>${field ? field.label : id}</li>`;
+      missing.map(m => {
+        if (m.u && m.f) { const e=document.getElementById(`err-${m.u.key}-${m.f.id}`); if(e) e.style.display='block'; const i=document.getElementById(`fld-${m.u.key}-${m.f.id}`); if(i) i.classList.add('error'); }
+        return `<li>${escHtml(m.label)}</li>`;
       }).join('') + '</ul>';
-    bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    bar.scrollIntoView({ behavior:'smooth', block:'start' });
     return;
   }
+  document.getElementById('validationBar').style.display='none';
 
-  document.getElementById('validationBar').style.display = 'none';
-
-  const btn = document.getElementById('btnSubmit');
-  btn.disabled = true;
-  btn.textContent = 'Enviando...';
-
+  const btn = document.getElementById('btnSubmit'); btn.disabled=true; btn.textContent='Enviando...';
   try {
-    const supabase = window.getSupabaseClient();
     let error;
     if (IS_PROJECT) {
-      ({ error } = await supabase.rpc('save_briefing_draft', {
-        p_project_id: ENTITY_ID,
-        p_answers:    answers,
-      }));
-      if (!error) {
-        ({ error } = await supabase.rpc('submit_briefing', { p_project_id: ENTITY_ID }));
-      }
+      ({ error } = await supabase.rpc('save_project_briefing', { p_project_id: ENTITY_ID, p_answers: { general: model.general, services: model.services } }));
+      if (!error) ({ error } = await supabase.rpc('submit_project_briefing', { p_project_id: ENTITY_ID }));
     } else {
-      ({ error } = await supabase.rpc('save_demand_briefing', {
-        p_demand_id: ENTITY_ID,
-        p_answers:   answers,
-        p_submit:    true,
-      }));
+      ({ error } = await supabase.rpc('save_demand_briefing', { p_demand_id: ENTITY_ID, p_answers: model, p_submit: true }));
     }
     if (error) throw error;
+    entity.briefing_status = 'submitted';
+    document.getElementById('submittedBanner').style.display='flex';
 
-    demand.briefing_status = 'submitted';
-    document.getElementById('submittedBanner').style.display = 'flex';
     btn.textContent = 'Gerando PDF...';
-
-    // Gera PDF e tenta anexar ao ClickUp
-    try {
-      const pdfBlob = generateBriefingPDF(tpl, answers, demand);
-      btn.textContent = 'Enviando ao ClickUp...';
-      await attachPDFToClickUp(pdfBlob);
-      document.getElementById('submittedBanner').querySelector('p').textContent =
-        'A equipe recebeu o contexto completo. O PDF foi anexado à task no ClickUp.';
-    } catch (pdfErr) {
-      // PDF/ClickUp falhou mas o briefing já foi salvo — não é crítico
-      console.warn('PDF/ClickUp:', pdfErr);
-      document.getElementById('submittedBanner').querySelector('p').textContent =
-        'Briefing salvo. Não foi possível anexar ao ClickUp automaticamente — faça o download manual se necessário.';
-    }
+    try { const blob = generatePDF(); btn.textContent='Enviando ao ClickUp...'; await attachPDF(blob); }
+    catch(e){ console.warn('PDF/ClickUp:', e); }
 
     btn.textContent = 'Enviado ✓';
-    document.getElementById('pageMeta').textContent = tpl.label + ' · Briefing enviado';
-    setTimeout(() => window.location.href = IS_PROJECT ? 'projetos.html' : 'demandas.html', 3000);
-  } catch (err) {
-    btn.disabled = false;
-    btn.textContent = 'Enviar para a Equipe ✓';
+    setTimeout(()=>goBack(), 2500);
+  } catch(err){
+    btn.disabled=false; btn.textContent='Enviar para a Equipe';
     alert('Erro ao enviar: ' + (err.message || err));
   }
 }
 
-// ── Scroll / nav ──────────────────────────────────────────────────
-function scrollToSection(idx) {
-  activeSectionIdx = idx;
-  document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === idx));
-  const panel = document.getElementById('section-' + idx);
-  if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// Intersection observer to highlight active section
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      const idx = parseInt(e.target.id.replace('section-', ''));
-      document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.toggle('active', i === idx));
-    }
-  });
-}, { threshold: 0.3 });
-
-function escHtml(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-// ── PDF Generation ───────────────────────────────────────────────
-function generateBriefingPDF(tpl, answers, demandData) {
+// ── PDF (genérico a partir das unidades) ─────────────────────
+function displayVal(v){ return v===true?'Sim':v===false?'Não':(v==null?'':String(v)); }
+function generatePDF(){
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const ORANGE=[242,151,37], DARK=[26,20,16], GRAY=[90,82,74], WHITE=[255,255,255];
+  const pageW=210, pageH=297, mL=18, mR=18, cW=pageW-mL-mR; let y=0;
+  function sf(s,st,c){ doc.setFontSize(s); doc.setFont('helvetica',st||'normal'); doc.setTextColor(...(c||DARK)); }
+  function chk(n){ if (y+n>pageH-16){ doc.addPage(); y=20; } }
 
-  const ORANGE  = [242, 151, 37];
-  const DARK    = [26,  20,  16];
-  const GRAY    = [90,  82,  74];
-  const LGRAY   = [230, 223, 212];
-  const WHITE   = [255, 255, 255];
-  const REDCLR  = [198,  40,  40];
-  const YELCLR  = [230, 150,   0];
-  const pageW   = 210;
-  const pageH   = 297;
-  const marginL = 18;
-  const marginR = 18;
-  const contentW = pageW - marginL - marginR;
-  let y = 0;
+  doc.setFillColor(...ORANGE); doc.rect(0,0,pageW,48,'F');
+  sf(9,'normal',WHITE); doc.text('GRUPO PARTICIPA · SERVIÇO DIAMANTE', mL, 12);
+  sf(22,'bold',WHITE); doc.text(IS_PROJECT?'BRIEFING DO PROJETO':'TERMO DE ABERTURA', mL, 27);
+  sf(11,'normal',WHITE); doc.text((IS_PROJECT?servicesLabel():(window.BRIEFING_TEMPLATES[demandService]||{}).label||''), mL, 37);
+  y=58;
+  sf(9,'bold',GRAY); doc.text(IS_PROJECT?'EVENTO':'DEMANDA', mL, y); y+=5;
+  sf(13,'bold',DARK); const tl=doc.splitTextToSize(entity.title,cW); doc.text(tl,mL,y); y+=tl.length*6+8;
 
-  const SERVICE_LABELS = {
-    anuncios_pagos:       'Anúncios Pagos',
-    design_grafico:       'Design Gráfico',
-    edicao_video:         'Edição de Vídeo',
-    social_media:         'Social Media / Copy',
-    web_design_automacao: 'Web Design / Automação',
-  };
-
-  function checkPage(need) {
-    if (y + need > pageH - 16) { doc.addPage(); y = 20; }
-  }
-
-  function setFont(size, style, color) {
-    doc.setFontSize(size);
-    doc.setFont('helvetica', style || 'normal');
-    doc.setTextColor(...(color || DARK));
-  }
-
-  // ── Capa ───────────────────────────────────────────────────────
-  doc.setFillColor(...ORANGE);
-  doc.rect(0, 0, pageW, 52, 'F');
-
-  doc.setFillColor(200, 120, 20);
-  doc.rect(0, 46, pageW, 6, 'F');
-
-  setFont(9, 'normal', WHITE);
-  doc.text('GRUPO PARTICIPA  ·  SERVIÇO DIAMANTE', marginL, 12);
-
-  setFont(26, 'bold', WHITE);
-  doc.text('TERMO DE ABERTURA', marginL, 28);
-
-  setFont(11, 'normal', WHITE);
-  doc.text(tpl.label + '  ·  Formulário de abertura', marginL, 38);
-
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
-  setFont(8, 'normal', WHITE);
-  doc.text('Gerado em ' + dateStr, marginL, 47);
-
-  y = 62;
-
-  // ── Info da demanda ────────────────────────────────────────────
-  setFont(9, 'bold', GRAY);
-  doc.text('DEMANDA', marginL, y);
-  y += 5;
-  setFont(13, 'bold', DARK);
-  const titleLines = doc.splitTextToSize(demandData.title, contentW);
-  doc.text(titleLines, marginL, y);
-  y += titleLines.length * 6 + 8;
-
-  doc.setDrawColor(...LGRAY);
-  doc.setLineWidth(0.3);
-  doc.line(marginL, y, pageW - marginR, y);
-  y += 10;
-
-  // ── Seções ────────────────────────────────────────────────────
-  const PRIORITY_LABELS = { red: 'OBRIGATÓRIO', yellow: 'IMPORTANTE', green: 'RECOMENDADO' };
-  const PRIORITY_COLORS = { red: REDCLR, yellow: YELCLR, green: [46,125,50] };
-
-  tpl.sections.forEach((section, si) => {
-    // Filtra campos com valor
-    const filledFields = section.fields.filter(f => {
-      if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return false;
-      const v = answers[f.id];
-      return v !== null && v !== undefined && v !== '';
+  units.forEach(u => {
+    const filled = u.fields.filter(f => { const v=readVal(u,f.id); return !(v===null||v===undefined||v===''); });
+    if (!filled.length) return;
+    chk(16);
+    doc.setFillColor(248,245,240); doc.roundedRect(mL,y,cW,9,1,1,'F');
+    sf(10,'bold',DARK); doc.text((u.group?u.group+' · ':'')+u.title, mL+4, y+6); y+=13;
+    filled.forEach(f => {
+      chk(12);
+      sf(8,'bold',GRAY); doc.text(f.label, mL, y+4); y+=6;
+      sf(9,'normal',DARK); const lines=doc.splitTextToSize(displayVal(readVal(u,f.id)), cW); doc.text(lines, mL, y+3); y+=lines.length*5+4;
+      doc.setDrawColor(240,235,225); doc.setLineWidth(0.2); doc.line(mL,y,pageW-mR,y); y+=4;
     });
-    if (filledFields.length === 0) return;
-
-    checkPage(20);
-
-    // Cabeçalho da seção
-    doc.setFillColor(248, 245, 240);
-    doc.roundedRect(marginL, y, contentW, 9, 1, 1, 'F');
-    setFont(10, 'bold', DARK);
-    doc.text((si + 1) + '.  ' + section.title, marginL + 4, y + 6);
-    y += 13;
-
-    filledFields.forEach(f => {
-      checkPage(14);
-
-      const rawVal = answers[f.id];
-      const displayVal = rawVal === true ? 'Sim' : rawVal === false ? 'Não' : String(rawVal);
-      const lines = doc.splitTextToSize(displayVal, contentW - 60);
-      const rowH = Math.max(10, lines.length * 5 + 4);
-
-      // Label + badge
-      setFont(8, 'bold', GRAY);
-      doc.text(f.label, marginL, y + 4.5);
-
-      // Badge de prioridade
-      const bColor = PRIORITY_COLORS[f.priority] || GRAY;
-      const bLabel = PRIORITY_LABELS[f.priority] || '';
-      doc.setFillColor(...bColor);
-      const bW = doc.getTextWidth(bLabel) + 4;
-      doc.roundedRect(pageW - marginR - bW - 1, y, bW + 2, 5, 1, 1, 'F');
-      setFont(6.5, 'bold', WHITE);
-      doc.text(bLabel, pageW - marginR - bW, y + 3.5);
-
-      y += 6;
-
-      // Valor
-      setFont(9, 'normal', DARK);
-      doc.text(lines, marginL, y + 3);
-      y += rowH - 2;
-
-      // Linha separadora
-      doc.setDrawColor(240, 235, 225);
-      doc.setLineWidth(0.2);
-      doc.line(marginL, y, pageW - marginR, y);
-      y += 4;
-    });
-
-    y += 4;
+    y+=4;
   });
 
-  // ── Rodapé de assinatura ──────────────────────────────────────
-  checkPage(40);
-  y += 6;
-  doc.setDrawColor(...ORANGE);
-  doc.setLineWidth(0.5);
-  doc.line(marginL, y, pageW - marginR, y);
-  y += 8;
-
-  setFont(8, 'bold', GRAY);
-  doc.text('ASSINATURAS', marginL, y);
-  y += 8;
-
-  const colW = (contentW - 10) / 2;
-  ['CLIENTE', 'COORDENAÇÃO DIAMANTE'].forEach((label, i) => {
-    const x = marginL + i * (colW + 10);
-    doc.setDrawColor(...LGRAY);
-    doc.setLineWidth(0.3);
-    doc.line(x, y + 14, x + colW - 4, y + 14);
-    setFont(7.5, 'normal', GRAY);
-    doc.text(label, x, y + 19);
-    doc.text('Data: ___/___/______', x, y + 25);
-  });
-
-  y += 34;
-
-  // ── Footer em todas as páginas ─────────────────────────────────
-  const pageCount = doc.getNumberOfPages();
-  for (let p = 1; p <= pageCount; p++) {
-    doc.setPage(p);
-    doc.setFillColor(...ORANGE);
-    doc.rect(0, pageH - 10, pageW, 10, 'F');
-    setFont(7, 'normal', WHITE);
-    doc.text('Grupo Participa  ·  Serviço Diamante  ·  ' + tpl.label + '  ·  Documento confidencial', marginL, pageH - 4);
-    setFont(7, 'normal', WHITE);
-    doc.text('Pág. ' + p + ' / ' + pageCount, pageW - marginR - 15, pageH - 4);
-  }
-
+  const pc=doc.getNumberOfPages();
+  for (let p=1;p<=pc;p++){ doc.setPage(p); doc.setFillColor(...ORANGE); doc.rect(0,pageH-10,pageW,10,'F'); sf(7,'normal',WHITE); doc.text('Grupo Participa · Serviço Diamante · Documento confidencial', mL, pageH-4); doc.text('Pág. '+p+'/'+pc, pageW-mR-15, pageH-4); }
   return doc.output('blob');
 }
 
-function buildBriefingSummaryText(tpl, answers) {
-  const lines = [];
-  tpl.sections.forEach(s => {
-    const filled = s.fields.filter(f => {
-      if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return false;
-      const v = answers[f.id];
-      return v !== null && v !== undefined && v !== '';
-    });
-    if (!filled.length) return;
-    lines.push('── ' + s.title.toUpperCase() + ' ──');
-    filled.forEach(f => {
-      const raw = answers[f.id];
-      let display;
-      if (f.type === 'card' && typeof raw === 'object') {
-        display = (raw.brand || '') + ' **** ' + (raw.last4 || '') + '  val. ' + (raw.expiry || '');
-      } else {
-        display = raw === true ? 'Sim' : raw === false ? 'Não' : String(raw);
-      }
-      lines.push(f.label + ': ' + display);
-    });
-    lines.push('');
-  });
-  return lines.join('\n');
-}
-
-async function attachPDFToClickUp(pdfBlob) {
-  const session = await window.getSupabaseClient().auth.getSession();
-  const jwt     = session?.data?.session?.access_token;
-  if (!jwt) throw new Error('Sessão expirada.');
-
-  const tpl     = window.BRIEFING_TEMPLATES[demand.service_type];
-  const summary = tpl ? buildBriefingSummaryText(tpl, answers) : '';
-
+async function attachPDF(blob){
+  const { data:{ session } } = await supabase.auth.getSession();
+  const jwt = session && session.access_token; if (!jwt) throw new Error('Sessão expirada.');
   const form = new FormData();
-  if (IS_PROJECT) {
-    form.append('project_id',      ENTITY_ID);
-  } else {
-    form.append('demand_id',       ENTITY_ID);
-  }
-  form.append('briefing_summary', summary);
-  form.append('pdf', pdfBlob, 'Briefing.pdf');
-
-  const res = await fetch('/api/briefing-to-clickup.php', {
-    method:  'POST',
-    headers: { 'Authorization': 'Bearer ' + jwt },
-    body:    form,
-  });
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Erro ao enviar ao ClickUp');
-  return data;
+  if (IS_PROJECT) form.append('project_id', ENTITY_ID); else form.append('demand_id', ENTITY_ID);
+  form.append('pdf', blob, 'Briefing.pdf');
+  const res = await fetch('/api/briefing-to-clickup.php', { method:'POST', headers:{ 'Authorization':'Bearer '+jwt }, body:form });
+  const d = await res.json(); if (!d.ok) throw new Error(d.error || 'Erro ClickUp'); return d;
 }
 
-// ── Bootstrap ─────────────────────────────────────────────────────
-init().then(() => {
-  const tpl = window.BRIEFING_TEMPLATES[demand && demand.service_type];
-  if (tpl) {
-    tpl.sections.forEach((_, i) => {
-      const el = document.getElementById('section-' + i);
-      if (el) observer.observe(el);
-    });
-  }
-});
+init();
 </script>
 </body>
 </html>

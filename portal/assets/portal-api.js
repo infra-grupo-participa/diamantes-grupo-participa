@@ -419,16 +419,16 @@
     }));
   }
 
-  async function createDemand({ title, description, operator_ids, service_type, starts_at, ends_at }) {
+  async function createDemand({ title, description, operator_ids, project_id, starts_at, ends_at }) {
     if (!title || !title.trim()) throw new Error('Título obrigatório.');
     if (!operator_ids || operator_ids.length === 0) throw new Error('Selecione pelo menos um operador.');
     const { data, error } = await client().rpc('create_demand', {
-      p_title:        title.trim(),
-      p_description:  description || null,
-      p_operators:    operator_ids,
-      p_service_type: service_type || null,
-      p_starts_at:    starts_at || null,
-      p_ends_at:      ends_at   || null,
+      p_title:       title.trim(),
+      p_description: description || null,
+      p_operators:   operator_ids,
+      p_project_id:  project_id || null,
+      p_starts_at:   starts_at || null,
+      p_ends_at:     ends_at   || null,
     });
     if (error) throw error;
     return data;
@@ -507,6 +507,88 @@
     return data;
   }
 
+  // ============================================================
+  // Briefing Básico (acessos, 1x por cliente, gate)
+  // ============================================================
+  async function getClientBriefing() {
+    const { data, error } = await client().rpc('get_client_briefing');
+    if (error) throw error;
+    return data || null; // { client_slug, access, base_status, pending_flags, submitted_at, services }
+  }
+
+  async function saveBaseBriefing(access, pending) {
+    const { data, error } = await client().rpc('save_base_briefing', {
+      p_access:  access || {},
+      p_pending: pending || null,
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function submitBaseBriefing() {
+    const { data, error } = await client().rpc('submit_base_briefing');
+    if (error) throw error;
+    return data;
+  }
+
+  // Conveniência: o cliente já concluiu o Briefing Básico?
+  async function isBaseReady() {
+    try {
+      const b = await getClientBriefing();
+      return !!b && b.base_status === 'submitted';
+    } catch (_) { return false; }
+  }
+
+  // ============================================================
+  // Projetos (evento multi-serviço)
+  // ============================================================
+  async function listMyProjects() {
+    const { data, error } = await client()
+      .from('projects')
+      .select('id, title, services, briefing, briefing_status, status, created_at, updated_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async function getProject(id) {
+    const { data, error } = await client()
+      .from('projects')
+      .select('id, title, services, briefing, briefing_status, status, client_slug, created_at')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  }
+
+  async function createProject({ title, general, services }) {
+    if (!title || !title.trim()) throw new Error('Título obrigatório.');
+    const { data, error } = await client().rpc('create_project', {
+      p_title:    title.trim(),
+      p_general:  general || {},
+      p_services: services || [],
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function saveProjectBriefing(project_id, answers) {
+    const { data, error } = await client().rpc('save_project_briefing', {
+      p_project_id: project_id,
+      p_answers:    answers || {},
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function submitProjectBriefing(project_id) {
+    const { data, error } = await client().rpc('submit_project_briefing', {
+      p_project_id: project_id,
+    });
+    if (error) throw error;
+    return data;
+  }
+
   async function logout() {
     clearCachedProfile();
     await client().auth.signOut();
@@ -542,6 +624,17 @@
     // Avaliação
     getMyDemandRating,
     submitClientRating,
+    // Briefing Básico (gate)
+    getClientBriefing,
+    saveBaseBriefing,
+    submitBaseBriefing,
+    isBaseReady,
+    // Projetos (evento multi-serviço)
+    listMyProjects,
+    getProject,
+    createProject,
+    saveProjectBriefing,
+    submitProjectBriefing,
     // Sessão
     logout,
     getSlugFromUrl,

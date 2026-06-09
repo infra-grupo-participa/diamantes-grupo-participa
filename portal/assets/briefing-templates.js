@@ -202,6 +202,20 @@ window.BRIEFING_TEMPLATES = {
         ],
       },
 
+      // ── 3.5 GTM e Trackeamento ─────────────────────────────
+      {
+        id: 'rastreamento',
+        title: 'GTM e Trackeamento',
+        icon: 'bar-chart',
+        hint: 'Configuração de rastreamento. Se não tiver, marque "não" — agendaremos uma reunião para criar.',
+        fields: [
+          { id: 'has_gtm', label: 'Possui Google Tag Manager (GTM) configurado?', type: 'boolean', priority: 'red', hint: 'Se não tiver, marque "não" — agendaremos reunião para criar o GTM.' },
+          { id: 'gtm_id', label: 'ID do contêiner GTM', type: 'text', priority: 'yellow', placeholder: 'GTM-XXXXXX', dependsOn: { field: 'has_gtm', value: true } },
+          { id: 'has_tracking_sheet', label: 'Possui Planilha de Trackeamento?', type: 'boolean', priority: 'red', hint: 'Se não tiver, marque "não" — agendaremos reunião para criar a planilha.' },
+          { id: 'tracking_sheet_url', label: 'Link da Planilha de Trackeamento', type: 'url', priority: 'yellow', placeholder: 'https://docs.google.com/spreadsheets/...', dependsOn: { field: 'has_tracking_sheet', value: true } },
+        ],
+      },
+
       // ── 4. Financeiro (Cartões) ────────────────────────────
       {
         id: 'financeiro',
@@ -1151,6 +1165,77 @@ window.BRIEFING_TEMPLATES = {
     ],
   },
 
+  // ═══════════════════════════════════════════════════════════
+  // PÁGINAS (Web Design) — split de web_design_automacao
+  // ═══════════════════════════════════════════════════════════
+  paginas: {
+    version: 'paginas@1.0',
+    label: 'Páginas (Web Design)',
+    sections: [
+      {
+        id: 'acessos_plataformas',
+        title: 'Acessos das Plataformas',
+        icon: 'cpu',
+        alert: '⚠️ Acessos pendentes são a principal causa de atraso. Resolva os obrigatórios primeiro.',
+        fields: [
+          { id: 'wordpress_access', label: 'Acesso ao WordPress (URL + usuário/senha)', type: 'text', priority: 'yellow', hint: 'Se usa WordPress. Informe a URL de login (/wp-admin) e credenciais de administrador.', placeholder: 'https://seusite.com/wp-admin' },
+          { id: 'builderall_access', label: 'Acesso ao Builderall', type: 'text', priority: 'yellow', hint: 'Se usa Builderall. E-mail e senha da conta.' },
+          { id: 'greatpages_access', label: 'Acesso ao GreatPages', type: 'text', priority: 'yellow', hint: 'Se usa GreatPages. E-mail e senha da conta.' },
+          { id: 'hosting_provider', label: 'Hospedagem', type: 'select', priority: 'red', options: ['Hostinger', 'TurboCloud', 'Outra'], hint: 'Onde o site está hospedado.' },
+          { id: 'hosting_access', label: 'Acesso ao painel de hospedagem', type: 'text', priority: 'red', hint: 'URL do painel (hPanel/cPanel) + usuário e senha.' },
+          { id: 'photos_drive_url', label: 'Drive de fotos (link atualizado)', type: 'url', priority: 'red', hint: 'Pasta no Google Drive com as fotos do expert/empresa, acesso liberado por link.', placeholder: 'https://drive.google.com/...' },
+          { id: 'visual_identity_url', label: 'Identidade Visual (link do Drive)', type: 'url', priority: 'red', hint: 'Logo, cores, fontes e manual de marca.', placeholder: 'https://drive.google.com/...' },
+        ],
+      },
+      {
+        id: 'dominio',
+        title: 'Domínio do Evento',
+        icon: 'target',
+        hint: 'Domínio e subdomínio que serão usados nas páginas deste evento.',
+        fields: [
+          { id: 'event_domain', label: 'Domínio para captação, central e sessão (ou Low Ticket)', type: 'text', priority: 'red', hint: 'Domínio principal a ser usado neste evento.', placeholder: 'Ex.: seminario.seusite.com.br' },
+          { id: 'subdomain', label: 'Vai usar subdomínio? Se sim, qual?', type: 'text', priority: 'yellow', placeholder: 'Ex.: inscricao.seusite.com.br' },
+        ],
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // AUTOMAÇÃO — split de web_design_automacao
+  // ═══════════════════════════════════════════════════════════
+  automacao: {
+    version: 'automacao@1.0',
+    label: 'Automação',
+    sections: [
+      {
+        id: 'acessos_ferramentas',
+        title: 'Acessos das Ferramentas',
+        icon: 'cpu',
+        alert: '⚠️ Sem os acessos das ferramentas a automação não pode ser configurada.',
+        fields: [
+          { id: 'group_tool', label: 'Ferramenta de gestão de grupo', type: 'select', priority: 'red', options: ['Senflow', 'Devzap', 'Outra', 'Não uso'], hint: 'Qual ferramenta de gestão de grupos de WhatsApp você usa.' },
+          { id: 'group_tool_access', label: 'Acesso à ferramenta de gestão de grupo', type: 'text', priority: 'red', hint: 'Login e senha (ou convite) da Senflow/Devzap.' },
+          { id: 'whatsapp_tool', label: 'Plataforma de WhatsApp', type: 'select', priority: 'red', options: ['Unnichat', 'Manychat', 'Infobeep', 'Outra', 'Não uso'] },
+          { id: 'whatsapp_access', label: 'Acesso à plataforma de WhatsApp', type: 'text', priority: 'red', hint: 'Login e senha da Unnichat/Manychat/Infobeep.' },
+          { id: 'activecampaign_access', label: 'Acesso ao ActiveCampaign', type: 'text', priority: 'yellow', hint: 'Se usa. URL da conta + login.' },
+          { id: 'highlevel_access', label: 'Acesso ao Google / HighLevel (GHL)', type: 'text', priority: 'yellow', hint: 'Se usa GoHighLevel.' },
+          { id: 'integration_tool', label: 'Ferramenta de integração', type: 'select', priority: 'yellow', options: ['Make', 'N8N', 'Outra', 'Não uso'] },
+          { id: 'integration_access', label: 'Acesso à ferramenta de integração', type: 'text', priority: 'yellow', hint: 'Login da Make/N8N.' },
+          { id: 'liguelead_access', label: 'Acesso ao LigueLead (ligação)', type: 'text', priority: 'green', hint: 'Se usa discador LigueLead.' },
+        ],
+      },
+      {
+        id: 'campanha_automacao',
+        title: 'Configuração da Campanha',
+        icon: 'target',
+        hint: 'Detalhes da automação para este evento.',
+        fields: [
+          { id: 'automation_goal', label: 'Objetivo da automação neste evento', type: 'text', priority: 'yellow', placeholder: 'Ex.: boas-vindas + lembretes do seminário' },
+        ],
+      },
+    ],
+  },
+
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1186,5 +1271,134 @@ window.validateBriefing = function (serviceType, answers) {
     }
   }
 
+  return { valid: missing.length === 0, missing };
+};
+
+// ─────────────────────────────────────────────────────────────
+// Briefing em 2 níveis — scope (base = acesso fixo / project = campanha)
+// ─────────────────────────────────────────────────────────────
+
+// Serviços com briefing ativo (Design Gráfico e Social Media ficam ocultos por ora).
+window.BRIEFING_ACTIVE_SERVICES = ['anuncios_pagos', 'edicao_video', 'paginas', 'automacao'];
+
+// Rótulos curtos por serviço (para UI).
+window.BRIEFING_SERVICE_LABELS = {
+  anuncios_pagos: 'Tráfego',
+  edicao_video:   'Edição',
+  paginas:        'Páginas',
+  automacao:      'Automação',
+};
+
+// Escopo padrão por seção. Tudo que não estiver aqui assume 'project'.
+window.BRIEFING_SECTION_SCOPE = {
+  anuncios_pagos: {
+    identificacao: 'project',
+    meta_ads:      'base',
+    google_ads:    'base',
+    rastreamento:  'base',
+    financeiro:    'base',
+    stape:         'base',
+    looker:        'base',
+    orcamento:     'project',
+    camadas:       'project',
+  },
+  edicao_video: {
+    identificacao:  'project',
+    materiais:      'project',
+    especificacoes: 'project',
+    estilo:         'project',
+  },
+  paginas: {
+    acessos_plataformas: 'base',
+    dominio:             'project',
+  },
+  automacao: {
+    acessos_ferramentas: 'base',
+    campanha_automacao:  'project',
+  },
+};
+
+// Override pontual por campo (vence a seção).
+window.BRIEFING_FIELD_SCOPE = {
+  // ex.: anuncios_pagos: { seminar_date: 'project' }
+};
+
+// Bloco geral do evento (transversal a todos os serviços) — vive em briefing.general
+window.GENERAL_PROJECT_FIELDS = [
+  { id: 'event_name',    label: 'Nome do Projeto (tema do evento)', type: 'text', priority: 'red', placeholder: 'Ex.: Seminário Reforma Tributária Jun/26' },
+  { id: 'event_date',    label: 'Data do evento', type: 'date', priority: 'red' },
+  { id: 'traffic_start', label: 'Início do tráfego', type: 'date', priority: 'yellow', hint: 'Quando as campanhas devem começar a rodar.' },
+  { id: 'total_budget',  label: 'Orçamento total do evento (R$)', type: 'number', priority: 'red', placeholder: '15000' },
+  { id: 'traffic_goal',  label: 'Objetivo do tráfego', type: 'text', priority: 'red', placeholder: 'Ex.: 600 leads a até R$25 de CPL' },
+  { id: 'project_goal',  label: 'Objetivo do projeto', type: 'text', priority: 'red', placeholder: 'Ex.: lotar o seminário e vender sessões' },
+  { id: 'audience',      label: 'Público-alvo', type: 'text', priority: 'red', placeholder: 'Ex.: empresários e contadores de PMEs' },
+  { id: 'desired_domain', label: 'Domínio desejado para o projeto', type: 'text', priority: 'yellow', placeholder: 'Ex.: seminario.seusite.com.br' },
+];
+
+// Resolve o scope de um campo (field > field-config > section-config > 'project').
+window.getFieldScope = function (service, sectionId, field) {
+  if (field && field.scope) return field.scope;
+  const fc = (window.BRIEFING_FIELD_SCOPE[service] || {})[field && field.id];
+  if (fc) return fc;
+  return (window.BRIEFING_SECTION_SCOPE[service] || {})[sectionId] || 'project';
+};
+
+// Retorna as seções de um serviço filtradas por scope (seções vazias são omitidas).
+window.getServiceSections = function (service, scope) {
+  const tpl = window.BRIEFING_TEMPLATES[service];
+  if (!tpl) return [];
+  return tpl.sections
+    .map(sec => ({ ...sec, fields: sec.fields.filter(f => window.getFieldScope(service, sec.id, f) === scope) }))
+    .filter(sec => sec.fields.length > 0);
+};
+
+window.getBaseSections    = function (service) { return window.getServiceSections(service, 'base'); };
+window.getProjectSections = function (service) { return window.getServiceSections(service, 'project'); };
+window.getGeneralFields   = function () { return window.GENERAL_PROJECT_FIELDS; };
+
+// Verifica se um campo (red) está vazio, respeitando dependsOn/readonly/tipo.
+window.fieldIsEmpty = function (field, answers) {
+  if (field.readonly) return false;
+  if (field.dependsOn) {
+    const dep = answers[field.dependsOn.field];
+    if (dep !== field.dependsOn.value) return false; // não exigido
+  }
+  const val = answers[field.id];
+  if (field.type === 'card') {
+    return !val || !val.brand || !val.last4 || val.last4.length < 4 || !val.expiry;
+  }
+  if (field.type === 'boolean') {
+    return val === null || val === undefined;
+  }
+  return val === null || val === undefined || val === '';
+};
+
+// Valida os campos red de ACESSO (base) de um serviço. answers = mapa plano daquele serviço.
+window.validateBaseAccess = function (service, answers) {
+  const missing = [];
+  window.getBaseSections(service).forEach(sec =>
+    sec.fields.forEach(f => {
+      if (f.priority === 'red' && window.fieldIsEmpty(f, answers || {})) missing.push(f.id);
+    })
+  );
+  return { valid: missing.length === 0, missing };
+};
+
+// Valida o briefing de um projeto: bloco geral (red) + seções project (red) dos serviços do evento.
+// briefing = { general:{}, services:{ svc:{} } }
+window.validateProjectBriefing = function (services, briefing) {
+  const missing = []; // [{ scope:'general'|svc, field }]
+  const general = (briefing && briefing.general) || {};
+  window.getGeneralFields().forEach(f => {
+    if (f.priority === 'red' && window.fieldIsEmpty(f, general)) missing.push({ scope: 'general', field: f.id });
+  });
+  (services || []).forEach(svc => {
+    const ans = ((briefing && briefing.services) || {})[svc] || {};
+    window.getProjectSections(svc).forEach(sec =>
+      sec.fields.forEach(f => {
+        if (f.priority === 'red' && window.fieldIsEmpty(f, ans)) missing.push({ scope: svc, field: f.id });
+      })
+    );
+  });
   return { valid: missing.length === 0, missing };
 };
