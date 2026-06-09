@@ -14,12 +14,15 @@
     "quality:compare": "node scripts/compare-baseline.js",
     "quality:gate": "npm run quality && npm run quality:compare",
     "quality:update-baseline": "node scripts/update-baseline.js",
-    "quality:pr-comment": "node scripts/render-pr-comment.js"
+    "quality:pr-comment": "node scripts/render-pr-comment.js",
+    "deploy:ftp": "node scripts/ftp-deploy.mjs",
+    "deploy:ftp:dry": "node scripts/ftp-deploy.mjs --dry-run"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
     "@playwright/test": "^1.44.0",
     "@vitest/coverage-v8": "^3.2.0",
+    "basic-ftp": "^6.0.1",
     "eslint": "^9.15.0",
     "eslint-plugin-sonarjs": "^3.0.0",
     "glob": "^11.0.0",
