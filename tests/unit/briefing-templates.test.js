@@ -115,3 +115,52 @@ describe('validateProjectBriefing', () => {
     expect(r.valid).toBe(true);
   });
 });
+
+describe('integridade dos templates (4 serviços ativos)', () => {
+  for (const svc of ['anuncios_pagos', 'edicao_video', 'paginas', 'automacao']) {
+    const fields = () => W.BRIEFING_TEMPLATES[svc].sections.flatMap(s => s.fields);
+
+    test(`${svc}: todo campo tem id/label/type/priority`, () => {
+      for (const f of fields()) {
+        expect(f.id, JSON.stringify(f)).toBeTruthy();
+        expect(typeof f.label).toBe('string');
+        expect(f.type, f.id).toBeTruthy();
+        expect(['red', 'yellow', 'green']).toContain(f.priority);
+      }
+    });
+
+    test(`${svc}: sem ids de campo duplicados`, () => {
+      const ids = fields().map(f => f.id);
+      expect(ids.length).toBe(new Set(ids).size);
+    });
+
+    test(`${svc}: dependsOn aponta p/ campo existente no mesmo serviço`, () => {
+      const ids = new Set(fields().map(f => f.id));
+      for (const f of fields()) {
+        if (f.dependsOn) expect(ids.has(f.dependsOn.field), `${f.id} → ${f.dependsOn.field}`).toBe(true);
+      }
+    });
+
+    test(`${svc}: select sempre tem options não-vazio`, () => {
+      for (const f of fields()) {
+        if (f.type === 'select') {
+          expect(Array.isArray(f.options)).toBe(true);
+          expect(f.options.length).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    test(`${svc}: toda seção tem id único + fields[]`, () => {
+      const secs = W.BRIEFING_TEMPLATES[svc].sections;
+      const sids = secs.map(s => s.id);
+      expect(sids.length).toBe(new Set(sids).size);
+      for (const s of secs) expect(Array.isArray(s.fields)).toBe(true);
+    });
+  }
+
+  test('serviços ocultos (design/social) NÃO estão em ACTIVE', () => {
+    expect(W.BRIEFING_ACTIVE_SERVICES).not.toContain('design_grafico');
+    expect(W.BRIEFING_ACTIVE_SERVICES).not.toContain('social_media');
+    expect(W.BRIEFING_ACTIVE_SERVICES).not.toContain('web_design_automacao');
+  });
+});
