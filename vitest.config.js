@@ -9,11 +9,10 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: 'build/coverage-js',
-      // Only measure the pure/testable ESM modules (no DOM-heavy modules).
-      // DOM-heavy modules (bootstrap, profiles, modals, task-cards) are covered by E2E.
+      // Mede a lógica pura nova do briefing (helpers de scope/validação).
+      // Telas DOM-heavy são cobertas por E2E (Playwright).
       include: [
-        'portal/assets/js/insights-utils.js',
-        'portal/assets/js/insights-state.js',
+        'portal/assets/briefing-templates.js',
       ],
       exclude: [
         'vendor/**',
