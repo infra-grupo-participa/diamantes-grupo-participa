@@ -1,7 +1,7 @@
 # Briefing em 2 Níveis + Chamados por Projeto — Tasks
 
 **Design:** `docs/specs/briefing-base-projeto/design.md`
-**Status:** T0–T13 implementadas (sintaxe validada) · T14/T15 pendentes · aguardando aplicação da migration 031 + teste funcional
+**Status:** Done — T0–T15 implementadas e deployadas (migration 031 aplicada; deploy FTP em produção). Teste funcional manual recomendado.
 
 > **Nota de verificação:** o banco de produção do diamantes (`npqyvjhvtfahuxfmuhie`) não é acessível
 > pelo MCP daqui; a migration é aplicada manualmente (Supabase SQL editor / deploy). Gate de cada task:

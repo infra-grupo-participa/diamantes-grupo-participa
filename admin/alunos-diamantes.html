@@ -832,6 +832,9 @@
               <button class="icon-btn" data-action="edit" title="Editar">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
               </button>
+              <button class="icon-btn" data-action="access" title="Gerar acesso de login">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+              </button>
               <button class="icon-btn danger" data-action="delete" title="Excluir">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg>
               </button>
@@ -917,6 +920,8 @@
         });
         tr.querySelector('[data-action="edit"]').addEventListener('click', (e) => { e.stopPropagation(); openEditModal(s); });
         tr.querySelector('[data-action="delete"]').addEventListener('click', (e) => { e.stopPropagation(); confirmDelete(s); });
+        const accBtn = tr.querySelector('[data-action="access"]');
+        if (accBtn) accBtn.addEventListener('click', (e) => { e.stopPropagation(); openAccessFlow(s); });
       });
     }
 
@@ -1096,6 +1101,59 @@
       document.getElementById('studentModal').style.display = 'flex';
       document.getElementById('studentName').focus();
     }
+    // ── ONB-01: gerar acesso (login) do aluno ────────────────────────
+    function escAccess(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    async function openAccessFlow(s){
+      const email = (window.prompt('E-mail de acesso do aluno (login):', s.owner_email || '') || '').trim();
+      if (!email) return;
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { alert('E-mail inválido.'); return; }
+      if (!confirm(`Criar acesso para "${s.display_name || s.slug}" com o e-mail ${email}?\n\nO sistema gera a senha — você envia manualmente ao aluno.`)) return;
+      try {
+        const { email: e, password } = await AdminAPI.createClientAccess({ slug: s.slug, email, name: s.display_name });
+        showCredentials(s.display_name || s.slug, e, password);
+      } catch (err) { alert('Erro ao criar acesso: ' + (err.message || err)); }
+    }
+
+    function showCredentials(name, email, password){
+      const ov = document.createElement('div');
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;';
+      ov.innerHTML = `
+        <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden;">
+          <div style="padding:20px 24px;border-bottom:1px solid #eef0f4;">
+            <div style="font-size:1.05rem;font-weight:700;">Acesso criado ✓</div>
+            <div style="font-size:.82rem;color:#64748b;margin-top:2px;">${escAccess(name)} — envie estes dados manualmente ao aluno.</div>
+          </div>
+          <div style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;">
+            <div>
+              <div style="font-size:.72rem;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">E-mail</div>
+              <div style="display:flex;gap:8px;">
+                <input readonly value="${escAccess(email)}" style="flex:1;padding:9px 12px;border:1.5px solid #e3e6ec;border-radius:8px;font-size:.9rem;background:#f7f8fa;" />
+                <button type="button" data-copy="${escAccess(email)}" style="border:1.5px solid #e3e6ec;background:#fff;border-radius:8px;padding:0 12px;cursor:pointer;">Copiar</button>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:.72rem;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;">Senha</div>
+              <div style="display:flex;gap:8px;">
+                <input readonly value="${escAccess(password)}" style="flex:1;padding:9px 12px;border:1.5px solid #e3e6ec;border-radius:8px;font-size:.9rem;background:#f7f8fa;font-family:monospace;" />
+                <button type="button" data-copy="${escAccess(password)}" style="border:1.5px solid #e3e6ec;background:#fff;border-radius:8px;padding:0 12px;cursor:pointer;">Copiar</button>
+              </div>
+            </div>
+            <div style="font-size:.78rem;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;line-height:1.5;">
+              ⚠️ Esta senha <strong>não será exibida de novo</strong>. Copie e envie agora. Uma <strong>reunião de configuração</strong> foi marcada como pendente para este aluno.
+            </div>
+            <button type="button" id="credClose" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px;font-weight:700;cursor:pointer;">Fechar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(ov);
+      ov.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => {
+        try { navigator.clipboard.writeText(b.dataset.copy); } catch (_) {}
+        b.textContent = 'Copiado'; setTimeout(() => b.textContent = 'Copiar', 1500);
+      }));
+      ov.querySelector('#credClose').addEventListener('click', () => ov.remove());
+      ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    }
+
     function openEditModal(s) {
       state.editingSlug = s.slug;
       document.getElementById('studentModalTitle').textContent = 'Editar aluno';

@@ -215,11 +215,11 @@ em modo leitura, com indicador de completude.
 | CHAM-01 | P2 Dois modos de chamado | Tasks | Implementing (T5,T13) |
 | CHAM-02 | P2 Gate no chamado | Tasks | Implementing (T5,T13) |
 | DASH-01 | P2 Equipe somente leitura | Tasks | Implementing (T0) |
-| ONB-01 | P2 Onboarding Diamante novo (acesso preparado, envio manual) | - | Pending (não iniciado) |
-| ADM-01 | P3 Painel admin briefings | - | Pending (não iniciado) |
+| ONB-01 | P2 Onboarding Diamante novo (acesso preparado, envio manual) | Tasks | Implementing (admin-api.createClientAccess + alunos-diamantes "Gerar acesso") |
+| ADM-01 | P3 Painel admin briefings | Tasks | Implementing (admin/projetos.html: eventos + acessos herdados no modal) |
 
-**Coverage:** 13 requisitos · 11 implementados (aguardando aplicação da migration + teste manual) · 2 pendentes (ONB-01, ADM-01).
-**Verificação:** sintaxe JS validada (`node --check` + parse dos scripts inline). Funcional pendente de aplicar a migration 031 no banco e testar no portal.
+**Coverage:** 13 requisitos · **13 implementados** · 0 pendentes.
+**Verificação:** sintaxe JS validada; migration 031 aplicada no banco; deploy FTP em produção confirmado. Teste funcional manual recomendado (login cliente + criar acesso no admin).
 
 ---
 

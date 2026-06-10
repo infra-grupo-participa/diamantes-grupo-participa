@@ -315,6 +315,62 @@
     return data;
   }
 
+  // Gera uma senha forte e legível (sem caracteres ambíguos).
+  function genPassword(len = 12) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$%';
+    const arr = new Uint32Array(len);
+    crypto.getRandomValues(arr);
+    let out = '';
+    for (let i = 0; i < len; i++) out += chars[arr[i] % chars.length];
+    return out;
+  }
+
+  // ONB-01: cria o ACESSO (login) do aluno Diamante a partir dos dados pessoais.
+  // O sistema gera e-mail+senha; o admin envia manualmente ao aluno (sem disparo de e-mail).
+  // Marca "reunião de configuração" pendente no perfil do cliente.
+  async function createClientAccess({ slug, email, name }) {
+    if (!slug || !email) throw new Error('Aluno (slug) e e-mail são obrigatórios.');
+    const supabase = client();
+    email = email.trim().toLowerCase();
+
+    const { data: existing } = await supabase
+      .from('users').select('id, email').eq('client_slug', slug).eq('role', 'user').maybeSingle();
+    if (existing) throw new Error('Este aluno já tem acesso: ' + existing.email);
+
+    const password = genPassword(12);
+    const { data: cur } = await supabase.auth.getSession();
+
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email, password, options: { data: { name: name || slug, role: 'user', status: 'approved' } },
+    });
+    if (signUpError) throw new Error(signUpError.message);
+    if (!signUpData?.user) throw new Error('Falha ao criar usuário no Auth.');
+    const newUserId = signUpData.user.id;
+
+    // Restaura sessão do admin (signUp troca a sessão ativa)
+    if (cur?.session) {
+      await supabase.auth.setSession({
+        access_token: cur.session.access_token, refresh_token: cur.session.refresh_token,
+      });
+    }
+
+    const { error: insErr } = await supabase.from('users').insert({
+      auth_user_id: newUserId, email, name: name || slug,
+      role: 'user', status: 'approved', client_slug: slug,
+    });
+    if (insErr) throw insErr;
+
+    // Marca reunião de configuração pendente (best-effort)
+    try {
+      const { data: prof } = await supabase.from('client_profiles').select('data').eq('client_slug', slug).maybeSingle();
+      const d = (prof && prof.data) || {};
+      d.onboarding = { meeting_pending: true, access_created_at: new Date().toISOString() };
+      await supabase.from('client_profiles').update({ data: d }).eq('client_slug', slug);
+    } catch (_) { /* perfil pode não existir ainda */ }
+
+    return { email, password };
+  }
+
   async function updateStudent(slug, patch) {
     if (!slug) throw new Error('slug obrigatório');
     const allowed = ['display_name', 'primary_color'];
@@ -938,6 +994,7 @@
     getClientActiveServices,
     getStudentStats,
     createStudent,
+    createClientAccess,
     updateStudent,
     deleteStudent,
     exportStudentsCsv,

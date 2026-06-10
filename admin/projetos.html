@@ -188,11 +188,10 @@
     <div class="filters">
       <select class="filter-select" id="filterService" onchange="loadProjects()">
         <option value="">Todos os serviços</option>
-        <option value="anuncios_pagos">Anúncios Pagos</option>
-        <option value="design_grafico">Design Gráfico</option>
-        <option value="edicao_video">Edição de Vídeo</option>
-        <option value="social_media">Social Media / Copy</option>
-        <option value="web_design_automacao">Web Design / Automação</option>
+        <option value="anuncios_pagos">Tráfego</option>
+        <option value="edicao_video">Edição</option>
+        <option value="paginas">Páginas</option>
+        <option value="automacao">Automação</option>
       </select>
       <select class="filter-select" id="filterStatus" onchange="loadProjects()">
         <option value="">Todos os status</option>
@@ -253,14 +252,11 @@
 'use strict';
 
 const SERVICE_LABELS = {
-  anuncios_pagos:        '📣 Anúncios Pagos',
-  design_grafico:        '🎨 Design Gráfico',
-  edicao_video:          '🎬 Edição de Vídeo',
-  social_media:          '📱 Social Media',
-  web_design_automacao:  '💻 Web Design / Auto.',
+  anuncios_pagos: '📣 Tráfego', edicao_video: '🎬 Edição', paginas: '💻 Páginas', automacao: '⚙️ Automação',
+  // legados (exibição de dados antigos)
+  design_grafico: '🎨 Design Gráfico', social_media: '📱 Social Media', web_design_automacao: '💻 Web/Auto.',
 };
 
-// Mapa de projetos para lookup seguro no modal (evita JSON no onclick = XSS)
 const projectsMap = {};
 
 async function loadProjects() {
@@ -272,7 +268,7 @@ async function loadProjects() {
   const svc = document.getElementById('filterService').value;
   const sta = document.getElementById('filterStatus').value;
   const brf = document.getElementById('filterBriefing').value;
-  if (svc) q = q.eq('service_type', svc);
+  if (svc) q = q.contains('services', [svc]);
   if (sta) q = q.eq('status', sta);
   if (brf) q = q.eq('briefing_status', brf);
 
@@ -284,29 +280,26 @@ async function loadProjects() {
     return;
   }
 
-  // Armazena no map para uso seguro no modal
   data.forEach(p => { projectsMap[p.id] = p; });
 
   tbody.innerHTML = data.map(p => {
-    const tpl      = window.BRIEFING_TEMPLATES[p.service_type];
-    const progress = tpl ? calcProgress(tpl, p.briefing || {}) : null;
+    const progress = calcProgress(p);
     const client   = escHtml(p.clients?.display_name || p.client_slug);
     const date     = new Date(p.created_at).toLocaleDateString('pt-BR');
-    const svcLabel = SERVICE_LABELS[p.service_type] || p.service_type;
+    const svcList  = (p.services || []).map(s => SERVICE_LABELS[s] || s).join(', ') || '—';
 
     return `<tr>
       <td><strong>${escHtml(p.title)}</strong></td>
       <td>${client}</td>
-      <td><span class="service-label">${escHtml(svcLabel)}</span></td>
+      <td><span class="service-label">${escHtml(svcList)}</span></td>
       <td>
         <span class="badge badge-${p.briefing_status === 'submitted' ? 'submitted' : 'draft'}">
           ${p.briefing_status === 'submitted' ? 'Enviado' : 'Rascunho'}
         </span>
-        ${progress !== null ? `
-          <div class="progress-pill">
-            <div class="bar"><div class="fill" style="width:${progress}%"></div></div>
-            ${progress}%
-          </div>` : ''}
+        <div class="progress-pill">
+          <div class="bar"><div class="fill" style="width:${progress}%"></div></div>
+          ${progress}%
+        </div>
       </td>
       <td><span class="badge badge-${escHtml(p.status)}">${escHtml(statusLabel(p.status))}</span></td>
       <td>${date}</td>
@@ -315,65 +308,83 @@ async function loadProjects() {
   }).join('');
 }
 
-function calcProgress(tpl, answers) {
-  const all = tpl.sections.flatMap(s => s.fields.filter(f => f.priority === 'red'));
-  if (!all.length) return 100;
-  const filled = all.filter(f => {
-    if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return true;
-    const v = answers[f.id];
-    return v !== null && v !== undefined && v !== '';
-  });
-  return Math.round(filled.length / all.length * 100);
+// Progresso do evento: bloco geral (red) + seções project (red) dos serviços do evento.
+function calcProgress(p) {
+  const services = p.services || [];
+  const briefing = p.briefing || {};
+  let total = (window.getGeneralFields() || []).filter(f => f.priority === 'red').length;
+  services.forEach(svc => (window.getProjectSections(svc) || []).forEach(sec =>
+    sec.fields.forEach(f => { if (f.priority === 'red') total++; })));
+  if (!total) return 100;
+  const { missing } = window.validateProjectBriefing(services, briefing);
+  return Math.round(Math.max(0, total - missing.length) / total * 100);
 }
 
 function statusLabel(s) {
   return { briefing: 'Briefing', active: 'Ativo', completed: 'Concluído', cancelled: 'Cancelado' }[s] || s;
 }
 
-function openModal(p) {
+function fieldRow(label, value) {
+  const display = value === true ? 'Sim' : value === false ? 'Não' : String(value);
+  return `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:.85rem;">
+    <span style="color:#888;min-width:220px;flex-shrink:0;">${escHtml(label)}</span>
+    <span style="color:#1a1a1a;font-weight:500;">${escHtml(display)}</span></div>`;
+}
+function sectionBlock(title, rowsHtml, tag) {
+  if (!rowsHtml) return '';
+  return `<div style="margin-bottom:20px;">
+    <div style="font-weight:700;font-size:.95rem;margin-bottom:10px;color:#333;padding-bottom:6px;border-bottom:2px solid #f0f0f0;display:flex;justify-content:space-between;">
+      <span>${escHtml(title)}</span>${tag?`<span style="font-size:.7rem;color:#94a3b8;font-weight:600;">${escHtml(tag)}</span>`:''}</div>
+    ${rowsHtml}</div>`;
+}
+
+async function openModal(p) {
+  const services = p.services || [];
   document.getElementById('modalTitle').textContent = p.title;
   document.getElementById('modalMeta').textContent =
-    (SERVICE_LABELS[p.service_type] || p.service_type) + ' · ' + (p.clients?.display_name || p.client_slug);
+    services.map(s => SERVICE_LABELS[s] || s).join(' · ') + ' · ' + (p.clients?.display_name || p.client_slug);
+  document.getElementById('modalBody').innerHTML = '<p style="color:#aaa;text-align:center;padding:20px;">Carregando…</p>';
+  document.getElementById('briefingModal').style.display = 'block';
 
-  const tpl     = window.BRIEFING_TEMPLATES[p.service_type];
-  const answers = p.briefing || {};
+  const briefing = p.briefing || {};
+  const general  = briefing.general || {};
+  const svcAns   = briefing.services || {};
+
+  // Acessos herdados do Briefing Básico do cliente (read-only)
+  let access = {};
+  try {
+    const { data } = await window.getSupabaseClient()
+      .from('client_briefing').select('access').eq('client_slug', p.client_slug).maybeSingle();
+    access = (data && data.access) || {};
+  } catch (_) {}
 
   let html = '';
-  if (!tpl) {
-    html = '<p style="color:#aaa;text-align:center;padding:20px;">Template não disponível para este serviço.</p>';
-  } else {
-    tpl.sections.forEach(s => {
-      const filledFields = s.fields.filter(f => {
-        if (f.dependsOn && answers[f.dependsOn.field] !== f.dependsOn.value) return false;
-        const v = answers[f.id];
-        return v !== null && v !== undefined && v !== '';
-      });
-      if (!filledFields.length) return;
+  // Bloco geral do evento
+  const gRows = (window.getGeneralFields() || []).map(f => {
+    const v = general[f.id]; return (v===null||v===undefined||v==='') ? '' : fieldRow(f.label, v);
+  }).join('');
+  html += sectionBlock('Dados do evento', gRows);
 
-      html += `<div style="margin-bottom:20px;">
-        <div style="font-weight:700;font-size:.95rem;margin-bottom:10px;color:#333;padding-bottom:6px;border-bottom:2px solid #f0f0f0;">${escHtml(s.title)}</div>`;
-      filledFields.forEach(f => {
-        const raw = answers[f.id];
-        let display;
-        if (f.type === 'card' && typeof raw === 'object' && raw) {
-          display = `${raw.brand || ''} **** ${raw.last4 || ''}  val. ${raw.expiry || ''}`;
-        } else {
-          display = raw === true ? 'Sim' : raw === false ? 'Não' : String(raw);
-        }
-        html += `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #f5f5f5;font-size:.85rem;">
-          <span style="color:#888;min-width:220px;flex-shrink:0;">${escHtml(f.label)}</span>
-          <span style="color:#1a1a1a;font-weight:500;">${escHtml(display)}</span>
-        </div>`;
-      });
-      html += '</div>';
-    });
-    if (!html) {
-      html = '<p style="color:#aaa;text-align:center;padding:20px;">Briefing ainda não preenchido.</p>';
-    }
-  }
+  // Por serviço: campanha + acessos
+  services.forEach(svc => {
+    const lbl = SERVICE_LABELS[svc] || svc;
+    const ans = svcAns[svc] || {};
+    let projRows = '';
+    (window.getProjectSections(svc) || []).forEach(sec => sec.fields.forEach(f => {
+      const v = ans[f.id]; if (!(v===null||v===undefined||v==='')) projRows += fieldRow(f.label, v);
+    }));
+    html += sectionBlock(lbl + ' — campanha', projRows);
 
+    const acc = access[svc] || {};
+    let accRows = '';
+    (window.getBaseSections(svc) || []).forEach(sec => sec.fields.forEach(f => {
+      const v = acc[f.id]; if (!(v===null||v===undefined||v==='')) accRows += fieldRow(f.label, v);
+    }));
+    html += sectionBlock(lbl + ' — acessos', accRows, 'do Briefing Básico');
+  });
+
+  if (!html) html = '<p style="color:#aaa;text-align:center;padding:20px;">Briefing ainda não preenchido.</p>';
   document.getElementById('modalBody').innerHTML = html;
-  document.getElementById('briefingModal').style.display = 'block';
 }
 
 function closeModal() {
