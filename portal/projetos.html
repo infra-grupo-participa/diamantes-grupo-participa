@@ -162,8 +162,7 @@ async function load() {
   }
 
   grid.innerHTML = data.map(p => {
-    // services[] (novo) com fallback para service_type legado
-    const svcList = (p.services && p.services.length) ? p.services : (p.service_type ? [p.service_type] : []);
+    const svcList = p.services || [];
     const svcTags = svcList.map(s => {
       const m = SERVICE_LABELS[s] || { label: s, icon: '📋' };
       return `<span class="service-icon">${m.icon}</span><span class="service-tag">${m.label}</span>`;
@@ -173,7 +172,7 @@ async function load() {
     const date    = new Date(p.created_at).toLocaleDateString('pt-BR');
 
     return `
-    <div class="project-card" onclick="openProject('${p.id}', '${p.briefing_status}')">
+    <div class="project-card" onclick="openProject('${p.id}')">
       <div class="card-service">
         ${svcTags}
       </div>
@@ -198,13 +197,8 @@ async function load() {
   }).join('');
 }
 
-function openProject(id, briefingStatus) {
-  if (briefingStatus === 'submitted') {
-    // Briefing já enviado — apenas exibe; futuramente abrirá tela de visualização
-    window.location.href = 'briefing.html?projeto=' + id;
-  } else {
-    window.location.href = 'briefing.html?projeto=' + id;
-  }
+function openProject(id) {
+  window.location.href = 'briefing.html?projeto=' + id;
 }
 
 function escHtml(s) {

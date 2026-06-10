@@ -813,10 +813,6 @@
             </button>
           </div>
         </div>
-        <div id="briefingAlertBanner" style="display:none;" class="briefing-alert-banner">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span id="briefingAlertText"></span>
-        </div>
         <div class="list-scroll" id="listScroll"></div>
       </aside>
 
@@ -877,11 +873,6 @@
           </div>
         </div>
 
-        <div class="detail-section" id="briefingDetailSection" style="display:none;">
-          <h3>Briefing de Abertura</h3>
-          <div id="briefingDetailCard"></div>
-        </div>
-
         <div class="detail-section">
           <h3>Etapas da entrega</h3>
           <div class="steps" id="stepsList"></div>
@@ -908,7 +899,6 @@
   <script src="../assets/js/demand-chat-api.js?v=20260512b"></script>
   <script src="../assets/js/chat-composer.js?v=20260512b"></script>
   <script src="assets/portal-api.js?v=20260512d"></script>
-  <script src="assets/briefing-templates.js"></script>
 
   <script>
     'use strict';
@@ -996,7 +986,7 @@
       return {
         all:         items.length,
         in_progress: items.filter(d => d.status === 'open' || d.status === 'in_progress' || d.status === 'review').length,
-        awaiting:    items.filter(d => d.status === 'review' || hasPendingBriefing(d)).length,
+        awaiting:    items.filter(d => d.status === 'review').length,
         done:        items.filter(d => d.status === 'done').length,
       };
     }
@@ -1013,57 +1003,28 @@
       const search = state.search.toLowerCase();
       let items = state.demands;
       if (state.filter === 'in_progress')   items = items.filter(d => d.status === 'open' || d.status === 'in_progress' || d.status === 'review');
-      else if (state.filter === 'awaiting') items = items.filter(d => d.status === 'review' || hasPendingBriefing(d));
+      else if (state.filter === 'awaiting') items = items.filter(d => d.status === 'review');
       else if (state.filter === 'done')     items = items.filter(d => d.status === 'done');
       if (search) items = items.filter(d => (d.title || '').toLowerCase().includes(search));
       return items;
-    }
-
-    function hasPendingBriefing(d) {
-      return d.service_type && d.briefing_status === 'draft' &&
-             window.BRIEFING_TEMPLATES && window.BRIEFING_TEMPLATES[d.service_type];
     }
 
     function renderList() {
       const items = filterDemands();
       const scroll = document.getElementById('listScroll');
 
-      // Banner de pendências
-      const pending = state.demands.filter(hasPendingBriefing);
-      const banner  = document.getElementById('briefingAlertBanner');
-      const bannerTxt = document.getElementById('briefingAlertText');
-      if (pending.length > 0) {
-        banner.style.display = 'flex';
-        const plural = pending.length > 1 ? `${pending.length} demandas precisam` : '1 demanda precisa';
-        bannerTxt.innerHTML = `<strong>${plural} do briefing preenchido</strong> para a equipe começar.`;
-        const link = document.createElement('a');
-        link.style.cssText = 'color:#c07000;font-weight:700;cursor:pointer;margin-left:6px;';
-        link.textContent = 'Preencher agora →';
-        link.addEventListener('click', () => {
-          const el = document.querySelector(`[data-id="${pending[0].id}"]`);
-          if (el) el.click();
-        });
-        bannerTxt.appendChild(link);
-      } else {
-        banner.style.display = 'none';
-      }
-
       if (items.length === 0) {
         scroll.innerHTML = `<div style="padding:30px 16px; text-align:center; color:var(--muted); font-size:0.86rem;">Nenhuma demanda nessa categoria.</div>`;
         return;
       }
       scroll.innerHTML = items.map(d => {
-        const pendingBriefing = hasPendingBriefing(d);
         return `
         <div class="list-item ${d.id === state.currentId ? 'active' : ''} ${d.status === 'review' ? 'awaiting' : ''}" data-id="${d.id}">
           <div class="list-icon ${iconKeyFor(d)}">${ICONS.pen}</div>
           <div class="list-body">
             <div class="list-title">${d.title || 'Sem título'}</div>
             <div class="list-meta">
-              ${pendingBriefing
-                ? `<span class="briefing-pill">⚠ Briefing pendente</span>`
-                : `<span>${categoryOf(state.members[d.id])}</span><span>•</span><span>${dueLabel(d)}</span>`
-              }
+              <span>${categoryOf(state.members[d.id])}</span><span>•</span><span>${dueLabel(d)}</span>
             </div>
           </div>
           <div class="list-unread"></div>
@@ -1103,33 +1064,6 @@
       badge.textContent = STATUS_LABEL[d.status] || d.status;
       periodEl.textContent = d.starts_at ? `Início ${fmtDate(d.starts_at)}` : '';
       document.getElementById('cntFiles').textContent = '0';
-
-      // CTA de briefing quando pendente — bloqueia o chat até o aluno preencher
-      if (hasPendingBriefing(d)) {
-        composer.disabled = true;
-        const SERVICE_NAMES = { anuncios_pagos: 'Anúncios Pagos', design_grafico: 'Design Gráfico',
-          edicao_video: 'Edição de Vídeo', social_media: 'Social Media / Copy',
-          web_design_automacao: 'Web Design / Automação' };
-        scroll.innerHTML = `
-          <div style="margin:auto; text-align:center; max-width:400px; padding:20px;">
-            <div style="width:56px;height:56px;background:#fff8e1;border-radius:16px;display:grid;place-items:center;margin:0 auto 16px;border:1px solid #ffe082;">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c07000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-            </div>
-            <div style="font-weight:800;font-size:1rem;color:var(--text);margin-bottom:8px;">Briefing de Abertura pendente</div>
-            <div style="font-size:0.86rem;color:var(--text-secondary);line-height:1.5;margin-bottom:20px;">
-              Preencha o Termo de Abertura de <strong>${SERVICE_NAMES[d.service_type] || d.service_type}</strong>
-              para liberar o chat e permitir que a equipe comece a trabalhar.
-            </div>
-            <a href="briefing.html?demanda=${d.id}"
-               style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;
-                      border-radius:10px;padding:12px 22px;font-weight:700;font-size:0.9rem;text-decoration:none;
-                      box-shadow:0 6px 18px rgba(242,151,37,.30);">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              Preencher briefing agora
-            </a>
-          </div>`;
-        return;
-      }
 
       composer.disabled = false;
 
@@ -1186,51 +1120,11 @@
         document.getElementById('teamMiniCount').textContent = '—';
         document.getElementById('attachList').innerHTML = '';
         document.getElementById('attachCount').textContent = '—';
-        document.getElementById('briefingDetailSection').style.display = 'none';
         return;
       }
       document.getElementById('infoStatus').innerHTML = `<span class="badge ${STATUS_TAG[d.status]}">${STATUS_LABEL[d.status]}</span>`;
       document.getElementById('infoOpened').textContent = fmtDate(d.created_at);
 
-      // ── Seção de Briefing ────────────────────────────────────────
-      const briefingSection = document.getElementById('briefingDetailSection');
-      const briefingCard    = document.getElementById('briefingDetailCard');
-      const SERVICE_NAMES   = {
-        anuncios_pagos:       'Anúncios Pagos',
-        design_grafico:       'Design Gráfico',
-        edicao_video:         'Edição de Vídeo',
-        social_media:         'Social Media / Copy',
-        web_design_automacao: 'Web Design / Automação',
-      };
-      const hasTpl = d.service_type && window.BRIEFING_TEMPLATES && window.BRIEFING_TEMPLATES[d.service_type];
-      if (hasTpl) {
-        briefingSection.style.display = '';
-        const svcName = SERVICE_NAMES[d.service_type] || d.service_type;
-        if (d.briefing_status === 'submitted') {
-          briefingCard.innerHTML = `
-            <div class="briefing-detail-card submitted">
-              <div class="card-title" style="color:#2e7d32;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                Briefing enviado
-              </div>
-              <div class="card-sub">O Termo de Abertura de <strong>${svcName}</strong> foi preenchido e entregue à equipe.</div>
-            </div>`;
-        } else {
-          briefingCard.innerHTML = `
-            <div class="briefing-detail-card pending">
-              <div class="card-title" style="color:#c07000;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                Briefing pendente
-              </div>
-              <div class="card-sub">Preencha o Termo de Abertura de <strong>${svcName}</strong> para que a equipe possa começar a trabalhar.</div>
-              <button class="btn-briefing" onclick="window.location.href='briefing.html?demanda=${d.id}'">
-                Preencher briefing agora →
-              </button>
-            </div>`;
-        }
-      } else {
-        briefingSection.style.display = 'none';
-      }
       const dueEl = document.getElementById('infoDue');
       dueEl.textContent = dueLabel(d);
       dueEl.className = 'val';
