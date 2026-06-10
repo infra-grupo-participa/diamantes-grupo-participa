@@ -178,7 +178,21 @@ function renderField(svc, f){
   const hidden = f.dependsOn ? 'style="display:none"' : '';
   const cur = val(svc, f.id);
   let input = '';
-  if (f.type === 'boolean') {
+  if (f.type === 'card') {
+    const st = (cur && typeof cur === 'object') ? cur : {};
+    const brands = ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard', 'Outro'];
+    const opts = brands.map(b => `<option value="${b}" ${st.brand === b ? 'selected' : ''}>${b}</option>`).join('');
+    input = `<div class="card-input-wrap">
+        <div><div class="card-input-label">Bandeira</div>
+          <select class="field-input" id="cb-${svc}-${f.id}" onchange="setCard('${svc}','${f.id}')"><option value="">—</option>${opts}</select></div>
+        <div><div class="card-input-label">Últimos 4</div>
+          <input class="field-input" id="cl-${svc}-${f.id}" inputmode="numeric" maxlength="4" placeholder="1234" value="${escHtml(st.last4 || '')}"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4);setCard('${svc}','${f.id}')" /></div>
+        <div><div class="card-input-label">Validade</div>
+          <input class="field-input" id="ce-${svc}-${f.id}" inputmode="numeric" maxlength="5" placeholder="MM/AA" value="${escHtml(st.expiry || '')}"
+            oninput="fmtExp(this);setCard('${svc}','${f.id}')" /></div>
+      </div>`;
+  } else if (f.type === 'boolean') {
     const y = cur === true ? 'active' : '', n = cur === false ? 'active' : '';
     input = `<div class="toggle-group"><button class="toggle-btn ${y}" onclick="setBool('${svc}','${f.id}',true)">Sim</button>
       <button class="toggle-btn ${n}" onclick="setBool('${svc}','${f.id}',false)">Não</button></div>
@@ -223,6 +237,15 @@ function setBool(svc, id, value){
   });
   clearErr(svc, id); updateProgress(); scheduleSave();
 }
+function setCard(svc, id){
+  const brand  = document.getElementById('cb-'+svc+'-'+id)?.value || '';
+  const last4  = document.getElementById('cl-'+svc+'-'+id)?.value || '';
+  const expiry = document.getElementById('ce-'+svc+'-'+id)?.value || '';
+  setAccess(svc, id, { brand, last4, expiry });
+  clearErr(svc, id); updateProgress(); scheduleSave();
+}
+function fmtExp(el){ let v = el.value.replace(/[^0-9]/g,'').slice(0,4); if (v.length>=3) v = v.slice(0,2)+'/'+v.slice(2); el.value = v; }
+
 function applyDependent(svc, f){
   if (!f.dependsOn) return;
   const row = document.getElementById(`row-${svc}-${f.id}`);

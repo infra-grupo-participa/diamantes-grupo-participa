@@ -219,8 +219,8 @@ BEGIN
   WHERE client_slug = v_caller.client_slug
   RETURNING * INTO v_row;
 
-  INSERT INTO portal.audit_log (event_type, actor_id, entity_type, entity_id, payload)
-  VALUES ('base_submitted', v_caller.id, 'client_briefing', NULL,
+  INSERT INTO portal.audit_log (actor_id, actor_email, action, target_type, target_id, payload)
+  VALUES (v_caller.auth_user_id, v_caller.email, 'base_submitted', 'client_briefing', v_caller.client_slug,
           jsonb_build_object('client_slug', v_caller.client_slug));
 
   RETURN v_row;
@@ -279,8 +279,8 @@ BEGIN
   )
   RETURNING * INTO v_project;
 
-  INSERT INTO portal.audit_log (event_type, actor_id, entity_type, entity_id, payload)
-  VALUES ('project_created', v_caller.id, 'project', v_project.id,
+  INSERT INTO portal.audit_log (actor_id, actor_email, action, target_type, target_id, payload)
+  VALUES (v_caller.auth_user_id, v_caller.email, 'project_created', 'project', v_project.id::text,
           jsonb_build_object('title', p_title, 'services', to_jsonb(p_services)));
 
   RETURN v_project;
@@ -367,8 +367,8 @@ BEGIN
   WHERE id = p_project_id
   RETURNING * INTO v_project;
 
-  INSERT INTO portal.audit_log (event_type, actor_id, entity_type, entity_id, payload)
-  VALUES ('project_briefing_submitted', v_caller.id, 'project', v_project.id,
+  INSERT INTO portal.audit_log (actor_id, actor_email, action, target_type, target_id, payload)
+  VALUES (v_caller.auth_user_id, v_caller.email, 'project_briefing_submitted', 'project', v_project.id::text,
           jsonb_build_object('title', v_project.title, 'services', to_jsonb(v_project.services)));
 
   RETURN v_project;
