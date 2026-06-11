@@ -1,0 +1,150 @@
+.wrap {
+  max-width: 720px;
+}
+
+.back {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.back:hover {
+  color: var(--text);
+}
+
+.wrap h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+.subtitle {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 0 0 28px;
+}
+
+.gate {
+  background: #fff7ed;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  padding: 16px 18px;
+  color: #9a3412;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.gate a {
+  color: #9a3412;
+  font-weight: 700;
+}
+
+.fieldGroup {
+  margin-bottom: 24px;
+}
+.fieldGroup label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
+}
+
+.serviceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.serviceCard {
+  border: 2px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 18px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: #fff;
+  text-align: left;
+  position: relative;
+}
+.serviceCard:hover {
+  border-color: var(--accent);
+  background: #fffbf4;
+}
+.serviceCard.selected {
+  border-color: var(--accent);
+  background: #fffbf4;
+}
+.serviceCard :global(.chk) {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.serviceCard.selected :global(.chk) {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.serviceCard :global(.icon) {
+  font-size: 1.8rem;
+  margin-bottom: 8px;
+}
+.serviceCard :global(.name) {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.serviceCard :global(.desc) {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.noServices {
+  color: var(--muted);
+  font-size: 0.9rem;
+  grid-column: 1 / -1;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+.submit {
+  width: 100%;
+  margin: 0;
+}
+
+.loading {
+  color: var(--muted);
+  font-size: 0.9rem;
+}

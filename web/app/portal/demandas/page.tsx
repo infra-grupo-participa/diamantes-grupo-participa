@@ -1,0 +1,697 @@
+'use client';
+
+// Demandas do cliente — port de portal/demandas.html (tela mais complexa).
+// Layout 3 colunas: lista | chat | detalhes. Realtime + composer com anexos.
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  finalizeMyPart,
+  getDemand,
+  getDemandMembers,
+  getMe,
+  getMyDemandRating,
+  isBaseReady,
+  listMyDemands,
+  type Demand,
+  type DemandMember,
+  type DemandStatus,
+  type Me,
+  type Rating,
+} from '@/lib/api/demandas';
+import { hydrateAttachments, isImage, listMessages, postMessage, subscribe, type Attachment, type ChatMessage } from '@/lib/chat';
+import { fmtDate, initials } from '@/lib/format';
+import { toast } from '@/lib/toast';
+import ChatComposer from '@/components/demandas/ChatComposer';
+import NewDemandModal from '@/components/demandas/NewDemandModal';
+import RatingModal from '@/components/demandas/RatingModal';
+import styles from './page.module.css';
+
+type Filter = 'all' | 'in_progress' | 'awaiting' | 'done';
+
+const STATUS_LABEL: Record<string, string> = {
+  open: 'Aberta',
+  in_progress: 'Em andamento',
+  review: 'Em revisão',
+  done: 'Concluída',
+  canceled: 'Cancelada',
+};
+const STATUS_TAG: Record<string, 'in_progress' | 'review' | 'done'> = {
+  open: 'in_progress',
+  in_progress: 'in_progress',
+  review: 'review',
+  done: 'done',
+  canceled: 'done',
+};
+
+const PenIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+  </svg>
+);
+const Check = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+);
+const FileIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+  </svg>
+);
+
+// ── Helpers de data/categoria (port das funções inline do legado) ──
+function fmtTime(s?: string | null): string {
+  if (!s) return '';
+  return new Date(s).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtDayLabel(s?: string | null): string {
+  if (!s) return '';
+  const d = new Date(s);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return 'Hoje';
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Ontem';
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
+}
+function dueLabel(d: Demand): string {
+  if (d.status === 'done') return 'Concluída em ' + fmtDate(d.finalized_at);
+  if (d.status === 'canceled') return 'Cancelada';
+  if (!d.ends_at) return 'Sem prazo';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((new Date(d.ends_at).getTime() - today.getTime()) / 86400000);
+  if (diff < 0) return 'Atrasada — ' + fmtDate(d.ends_at);
+  if (diff === 0) return 'Vence hoje';
+  if (diff === 1) return 'Vence amanhã';
+  return 'Vence em ' + diff + ' dias';
+}
+function categoryOf(members?: DemandMember[]): string {
+  const ops = (members || []).filter((m) => m.role === 'operator');
+  const positions = [...new Set(ops.map((m) => m.position_name).filter(Boolean))];
+  if (positions.length === 0) return 'Sem categoria';
+  if (positions.length === 1) return positions[0] as string;
+  return positions.length + ' cargos';
+}
+function iconKeyFor(d: Demand): 'done' | 'review' | 'in_progress' {
+  if (d.status === 'done') return 'done';
+  if (d.status === 'review') return 'review';
+  return 'in_progress';
+}
+
+export default function DemandasPage() {
+  const [demands, setDemands] = useState<Demand[]>([]);
+  const [members, setMembers] = useState<Record<string, DemandMember[]>>({});
+  const [ratings, setRatings] = useState<Record<string, Rating | null>>({});
+  const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
+  const [me, setMe] = useState<Me | null>(null);
+
+  const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const [showNew, setShowNew] = useState(false);
+  const [ratingFor, setRatingFor] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null);
+
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const detailRef = useRef<HTMLElement>(null);
+  const unsubRef = useRef<(() => void) | null>(null);
+  const currentIdRef = useRef<string | null>(null);
+  currentIdRef.current = currentId;
+
+  // ── Carga inicial ──
+  const loadAll = useCallback(async () => {
+    try {
+      const list = await listMyDemands();
+      const mem: Record<string, DemandMember[]> = {};
+      const rat: Record<string, Rating | null> = {};
+      await Promise.all(
+        list.map(async (d) => {
+          mem[d.id] = await getDemandMembers(d.id);
+          if (d.status === 'done') {
+            try {
+              rat[d.id] = await getMyDemandRating(d.id);
+            } catch {
+              rat[d.id] = null;
+            }
+          }
+        }),
+      );
+      setDemands(list);
+      setMembers(mem);
+      setRatings(rat);
+      setCurrentId((prev) => prev ?? (list.length > 0 ? list[0].id : null));
+      return list;
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+      return [];
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      const [profile] = await Promise.all([getMe()]);
+      if (cancel) return;
+      setMe(profile);
+      await loadAll();
+      if (!cancel) setLoading(false);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [loadAll]);
+
+  // ── Carrega mensagens (com hydrate de anexos) ──
+  const loadMessages = useCallback(async (demandId: string) => {
+    try {
+      const msgs = await listMessages(demandId);
+      for (const m of msgs) {
+        if (Array.isArray(m.attachments) && m.attachments.length) {
+          m.attachments = await hydrateAttachments(m.attachments);
+        }
+      }
+      setMessages((prev) => ({ ...prev, [demandId]: msgs }));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  // ── Realtime para a demanda atual ──
+  useEffect(() => {
+    if (unsubRef.current) {
+      unsubRef.current();
+      unsubRef.current = null;
+    }
+    if (!currentId) return;
+    void loadMessages(currentId);
+    unsubRef.current = subscribe(currentId, {
+      onMessage: () => {
+        if (currentIdRef.current) void loadMessages(currentIdRef.current);
+      },
+      onDemandUpdate: async (raw) => {
+        const id = String(raw.id);
+        const fresh = await getDemand(id);
+        const mem = await getDemandMembers(id);
+        setMembers((prev) => ({ ...prev, [id]: mem }));
+        if (fresh) setDemands((prev) => prev.map((x) => (x.id === id ? fresh : x)));
+      },
+    });
+    return () => {
+      if (unsubRef.current) {
+        unsubRef.current();
+        unsubRef.current = null;
+      }
+    };
+  }, [currentId, loadMessages]);
+
+  // Auto-scroll do chat ao receber/atualizar mensagens.
+  useEffect(() => {
+    const el = chatScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, currentId]);
+
+  // ── Derivados ──
+  const counts = useMemo(
+    () => ({
+      all: demands.length,
+      in_progress: demands.filter((d) => d.status === 'open' || d.status === 'in_progress' || d.status === 'review').length,
+      awaiting: demands.filter((d) => d.status === 'review').length,
+      done: demands.filter((d) => d.status === 'done').length,
+    }),
+    [demands],
+  );
+
+  const filtered = useMemo(() => {
+    let items = demands;
+    if (filter === 'in_progress') items = items.filter((d) => d.status === 'open' || d.status === 'in_progress' || d.status === 'review');
+    else if (filter === 'awaiting') items = items.filter((d) => d.status === 'review');
+    else if (filter === 'done') items = items.filter((d) => d.status === 'done');
+    const q = search.trim().toLowerCase();
+    if (q) items = items.filter((d) => (d.title || '').toLowerCase().includes(q));
+    return items;
+  }, [demands, filter, search]);
+
+  const current = useMemo(() => demands.find((d) => d.id === currentId) || null, [demands, currentId]);
+  const currentMsgs = currentId ? messages[currentId] || [] : [];
+  const currentMembers = currentId ? members[currentId] || [] : [];
+  const operators = currentMembers.filter((m) => m.role === 'operator');
+
+  // ── Nova demanda (gate-aware) ──
+  async function openNewDemand() {
+    try {
+      if (!(await isBaseReady())) {
+        toast('Conclua o Briefing Básico antes de abrir chamados.', 'warning');
+        window.location.href = '/portal/briefing-basico';
+        return;
+      }
+    } catch {
+      /* falha de rede: segue */
+    }
+    setShowNew(true);
+  }
+
+  async function onDemandCreated(created: Demand) {
+    setShowNew(false);
+    const list = await loadAll();
+    const found = list.find((d) => d.id === created.id);
+    setCurrentId(created.id);
+    if (!found) {
+      // Garante presença mesmo se a view ainda não refletiu.
+      setDemands((prev) => (prev.some((d) => d.id === created.id) ? prev : [created, ...prev]));
+    }
+    void loadMessages(created.id);
+  }
+
+  // ── Finalizar minha parte (operador membro) ──
+  const isOperatorMember = !!me && operators.some((m) => m.user_id === me.id);
+  const alreadyApproved = !!me && operators.some((m) => m.user_id === me.id && m.approved_finish);
+
+  async function doFinalize() {
+    if (!currentId || !current) return;
+    if (!window.confirm('Confirmar que sua parte está concluída?\n\nA demanda só é fechada quando todos os operadores aprovarem.')) return;
+    try {
+      const res = await finalizeMyPart(currentId);
+      const mem = await getDemandMembers(currentId);
+      const updated = await getDemand(currentId);
+      setMembers((prev) => ({ ...prev, [currentId]: mem }));
+      if (updated) setDemands((prev) => prev.map((x) => (x.id === currentId ? updated : x)));
+      if (res?.status === 'done') toast('Demanda concluída! Todos os operadores aprovaram.', 'success');
+      else toast('Sua parte foi marcada como concluída.', 'success');
+    } catch (e) {
+      toast('Erro: ' + (e instanceof Error ? e.message : String(e)), 'error');
+    }
+  }
+
+  // ── Etapas (timeline) ──
+  function renderSteps() {
+    if (!current) return null;
+    const approved = operators.filter((m) => m.approved_finish).length;
+    const total = operators.length;
+    return (
+      <div className={styles.steps}>
+        <div className={`${styles.step} ${styles.done}`}>
+          <span className={styles.dot}>
+            <Check />
+          </span>
+          <span>
+            <span className={styles.stepTitle}>Demanda aberta</span>
+            <span className={styles.stepWhen}>{fmtDate(current.created_at)}</span>
+          </span>
+        </div>
+        <div className={`${styles.step} ${current.status === 'open' ? styles.current : styles.done}`}>
+          <span className={styles.dot}>{current.status !== 'open' && <Check />}</span>
+          <span>
+            <span className={styles.stepTitle}>Equipe trabalhando</span>
+            <span className={styles.stepWhen}>
+              {total} operador{total === 1 ? '' : 'es'}
+            </span>
+          </span>
+        </div>
+        <div className={`${styles.step} ${current.status === 'done' ? styles.done : styles.current}`}>
+          <span className={styles.dot}>{current.status === 'done' && <Check />}</span>
+          <span>
+            <span className={styles.stepTitle}>
+              Aprovação {approved}/{total}
+            </span>
+            <span className={styles.stepWhen}>
+              {total === 0 ? 'Sem operadores' : approved === total ? 'Todos aprovaram' : 'Aguardando todos confirmarem'}
+            </span>
+          </span>
+        </div>
+        {current.status === 'done' && (
+          <div className={`${styles.step} ${styles.done}`}>
+            <span className={styles.dot}>
+              <Check />
+            </span>
+            <span>
+              <span className={styles.stepTitle}>Concluída</span>
+              <span className={styles.stepWhen}>{fmtDate(current.finalized_at)}</span>
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Detalhes: prazo com cor ──
+  function dueClass(): string {
+    if (!current) return '';
+    if (current.status === 'done') return styles.onTime;
+    if (current.ends_at) {
+      const diff = Math.ceil((new Date(current.ends_at).getTime() - Date.now()) / 86400000);
+      if (diff < 0) return styles.late;
+      if (diff <= 3) return styles.dueSoon;
+    }
+    return '';
+  }
+
+  // ── Render de anexos de mensagem ──
+  function renderAttachments(atts: Attachment[]) {
+    if (!Array.isArray(atts) || atts.length === 0) return null;
+    return (
+      <div className={styles.msgAtt}>
+        {atts.map((a, i) => {
+          if (!a) return null;
+          const url = a.signedUrl || a.url || '';
+          const name = a.name || 'arquivo';
+          if (isImage(a.mime)) {
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                className={styles.msgImg}
+                src={url}
+                alt={name}
+                loading="lazy"
+                onClick={() => setLightbox({ url, alt: name })}
+              />
+            );
+          }
+          return (
+            <a key={i} className={styles.msgFile} href={url} target="_blank" rel="noopener noreferrer">
+              <FileIcon />
+              <span>{name}</span>
+            </a>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const rating = currentId ? ratings[currentId] : null;
+
+  return (
+    <div className={styles.wrap}>
+      <div className={styles.pageHead}>
+        <div>
+          <h1>Minhas demandas</h1>
+          <p className="sub">Acompanhe e converse sobre suas demandas com sua equipe.</p>
+        </div>
+        <button type="button" className={styles.newBtn} onClick={() => void openNewDemand()}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Nova demanda
+        </button>
+      </div>
+
+      <div className={styles.layout}>
+        {/* ── LISTA ── */}
+        <aside className={`${styles.pane} ${styles.listPane} ${currentId ? styles.hideMobile : ''}`}>
+          <div className={styles.listHead}>
+            <div className={styles.filterTabs}>
+              <button className={filter === 'all' ? styles.active : ''} onClick={() => setFilter('all')}>
+                Todas <span className={styles.cnt}>{counts.all}</span>
+              </button>
+              <button className={filter === 'in_progress' ? styles.active : ''} onClick={() => setFilter('in_progress')}>
+                Em andamento <span className={styles.cnt}>{counts.in_progress}</span>
+              </button>
+              <button
+                className={`${styles.urgent} ${filter === 'awaiting' ? styles.active : ''}`}
+                onClick={() => setFilter('awaiting')}
+              >
+                Aguardando você <span className={styles.cnt}>{counts.awaiting}</span>
+              </button>
+              <button className={filter === 'done' ? styles.active : ''} onClick={() => setFilter('done')}>
+                Concluídas <span className={styles.cnt}>{counts.done}</span>
+              </button>
+            </div>
+            <div className={styles.searchWrap}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input type="text" placeholder="Buscar demanda…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+          </div>
+          <div className={styles.listScroll}>
+            {loadError ? (
+              <div className={styles.loadError}>Erro: {loadError}</div>
+            ) : loading ? (
+              <div className={styles.empty}>Carregando…</div>
+            ) : filtered.length === 0 ? (
+              <div className={styles.empty}>Nenhuma demanda nessa categoria.</div>
+            ) : (
+              filtered.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  className={`${styles.listItem} ${d.id === currentId ? styles.active : ''} ${d.status === 'review' ? styles.awaiting : ''}`}
+                  onClick={() => setCurrentId(d.id)}
+                >
+                  <span className={`${styles.listIcon} ${styles[iconKeyFor(d)]}`}>
+                    <PenIcon />
+                  </span>
+                  <span className={styles.listBody}>
+                    <span className={styles.listTitle} style={{ display: 'block' }}>
+                      {d.title || 'Sem título'}
+                    </span>
+                    <span className={styles.listMeta}>
+                      <span>{categoryOf(members[d.id])}</span>
+                      <span>•</span>
+                      <span>{dueLabel(d)}</span>
+                    </span>
+                  </span>
+                  <span />
+                </button>
+              ))
+            )}
+          </div>
+        </aside>
+
+        {/* ── CHAT ── */}
+        <section className={styles.pane}>
+          <div className={styles.chatHead}>
+            <div>
+              <h2>{current ? current.title || 'Sem título' : 'Selecione uma demanda'}</h2>
+              {current && (
+                <div className={styles.chatMeta}>
+                  <span className={`${styles.statusBadge} ${styles[STATUS_TAG[current.status]]}`}>
+                    {STATUS_LABEL[current.status] || current.status}
+                  </span>
+                  <span>{current.starts_at ? `Início ${fmtDate(current.starts_at)}` : ''}</span>
+                </div>
+              )}
+            </div>
+            {current && (
+              <button
+                type="button"
+                className={styles.detailsLink}
+                onClick={() => detailRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                Ver detalhes →
+              </button>
+            )}
+          </div>
+
+          <div className={styles.chatScroll} ref={chatScrollRef}>
+            {!current ? (
+              <div className={styles.chatEmpty}>
+                Nada por aqui ainda.
+                <br />
+                <small>Clique em uma demanda na lista ao lado.</small>
+              </div>
+            ) : currentMsgs.length === 0 ? (
+              <div className={styles.chatEmpty}>Comece a conversa com sua equipe — diga o que precisa pra essa demanda. 💬</div>
+            ) : (
+              (() => {
+                let lastDay = '';
+                const nodes: React.ReactNode[] = [];
+                currentMsgs.forEach((m) => {
+                  const day = fmtDayLabel(m.created_at);
+                  if (day !== lastDay) {
+                    nodes.push(
+                      <div key={'day-' + m.id} className={styles.msgDay}>
+                        {day}
+                      </div>,
+                    );
+                    lastDay = day;
+                  }
+                  const mine = !!me && m.user_id === me.id;
+                  const role = mine ? 'cliente' : m.author_role === 'operator' ? 'equipe' : m.author_role || 'equipe';
+                  nodes.push(
+                    <div key={m.id} className={`${styles.msg} ${mine ? styles.mine : ''}`}>
+                      <span
+                        className={styles.msgAvatar}
+                        style={m.avatar_url ? { backgroundImage: `url('${m.avatar_url}')` } : undefined}
+                      >
+                        {m.avatar_url ? '' : initials(m.author_name)}
+                      </span>
+                      <span>
+                        <span className={styles.msgAuthor}>
+                          {m.author_name || 'Alguém'} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>•</span>{' '}
+                          <span className="role">{role}</span>
+                        </span>
+                        {m.content && <span className={styles.msgBubble} style={{ display: 'block' }}>{m.content}</span>}
+                        {renderAttachments(m.attachments)}
+                        <span className={styles.msgTime} style={{ display: 'block', textAlign: mine ? 'right' : 'left' }}>
+                          {fmtTime(m.created_at)}
+                        </span>
+                      </span>
+                    </div>,
+                  );
+                });
+                return nodes;
+              })()
+            )}
+          </div>
+
+          <ChatComposer
+            demandId={currentId}
+            disabled={!current}
+            onSend={async ({ content, attachments }) => {
+              if (!currentId || !me) return;
+              await postMessage(currentId, content, attachments, me.id, me.client_slug || '');
+              await loadMessages(currentId);
+            }}
+          />
+        </section>
+
+        {/* ── DETALHES ── */}
+        <aside className={`${styles.pane} ${styles.detailPane}`} ref={detailRef}>
+          {!current ? (
+            <div className={styles.detailSection}>
+              <p className="muted" style={{ fontSize: '0.86rem' }}>
+                Selecione uma demanda para ver os detalhes.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className={styles.detailSection}>
+                <h3>Sobre essa demanda</h3>
+                <div className={styles.infoRow}>
+                  <span className={styles.lbl}>Status</span>
+                  <span className={styles.val}>
+                    <span className={`${styles.statusBadge} ${styles[STATUS_TAG[current.status]]}`}>
+                      {STATUS_LABEL[current.status]}
+                    </span>
+                  </span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.lbl}>Aberta em</span>
+                  <span className={styles.val}>{fmtDate(current.created_at)}</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.lbl}>Prazo</span>
+                  <span className={`${styles.val} ${dueClass()}`}>{dueLabel(current)}</span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.lbl}>Categoria</span>
+                  <span className={styles.val}>{categoryOf(currentMembers)}</span>
+                </div>
+              </div>
+
+              <div className={styles.detailSection}>
+                <h3>Etapas da entrega</h3>
+                {renderSteps()}
+              </div>
+
+              {current.status === 'done' && rating && rating.status === 'pending' && (
+                <div className={styles.detailSection}>
+                  <div className={styles.ratingPending}>
+                    <div className="t">Como foi essa entrega?</div>
+                    <div className="s">Sua avaliação ajuda a equipe a crescer.</div>
+                    <button type="button" className={styles.rateBtn} onClick={() => setRatingFor(current.id)}>
+                      Avaliar agora
+                    </button>
+                  </div>
+                </div>
+              )}
+              {current.status === 'done' && rating && rating.status === 'submitted' && (
+                <div className={styles.detailSection}>
+                  <div className={styles.ratingDone}>
+                    <div className="t">Você avaliou com {rating.score}/10 ⭐</div>
+                    {rating.comment && <div className="c">&ldquo;{rating.comment}&rdquo;</div>}
+                  </div>
+                </div>
+              )}
+
+              <div className={styles.detailSection}>
+                <h3>
+                  Pessoas envolvidas{' '}
+                  <span className="small">
+                    {operators.length} pessoa{operators.length === 1 ? '' : 's'}
+                  </span>
+                </h3>
+                <div className={styles.teamMini}>
+                  {operators.length === 0 ? (
+                    <div className="muted" style={{ fontSize: '0.84rem' }}>
+                      Sem operadores.
+                    </div>
+                  ) : (
+                    operators.map((m) => (
+                      <div key={String(m.id)} className={styles.teamItem}>
+                        <span
+                          className={styles.teamAvatar}
+                          style={
+                            m.position_color
+                              ? { background: `linear-gradient(135deg, ${m.position_color}33, ${m.position_color})` }
+                              : undefined
+                          }
+                        >
+                          {initials(m.user_name)}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontWeight: 600, display: 'block' }}>{m.user_name || '—'}</span>
+                          <span className={styles.teamRole}>{m.position_name || '—'}</span>
+                        </span>
+                        {m.approved_finish && (
+                          <span className={styles.approvedTick} title="Aprovou finalização">
+                            ✓
+                          </span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {isOperatorMember && current.status !== 'done' && current.status !== 'canceled' && (
+                <div className={styles.detailSection}>
+                  <button type="button" className={styles.finalizeBtn} onClick={() => void doFinalize()} disabled={alreadyApproved}>
+                    {alreadyApproved ? 'Você já aprovou. Aguardando outros…' : 'Finalizar minha parte'}
+                  </button>
+                  <small className={styles.finalizeHint}>A demanda é concluída quando todos os operadores aprovam.</small>
+                </div>
+              )}
+            </>
+          )}
+        </aside>
+      </div>
+
+      {showNew && <NewDemandModal onClose={() => setShowNew(false)} onCreated={(d) => void onDemandCreated(d)} />}
+      {ratingFor && current && (
+        <RatingModal
+          demandId={ratingFor}
+          demandTitle={current.title || 'Demanda'}
+          onClose={() => setRatingFor(null)}
+          onSubmitted={async () => {
+            const r = await getMyDemandRating(ratingFor);
+            setRatings((prev) => ({ ...prev, [ratingFor]: r }));
+            setRatingFor(null);
+          }}
+        />
+      )}
+
+      {lightbox && (
+        <div className={styles.lightbox} onClick={() => setLightbox(null)}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={lightbox.url} alt={lightbox.alt} />
+          <button type="button" className={styles.lightboxClose} title="Fechar" onClick={() => setLightbox(null)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

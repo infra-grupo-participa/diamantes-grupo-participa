@@ -1,0 +1,81 @@
+// web/lib/briefing-pdf.ts
+// Geração client-side do PDF do Briefing do Projeto (porte fiel de generatePDF() em portal/briefing.html).
+
+import { jsPDF } from 'jspdf';
+
+export interface PdfUnit {
+  group?: string;
+  title: string;
+  /** Campos preenchidos: { label, value } já formatados para exibição. */
+  fields: Array<{ label: string; value: string }>;
+}
+
+/** Converte valor cru em string exibível (Sim/Não/vazio). */
+export function displayVal(v: unknown): string {
+  if (v === true) return 'Sim';
+  if (v === false) return 'Não';
+  if (v == null) return '';
+  return String(v);
+}
+
+/** Gera o PDF do briefing e devolve um Blob. */
+export function generateBriefingPdf(servicesLabel: string, projectTitle: string, units: PdfUnit[]): Blob {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const ORANGE: [number, number, number] = [242, 151, 37];
+  const DARK: [number, number, number] = [26, 20, 16];
+  const GRAY: [number, number, number] = [90, 82, 74];
+  const WHITE: [number, number, number] = [255, 255, 255];
+  const pageW = 210, pageH = 297, mL = 18, mR = 18, cW = pageW - mL - mR;
+  let y = 0;
+
+  const sf = (s: number, st: 'normal' | 'bold', c?: [number, number, number]) => {
+    doc.setFontSize(s);
+    doc.setFont('helvetica', st);
+    doc.setTextColor(...(c ?? DARK));
+  };
+  const chk = (n: number) => {
+    if (y + n > pageH - 16) { doc.addPage(); y = 20; }
+  };
+
+  doc.setFillColor(...ORANGE);
+  doc.rect(0, 0, pageW, 48, 'F');
+  sf(9, 'normal', WHITE); doc.text('GRUPO PARTICIPA · SERVIÇO DIAMANTE', mL, 12);
+  sf(22, 'bold', WHITE); doc.text('BRIEFING DO PROJETO', mL, 27);
+  sf(11, 'normal', WHITE); doc.text(servicesLabel, mL, 37);
+  y = 58;
+
+  sf(9, 'bold', GRAY); doc.text('EVENTO', mL, y); y += 5;
+  sf(13, 'bold', DARK);
+  const tl = doc.splitTextToSize(projectTitle, cW) as string[];
+  doc.text(tl, mL, y); y += tl.length * 6 + 8;
+
+  units.forEach((u) => {
+    if (!u.fields.length) return;
+    chk(16);
+    doc.setFillColor(248, 245, 240);
+    doc.roundedRect(mL, y, cW, 9, 1, 1, 'F');
+    sf(10, 'bold', DARK);
+    doc.text((u.group ? u.group + ' · ' : '') + u.title, mL + 4, y + 6); y += 13;
+    u.fields.forEach((f) => {
+      chk(12);
+      sf(8, 'bold', GRAY); doc.text(f.label, mL, y + 4); y += 6;
+      sf(9, 'normal', DARK);
+      const lines = doc.splitTextToSize(f.value, cW) as string[];
+      doc.text(lines, mL, y + 3); y += lines.length * 5 + 4;
+      doc.setDrawColor(240, 235, 225); doc.setLineWidth(0.2);
+      doc.line(mL, y, pageW - mR, y); y += 4;
+    });
+    y += 4;
+  });
+
+  const pc = doc.getNumberOfPages();
+  for (let p = 1; p <= pc; p++) {
+    doc.setPage(p);
+    doc.setFillColor(...ORANGE);
+    doc.rect(0, pageH - 10, pageW, 10, 'F');
+    sf(7, 'normal', WHITE);
+    doc.text('Grupo Participa · Serviço Diamante · Documento confidencial', mL, pageH - 4);
+    doc.text('Pág. ' + p + '/' + pc, pageW - mR - 15, pageH - 4);
+  }
+  return doc.output('blob');
+}
