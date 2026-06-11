@@ -1,0 +1,847 @@
+/* Demandas (admin) — estilos co-locais portados de admin/demandas.html.
+   Tokens (var(--accent) etc.) vêm de globals.css; vars locais abaixo
+   replicam as colunas/badges do legado sem tocar o global. */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  --d-success: #16a34a;
+  --d-warning: #f59e0b;
+  --d-bg: #f7f8fa;
+  --d-surface: #ffffff;
+  --d-border: #eef0f4;
+  --d-border-strong: #e3e6ec;
+  --d-text: #0f172a;
+  --d-text-secondary: #475569;
+  --d-muted: #94a3b8;
+}
+
+/* ── Cabeçalho ──────────────────────────────────────────────── */
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+.title {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.subtitle {
+  margin: 0;
+  color: var(--d-text-secondary);
+  font-size: 0.92rem;
+}
+
+/* ── KPIs ───────────────────────────────────────────────────── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+.kpiCard {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.kpiIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.kpiIcon svg {
+  width: 20px;
+  height: 20px;
+}
+.kpiLabel {
+  font-size: 0.74rem;
+  color: var(--d-muted);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.kpiValue {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* ── Filtros + toggle ───────────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.searchWrap {
+  flex: 1;
+  max-width: 380px;
+  position: relative;
+}
+.searchWrap svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--d-muted);
+  width: 16px;
+  height: 16px;
+}
+.searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid var(--d-border-strong);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  background: var(--d-surface);
+  color: var(--d-text);
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
+}
+.selectPill {
+  padding: 10px 12px;
+  border: 1px solid var(--d-border-strong);
+  border-radius: 10px;
+  font-size: 0.86rem;
+  background: var(--d-surface);
+  color: var(--d-text);
+  min-width: 180px;
+}
+.selectPill:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.viewToggle {
+  display: inline-flex;
+  background: var(--d-surface);
+  border: 1px solid var(--d-border-strong);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+.viewToggle button {
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--d-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.viewToggle button:hover {
+  background: var(--d-bg);
+  color: var(--d-text);
+}
+.viewToggle button.toggleActive {
+  background: var(--d-text);
+  color: #fff;
+}
+.viewToggle svg {
+  width: 14px;
+  height: 14px;
+}
+.btnRefresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  background: var(--d-surface);
+  color: var(--d-text);
+  border: 1px solid var(--d-border-strong);
+  cursor: pointer;
+  margin-left: auto;
+}
+.btnRefresh:hover {
+  background: var(--d-bg);
+}
+
+/* ── Kanban ─────────────────────────────────────────────────── */
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  min-height: 60vh;
+}
+@media (max-width: 1200px) {
+  .kanban {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .kanban {
+    grid-template-columns: 1fr;
+  }
+}
+.kcol {
+  background: var(--d-bg);
+  border: 1px solid var(--d-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
+}
+.kcolHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 4px 12px;
+  border-bottom: 1px dashed var(--d-border-strong);
+  margin-bottom: 10px;
+}
+.kcolTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.kcolDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.dotOpen {
+  background: #3b82f6;
+}
+.dotProg {
+  background: #eab308;
+}
+.dotReview {
+  background: #ec4899;
+}
+.dotDone {
+  background: #16a34a;
+}
+.kcolCount {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--d-text-secondary);
+  font-weight: 700;
+}
+.kcards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 80px;
+}
+.empty {
+  color: var(--d-muted);
+  font-size: 0.84rem;
+  padding: 30px 10px;
+  text-align: center;
+}
+
+/* ── Card ───────────────────────────────────────────────────── */
+.kcard {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.kcard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  border-color: var(--d-border-strong);
+}
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+.cardTitle {
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.3;
+}
+.cardClient {
+  font-size: 0.74rem;
+  color: var(--d-muted);
+  margin-top: 2px;
+}
+.approvLine {
+  font-size: 0.72rem;
+  color: var(--d-muted);
+  margin-top: 6px;
+}
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+.due {
+  font-size: 0.74rem;
+  color: var(--d-muted);
+}
+.due.late {
+  color: var(--danger);
+  font-weight: 600;
+}
+.due.soon {
+  color: var(--d-warning);
+  font-weight: 600;
+}
+.avatars {
+  display: flex;
+}
+.avatars .avatar {
+  width: 22px;
+  height: 22px;
+  font-size: 0.6rem;
+  margin-left: -6px;
+  border: 2px solid var(--d-surface);
+}
+.avatars .avatar:first-child {
+  margin-left: 0;
+}
+.avatarMore {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--d-border-strong);
+  color: var(--d-text-secondary);
+  display: grid;
+  place-items: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  margin-left: -6px;
+  border: 2px solid var(--d-surface);
+}
+.noTeam {
+  font-size: 0.72rem;
+  color: var(--d-muted);
+}
+.progress {
+  height: 4px;
+  background: var(--d-bg);
+  border-radius: 999px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.progress > div {
+  height: 100%;
+  background: var(--d-success);
+  border-radius: 999px;
+}
+.cardFoot {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.chatCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--d-muted);
+}
+.chatCount svg {
+  width: 11px;
+  height: 11px;
+}
+.cuLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #7b68ee;
+  font-weight: 700;
+  text-decoration: none;
+}
+.cuLink svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* avatar genérico (usado em card, equipe, chat) */
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fcd9a5, var(--accent));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+
+/* ── View por aluno ─────────────────────────────────────────── */
+.studentsView {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.studentBlock {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.studentHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  gap: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.studentHead:hover {
+  background: var(--d-bg);
+}
+.studentHeadLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+.studentHeadLeft .avatar {
+  width: 38px;
+  height: 38px;
+  font-size: 0.78rem;
+}
+.studentName {
+  font-weight: 700;
+  font-size: 0.96rem;
+}
+.studentMeta {
+  font-size: 0.74rem;
+  color: var(--d-muted);
+  margin-top: 2px;
+}
+.studentHeadRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.studentCounter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--d-bg);
+  color: var(--d-text-secondary);
+}
+.studentCounter.cReview {
+  background: #ffe9ee;
+  color: #be185d;
+}
+.studentCounter.cProg {
+  background: #fff4d6;
+  color: #b45309;
+}
+.studentCounter.cDone {
+  background: #e7f7ee;
+  color: #15803d;
+}
+.studentCaret {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  color: var(--d-muted);
+  transition: transform 0.18s;
+}
+.studentBlock.collapsed .studentCaret {
+  transform: rotate(-90deg);
+}
+.studentCaret svg {
+  width: 16px;
+  height: 16px;
+}
+.studentBody {
+  padding: 6px 14px 14px;
+  border-top: 1px solid var(--d-border);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+.studentBlock.collapsed .studentBody {
+  display: none;
+}
+.studentBody .empty {
+  padding: 18px;
+  grid-column: 1 / -1;
+}
+.studentBody .kcard {
+  padding: 10px 12px;
+}
+.studentBody .cardTitle {
+  font-size: 0.88rem;
+}
+.badgeMini {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.badgeMini.open {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.badgeMini.prog {
+  background: #fff4d6;
+  color: #b45309;
+}
+.badgeMini.review {
+  background: #ffe9ee;
+  color: #be185d;
+}
+.badgeMini.done {
+  background: #e7f7ee;
+  color: #15803d;
+}
+.badgeMini.cancel {
+  background: #e2e8f0;
+  color: #475569;
+}
+.studentsEmpty {
+  padding: 40px;
+  text-align: center;
+  color: var(--d-muted);
+}
+
+/* ── Modal ──────────────────────────────────────────────────── */
+.modalBg {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--d-surface);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 780px;
+  max-height: 90vh;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.modalHead {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--d-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+}
+.modalHead h3 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+.modalSub {
+  margin-top: 4px;
+  font-size: 0.82rem;
+  color: var(--d-muted);
+}
+.modalSub a {
+  color: #7b68ee;
+  font-weight: 600;
+  text-decoration: none;
+}
+.modalClose {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--d-border-strong);
+  background: transparent;
+  color: var(--d-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.modalClose:hover {
+  background: var(--d-bg);
+  color: var(--d-text);
+}
+.modalBody {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: grid;
+  gap: 20px;
+}
+.sectionTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--d-text-secondary);
+  margin: 0 0 10px;
+}
+.metaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.metaItem {
+  padding: 10px 12px;
+  background: var(--d-bg);
+  border-radius: 10px;
+}
+.metaLbl {
+  font-size: 0.72rem;
+  color: var(--d-muted);
+  margin-bottom: 2px;
+}
+.metaVal {
+  font-weight: 600;
+}
+.descWrap {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--d-bg);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* badges de status (modal) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.bOpen {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.bProg {
+  background: #fff4d6;
+  color: #b45309;
+}
+.bReview {
+  background: #ffe9ee;
+  color: #be185d;
+}
+.bDone {
+  background: #e7f7ee;
+  color: #15803d;
+}
+.bCancel {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+/* ações de status */
+.statusActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.statusBtn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid var(--d-border-strong);
+  background: var(--d-surface);
+  color: var(--d-text-secondary);
+  cursor: pointer;
+}
+.statusBtn:hover:not(:disabled) {
+  background: var(--d-bg);
+  color: var(--d-text);
+}
+.statusBtn.statusActive {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.statusBtn.statusDanger {
+  color: var(--danger);
+}
+.statusBtn.statusDanger:hover:not(:disabled) {
+  background: #fee2e2;
+}
+.statusBtn:disabled {
+  cursor: default;
+}
+
+/* equipe */
+.teamList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.teamRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--d-bg);
+  border-radius: 10px;
+}
+.teamRow .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 0.66rem;
+}
+.teamName {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.teamRoleTag {
+  font-size: 0.7rem;
+  color: var(--d-muted);
+  font-weight: 500;
+}
+.teamRole {
+  font-size: 0.72rem;
+  color: var(--d-muted);
+}
+.approved {
+  font-size: 0.72rem;
+  color: var(--d-success);
+  font-weight: 700;
+}
+.approved.no {
+  color: var(--d-muted);
+  font-weight: 500;
+}
+.cuBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #7b68ee;
+  background: #efebff;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-right: 6px;
+}
+.cuBadge svg {
+  width: 10px;
+  height: 10px;
+}
+.cuNone {
+  font-size: 0.66rem;
+  color: var(--d-muted);
+  margin-right: 6px;
+}
+.teamRight {
+  display: inline-flex;
+  align-items: center;
+}
+.teamEmpty {
+  color: var(--d-muted);
+  font-size: 0.84rem;
+}
+
+/* chat */
+.chatBox {
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--d-bg);
+  border: 1px solid var(--d-border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.msg {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  max-width: 90%;
+}
+.msg .avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.62rem;
+  margin-top: 2px;
+}
+.msgBody {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.msgAuthor {
+  font-size: 0.72rem;
+  color: var(--d-muted);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.msgText {
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.msgTime {
+  font-size: 0.68rem;
+  color: var(--d-muted);
+  margin-top: 4px;
+}
+.chatEmpty {
+  color: var(--d-muted);
+  font-size: 0.86rem;
+  padding: 20px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

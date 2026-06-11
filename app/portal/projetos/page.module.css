@@ -1,0 +1,191 @@
+.wrap {
+  max-width: 1100px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.header h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.btnNew {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 22px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(242, 151, 37, 0.28);
+  transition: background 0.15s;
+}
+.btnNew:hover {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s, transform 0.12s;
+}
+.card:hover {
+  box-shadow: 0 4px 16px rgba(85, 60, 30, 0.1);
+  transform: translateY(-1px);
+}
+
+.tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1.5px solid;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badgeBriefing {
+  background: #fff8e1;
+  color: #e65100;
+}
+.badgeActive {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.badgeCompleted {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.badgeCancelled {
+  background: #f5f5f5;
+  color: #777;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.progressWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.progressBar {
+  width: 80px;
+  height: 5px;
+  background: #e8e0d4;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+.progressPct {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pillDraft {
+  background: #fff3e0;
+  color: #bf360c;
+}
+.pillSubmitted {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--muted);
+}
+.empty .icon {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+}
+.empty h2 {
+  font-size: 1.1rem;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.empty p {
+  font-size: 0.875rem;
+  margin: 0 0 20px;
+}

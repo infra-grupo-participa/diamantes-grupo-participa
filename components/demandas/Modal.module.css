@@ -1,0 +1,255 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(3px);
+}
+.dialog {
+  background: #fff;
+  border-radius: 18px;
+  width: 100%;
+  max-width: 560px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.dialog.narrow {
+  max-width: 480px;
+}
+.head {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.head h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+.stepLabel {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.headSub {
+  font-size: 0.84rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.closeBtn {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 4px;
+}
+.body {
+  padding: 22px 24px;
+  overflow-y: auto;
+}
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.label .opt {
+  font-weight: 400;
+  color: var(--muted);
+}
+.input,
+.textarea,
+.select {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--text);
+}
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+.error {
+  color: var(--danger);
+  font-size: 0.82rem;
+}
+.hint {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+/* Step 1 — cards de modo */
+.modeGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .modeGrid,
+  .grid2 {
+    grid-template-columns: 1fr;
+  }
+}
+.modeCard {
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 14px;
+  cursor: pointer;
+  text-align: left;
+  background: #fff;
+  transition: border-color 0.12s, background 0.12s;
+}
+.modeCard:hover {
+  border-color: var(--border-strong);
+}
+.modeCard.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.modeEmoji {
+  font-size: 1.4rem;
+  margin-bottom: 6px;
+}
+.modeTitle {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text);
+}
+.modeDesc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Lista de operadores (checkbox) */
+.operators {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 8px;
+  background: #fafbfc;
+}
+.opRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.opRow:hover {
+  background: var(--hero-tint);
+}
+.opAvatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  flex-shrink: 0;
+}
+.opName {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.opRole {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* Rating modal */
+.scoreRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.scoreBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.86rem;
+  color: var(--text);
+  transition: background 0.12s, border-color 0.12s;
+}
+.scoreBtn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.btnPrimary {
+  padding: 11px 20px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+}
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btnSecondary {
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1.5px solid var(--border-strong);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}

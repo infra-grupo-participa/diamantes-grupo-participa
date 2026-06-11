@@ -1,0 +1,770 @@
+/* CSS Module co-local para o painel admin (Equipe + Projetos).
+   Tokens vêm de globals.css (var(--accent) etc.). Fiel ao legado. */
+
+/* ── KPIs ──────────────────────────────────────────────────── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+.kpiCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.kpiIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.kpiIcon svg {
+  width: 22px;
+  height: 22px;
+}
+.kpiInfo {
+  min-width: 0;
+}
+.kpiLabel {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+.kpiValue {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* ── Page head ─────────────────────────────────────────────── */
+.pageHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.pageActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Abas ──────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+}
+.tabBtn {
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tabBtn.active {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Table card ────────────────────────────────────────────── */
+.tableCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.tableHeadBar {
+  padding: 20px 24px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.tableHeadTitle h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.tableHeadTitle p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+.tableControls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.searchWrap {
+  flex: 1;
+  max-width: 360px;
+  position: relative;
+}
+.searchWrap svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  width: 16px;
+  height: 16px;
+}
+.searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  background: var(--surface);
+  color: var(--text);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
+}
+.selectInput {
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  background: var(--surface);
+  color: var(--text);
+  max-width: 190px;
+}
+.selectInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* ── Table ─────────────────────────────────────────────────── */
+.tableWrap {
+  overflow-x: auto;
+}
+.usersTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.usersTable thead th {
+  text-align: left;
+  padding: 12px 18px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.usersTable thead th:first-child {
+  padding-left: 24px;
+}
+.usersTable thead th:last-child {
+  padding-right: 24px;
+}
+.usersTable tbody td {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+.usersTable tbody td:first-child {
+  padding-left: 24px;
+}
+.usersTable tbody td:last-child {
+  padding-right: 24px;
+}
+.usersTable tbody tr:last-child td {
+  border-bottom: none;
+}
+.usersTable tbody tr:hover {
+  background: #fafbfc;
+}
+.emptyCell {
+  padding: 32px;
+  text-align: center;
+  color: var(--muted);
+}
+.errCell {
+  padding: 24px;
+  text-align: center;
+  color: var(--danger);
+}
+
+.userCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fcd9a5, var(--accent));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+.userCellInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.userCellName {
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.userCellId {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.subtle {
+  color: var(--muted);
+}
+.mono {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #475569);
+}
+
+/* Role pill */
+.rolePill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.rolePill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  flex-shrink: 0;
+}
+.rolePillAdmin {
+  background: linear-gradient(135deg, #fef3c7, #fff4d6);
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+.rolePillAdmin .dot {
+  background: var(--accent-strong);
+}
+.rolePillOperator {
+  color: #fff;
+}
+
+/* Rating / stars */
+.stars {
+  display: inline-flex;
+  gap: 1px;
+  color: #f59e0b;
+  align-items: center;
+}
+.stars svg {
+  width: 13px;
+  height: 13px;
+}
+.ratingValue {
+  font-weight: 600;
+  margin-left: 6px;
+}
+.ratingEmpty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.ratingEmpty .dash {
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+.ratingEmpty .sub {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
+/* Count pill */
+.countPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.84rem;
+  border: 1px solid var(--border-strong);
+}
+.countPill.zero {
+  color: var(--muted);
+  background: transparent;
+}
+
+/* Status cell */
+.statusCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.statusCell .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.statusApproved .dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+}
+.statusDisabled .dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+}
+.statusRejected .dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+.statusPending .dot {
+  background: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+/* Row actions */
+.rowActions {
+  display: inline-flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.iconBtn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.usersTable tbody tr:hover .iconBtn {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+.iconBtn:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.iconBtn.danger:hover {
+  background: #fee2e2;
+  color: var(--danger);
+  border-color: #fecaca;
+}
+.iconBtn.success {
+  color: var(--success);
+}
+.iconBtn.success:hover {
+  background: #dcfce7;
+  color: var(--success);
+  border-color: #bbf7d0;
+}
+.iconBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  font-size: 0.84rem;
+  color: var(--text);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.pgInfo {
+  white-space: nowrap;
+}
+.pageSizeWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+.pageSizeWrap select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+.pageNav {
+  display: flex;
+  gap: 4px;
+}
+.pageBtn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pageBtn:hover {
+  background: var(--accent-soft);
+}
+.pageBtn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.pageBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Botões locais (operador roxo) ─────────────────────────── */
+.btnOp {
+  background: #6366f1;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.28);
+}
+.btnOp:hover {
+  background: #4f46e5;
+}
+
+/* ── Modal ─────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modalCard {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+  overflow: hidden;
+}
+.modalHead {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modalHead h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.modalClose {
+  border: none;
+  background: transparent;
+  font-size: 1.4rem;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+}
+.modalForm {
+  padding: 24px;
+}
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.fieldGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.hintSmall {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+.infoBox {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  background: var(--accent-soft);
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+.modalError {
+  color: var(--danger);
+  font-size: 0.82rem;
+  margin-top: 12px;
+}
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* ── Projetos / Briefings ──────────────────────────────────── */
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.projTableWrap {
+  background: var(--surface);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
+.projTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.projTable th {
+  background: var(--accent-soft);
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.projTable td {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  vertical-align: top;
+}
+.projTable tr:hover td {
+  background: #fafbfc;
+}
+.serviceLabel {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.progressPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-soft);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.76rem;
+  color: var(--text);
+  margin-top: 4px;
+}
+.bar {
+  width: 56px;
+  height: 4px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.btnView {
+  background: none;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text);
+}
+.btnView:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+/* Briefing badges */
+.bBadge {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.bDraft {
+  background: #fff3e0;
+  color: #bf360c;
+}
+.bSubmitted {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.bBriefing {
+  background: #fff8e1;
+  color: #e65100;
+}
+.bActive {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+.bCompleted {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+.bCancelled {
+  background: #f5f5f5;
+  color: #777;
+}
+
+/* Briefing modal */
+.briefingOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 100;
+  overflow-y: auto;
+}
+.briefingCard {
+  max-width: 700px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+.briefingHead {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.briefingTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.briefingMeta {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.briefingBody {
+  padding: 24px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.bSection {
+  margin-bottom: 20px;
+}
+.bSectionHead {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+  color: var(--text);
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+.bSectionTag {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.bRow {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.bRowLabel {
+  color: var(--muted);
+  min-width: 220px;
+  flex-shrink: 0;
+}
+.bRowValue {
+  color: var(--text);
+  font-weight: 500;
+}
+.bEmpty {
+  color: var(--muted);
+  text-align: center;
+  padding: 20px;
+}
+
+@media (max-width: 1100px) {
+  .kpiGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fieldGrid2 {
+    grid-template-columns: 1fr;
+  }
+}

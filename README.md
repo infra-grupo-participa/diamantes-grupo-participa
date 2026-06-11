@@ -1,55 +1,36 @@
-# Diamantes — Portal Grupo Participa
+# Diamantes — Portal (Next.js)
 
-Portal de clientes do programa Diamantes do Grupo Participa.
-Hospedado em https://diamantes.grupoparticipa.app.br
+Portal do programa Diamantes (Grupo Participa). **Next.js 14 (App Router) + TypeScript** na raiz do repo.
+Backend: Supabase (schema `portal`, RLS, RPCs) — o app só consome.
+Detalhes em [`CLAUDE.md`](CLAUDE.md) e [`docs/specs/migracao-node-webapp/`](docs/specs/migracao-node-webapp/).
+
+## Rodar local
+
+```bash
+cp .env.example .env.local   # preencha NEXT_PUBLIC_SUPABASE_ANON_KEY (e service-role p/ rotas server)
+npm install
+npm run dev                  # http://localhost:3000/login
+```
+
+`/login` autentica no Supabase e redireciona por role: `admin`→`/admin`, cliente→`/portal`, operador→`/operator`.
 
 ## Estrutura
 
-- `index.html` — tela de login do portal
-- `admin/` — painel administrativo
-- `<slug-cliente>/` — portal individual de cada cliente (27 portais)
-- `api/` — backend PHP (auth, users, ClickUp proxy, insights, export)
-- `backend/` — worker Python que ouve webhooks do ClickUp e envia email
-- `chatbot/` — bot auxiliar (ver `chatbot/README.md`)
-- `google-apps-script/` — referência do Apps Script de sync de planilha
-
-## Configuração que precisa existir em produção (NÃO versionado)
-
-Esses arquivos estão no `.gitignore` e precisam ser criados no servidor:
-
-| Arquivo                                    | Conteúdo                            |
-|--------------------------------------------|-------------------------------------|
-| `api/data/clickup-api-key.txt`             | Chave pessoal `pk_...` do ClickUp   |
-| `api/storage/app-state.json`               | Estado do app (criado no 1° boot)   |
-| `backend/clients.json`                     | Mapeamento slug→emails de webhook   |
-| `chatbot/.env`                             | Vars do bot (ver `.env.example`)    |
-
-Modelos de cada um estão em `*.example` ao lado.
-
-## Rodando local
-
-Pré-requisitos:
-- PHP 8.3+ com `mbstring`, `curl`, `openssl`, `fileinfo`, `intl`
-- (opcional, para o worker) Python 3.10+
-
-```bash
-# servidor de desenvolvimento
-php -S 127.0.0.1:8765
+```
+app/        rotas (login, portal, admin, operator, api Route Handlers)
+components/  ui · shell · briefing · demandas · admin · operator
+lib/        supabase/ssr · auth · format · i18n · toast · briefing-templates · api/*
+middleware.ts  sessão + guards de área
+server.js   startup do Node App (lê process.env.PORT)
+db/         migrations (referência do backend Supabase)
+docs/       specs da migração
 ```
 
-No Windows com extensões em DLL separadas, é mais fácil apontar para um `php.ini`
-local que carregue as extensões e configure `curl.cainfo`. Exemplo:
+## Deploy — Hostinger Node App (hPanel)
 
-```bash
-php -c "C:/php-ini-grupo-participa/php.ini" -S 127.0.0.1:8765
-```
-
-Login admin de seed: `admin` / `12345678` (troque imediatamente).
-
-## Deploy na Hostinger
-
-Veja `HOSTINGER-DEPLOY.md`.
-
-## Sync da planilha
-
-Veja `GOOGLE-SHEETS-SYNC.md`.
+1. **Setup Node App:** Node 20 LTS+, **Application root = raiz do repo**, **startup file = `server.js`**.
+2. **Build no deploy:** `npm ci && npm run build` (não buildar em runtime).
+3. **Env vars** (no painel, não em `.htaccess`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE`, `CLICKUP_TOKEN`, `CLICKUP_WEBHOOK_SECRET`, `HOTMART_HOTTOK`.
+4. Subdomínio (ex. `app.diamantes.grupoparticipa.app.br`) apontando pro Node App.
+5. Reconfigurar as URLs dos webhooks (ClickUp/Hotmart) para o novo domínio.

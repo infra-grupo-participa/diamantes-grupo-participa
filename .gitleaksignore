@@ -1,2 +1,0 @@
-# Supabase ANON key é pública por design (RLS protege os dados)
-assets/js/supabase-config.js:jwt:6
