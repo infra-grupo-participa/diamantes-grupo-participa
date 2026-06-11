@@ -3,15 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-
-/** Traduz os erros mais comuns do Supabase Auth (porta de supabase-i18n.js). */
-function traduzErro(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
-  if (m.includes('email not confirmed')) return 'E-mail ainda não confirmado.';
-  if (m.includes('rate limit')) return 'Muitas tentativas. Aguarde um instante.';
-  return 'Não foi possível entrar. Tente novamente.';
-}
+import { translateAuthError } from '@/lib/i18n';
 
 export default function LoginForm() {
   const router = useRouter();
@@ -28,7 +20,7 @@ export default function LoginForm() {
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
-      setErro(traduzErro(error?.message ?? ''));
+      setErro(translateAuthError(error));
       setLoading(false);
       return;
     }
