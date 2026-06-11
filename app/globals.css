@@ -674,3 +674,146 @@ a {
 .cta-card .btn-primary {
   margin-top: 8px;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   POLISH + RESPONSIVIDADE (camada global — afeta o sistema todo)
+   ════════════════════════════════════════════════════════════════ */
+
+button,
+a,
+input,
+select,
+textarea,
+.svc-chip,
+.topnav-item,
+.sidebar-item {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease, transform 0.06s ease;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+button:active {
+  transform: translateY(1px);
+}
+.card {
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.card:hover {
+  box-shadow: 0 10px 28px rgba(26, 20, 48, 0.08);
+}
+
+/* Spinner / loading de rota */
+.route-loading {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+}
+.spinner {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Tabelas roláveis em telas estreitas */
+.table-wrap,
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+table {
+  border-collapse: collapse;
+}
+img,
+svg,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Tablets ─────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .app-main {
+    padding: 22px 18px;
+  }
+  .admin-main {
+    max-width: 100%;
+  }
+}
+
+/* ── Telefones ───────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .topbar {
+    gap: 10px;
+    padding: 10px 14px;
+    flex-wrap: nowrap;
+  }
+  .topnav {
+    margin: 0;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .topnav::-webkit-scrollbar {
+    display: none;
+  }
+  .topnav-item {
+    padding: 7px 12px;
+    white-space: nowrap;
+  }
+  .user-chip-name,
+  .brand-text small {
+    display: none;
+  }
+  .sidebar {
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .sidebar-section {
+    display: none;
+  }
+  .sidebar-nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sidebar-item {
+    white-space: nowrap;
+    padding: 8px 12px;
+  }
+  .app-main {
+    padding: 16px 12px;
+  }
+  .dash-hero h1 {
+    font-size: 1.45rem;
+  }
+  .dash-badges {
+    align-items: flex-start;
+  }
+  .user-menu {
+    min-width: 200px;
+    max-width: calc(100vw - 24px);
+  }
+  .dash-grid,
+  .dash-pills {
+    grid-template-columns: 1fr;
+  }
+  .toast-stack {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+  }
+  .toast {
+    width: 100%;
+  }
+}

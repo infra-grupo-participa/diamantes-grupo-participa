@@ -1,7 +1,6 @@
-// web/lib/briefing-pdf.ts
+// lib/briefing-pdf.ts
 // Geração client-side do PDF do Briefing do Projeto (porte fiel de generatePDF() em portal/briefing.html).
-
-import { jsPDF } from 'jspdf';
+// jspdf é importado dinamicamente (só carrega no submit) para não inflar o bundle da rota.
 
 export interface PdfUnit {
   group?: string;
@@ -18,8 +17,13 @@ export function displayVal(v: unknown): string {
   return String(v);
 }
 
-/** Gera o PDF do briefing e devolve um Blob. */
-export function generateBriefingPdf(servicesLabel: string, projectTitle: string, units: PdfUnit[]): Blob {
+/** Gera o PDF do briefing e devolve um Blob. (async: carrega jspdf sob demanda) */
+export async function generateBriefingPdf(
+  servicesLabel: string,
+  projectTitle: string,
+  units: PdfUnit[],
+): Promise<Blob> {
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const ORANGE: [number, number, number] = [242, 151, 37];
   const DARK: [number, number, number] = [26, 20, 16];

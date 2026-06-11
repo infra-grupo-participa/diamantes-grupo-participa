@@ -243,7 +243,7 @@ export default function ProjectBriefingPage() {
       // PDF + ClickUp (falha não bloqueia)
       try {
         setSubmitBtn('Gerando PDF...');
-        const blob = buildPdf();
+        const blob = await buildPdf();
         setSubmitBtn('Enviando ao ClickUp...');
         await attachPdf(blob);
       } catch (e) {
@@ -260,7 +260,7 @@ export default function ProjectBriefingPage() {
     }
   }
 
-  function buildPdf(): Blob {
+  async function buildPdf(): Promise<Blob> {
     const pdfUnits: PdfUnit[] = units.map((u) => ({
       group: u.group,
       title: u.title,
