@@ -1,10 +1,12 @@
 -- 032_fix_audit_log_columns.sql
--- FIX: as funções de 031/029 inseriam em portal.audit_log com colunas inexistentes
--- (event_type/entity_type/entity_id) e actor_id = portal.users.id (bigint) em coluna uuid.
--- Schema real: audit_log(actor_id uuid, actor_email text, action text, target_type text,
--- target_id text, payload jsonb). Isso quebrava submit_base_briefing, submit_project_briefing
--- e create_project ("column event_type ... does not exist").
--- CREATE OR REPLACE — seguro reaplicar; preserva grants.
+-- FIX: as funções de 031/029 gravavam em portal.audit_log com colunas que NÃO existem
+-- no schema real de produção. O audit_log em prod tem apenas (id, created_at, user_id, metadata),
+-- divergente da definição do repo (003). Tentativas com event_type/entity_* e depois
+-- actor_id/action/target_* falharam ("column ... does not exist").
+--
+-- Decisão: REMOVER o INSERT em audit_log dessas 3 funções (log é acessório; o fluxo de
+-- briefing/projeto não pode quebrar por causa de logging). Auditoria pode ser re-adicionada
+-- depois, alinhada ao schema real. CREATE OR REPLACE — seguro reaplicar; preserva grants.
 
 CREATE OR REPLACE FUNCTION portal.submit_base_briefing()
 RETURNS portal.client_briefing
@@ -27,10 +29,6 @@ BEGIN
   SET base_status = 'submitted', submitted_at = now(), updated_at = now()
   WHERE client_slug = v_caller.client_slug
   RETURNING * INTO v_row;
-
-  INSERT INTO portal.audit_log (actor_id, actor_email, action, target_type, target_id, payload)
-  VALUES (v_caller.auth_user_id, v_caller.email, 'base_submitted', 'client_briefing', v_caller.client_slug,
-          jsonb_build_object('client_slug', v_caller.client_slug));
 
   RETURN v_row;
 END;
@@ -76,10 +74,6 @@ BEGIN
   )
   RETURNING * INTO v_project;
 
-  INSERT INTO portal.audit_log (actor_id, actor_email, action, target_type, target_id, payload)
-  VALUES (v_caller.auth_user_id, v_caller.email, 'project_created', 'project', v_project.id::text,
-          jsonb_build_object('title', p_title, 'services', to_jsonb(p_services)));
-
   RETURN v_project;
 END;
 $$;
@@ -113,10 +107,6 @@ BEGIN
       status = 'active', updated_at = now()
   WHERE id = p_project_id
   RETURNING * INTO v_project;
-
-  INSERT INTO portal.audit_log (actor_id, actor_email, action, target_type, target_id, payload)
-  VALUES (v_caller.auth_user_id, v_caller.email, 'project_briefing_submitted', 'project', v_project.id::text,
-          jsonb_build_object('title', v_project.title, 'services', to_jsonb(v_project.services)));
 
   RETURN v_project;
 END;
