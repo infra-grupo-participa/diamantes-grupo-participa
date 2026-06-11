@@ -1,6 +1,15 @@
 # CONTINUE — checkpoint da migração Next
 
-**Branch:** `feat/migracao-next`. Data do checkpoint: 2026-06-11.
+**Branch:** `feat/migracao-next`. Atualizado: 2026-06-11.
+
+## STATUS: porte funcional COMPLETO ✅
+Todas as fases de código feitas e commitadas. `tsc` + `next build` verdes (19 rotas).
+**Smoke autenticado headless** (login cliente + admin contra Supabase real) → **10/10 telas sem erro de runtime**.
+Falta só o **cutover/deploy** (depende de você — ver "Pré-requisitos do usuário" no fim).
+
+Não smokado em runtime (sem usuário de teste/ID), mas compila e usa os mesmos componentes já validados:
+- `/operator/*` (sem usuário operador de teste) · `/portal/briefing/[projetoId]` (precisa de um project id real).
+
 
 ## Feito (commitado)
 - Fase 0 — scaffold Next 14 + TS (login SSR, middleware, server.js Node App).
