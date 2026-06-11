@@ -453,3 +453,11 @@ GRANT EXECUTE ON FUNCTION portal.create_demand(text, text, uuid[], uuid, timesta
 
 COMMENT ON FUNCTION portal.create_demand(text, text, uuid[], uuid, timestamptz, timestamptz) IS
   'Assinatura canônica (031): cria chamado simples (p_project_id NULL) ou por projeto. Gate do Briefing Básico para clientes.';
+
+-- ─────────────────────────────────────────────
+-- 8. GRANTS de tabela para o role authenticated
+--    (RLS filtra linhas; o GRANT dá acesso à tabela — sem ele o front recebe
+--     "permission denied for table" na leitura direta via .from()).
+-- ─────────────────────────────────────────────
+GRANT SELECT, INSERT, UPDATE ON portal.projects        TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON portal.client_briefing TO authenticated;

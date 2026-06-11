@@ -111,3 +111,12 @@ BEGIN
   RETURN v_project;
 END;
 $$;
+
+-- ════════════════════════════════════════════════════════════════
+-- GRANTS faltantes: o role `authenticated` não tinha privilégio de tabela em
+-- portal.projects nem portal.client_briefing → o front (leitura direta via .from())
+-- recebia "permission denied for table projects" mesmo com RLS, resultando em
+-- "Projeto não encontrado". (As RPCs são SECURITY DEFINER e já funcionavam.)
+-- ════════════════════════════════════════════════════════════════
+GRANT SELECT, INSERT, UPDATE ON portal.projects        TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON portal.client_briefing TO authenticated;
