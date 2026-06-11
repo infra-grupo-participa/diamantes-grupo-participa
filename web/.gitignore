@@ -1,0 +1,15 @@
+# deps
+/node_modules
+# next
+/.next/
+/out/
+# produção
+/build
+# env (secrets nunca versionados; use .env.example)
+.env
+.env*.local
+# debug / SO
+npm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
