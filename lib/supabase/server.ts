@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config';
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
@@ -10,10 +11,7 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 export function createClient() {
   const cookieStore = cookies();
 
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       db: { schema: 'portal' },
       cookies: {
         getAll() {
@@ -38,13 +36,9 @@ export function createClient() {
  * Bypassa RLS; usar só em Route Handlers/Server Actions controlados.
  */
 export function createAdminClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE!,
-    {
-      db: { schema: 'portal' },
-      cookies: { getAll: () => [], setAll: () => {} },
-      auth: { persistSession: false, autoRefreshToken: false },
-    },
-  );
+  return createServerClient(SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE!, {
+    db: { schema: 'portal' },
+    cookies: { getAll: () => [], setAll: () => {} },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
