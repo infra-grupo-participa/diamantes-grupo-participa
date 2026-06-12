@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { translateAuthError } from '@/lib/i18n';
@@ -76,6 +77,9 @@ export default function LoginForm() {
       <button className="btn-primary" type="submit" disabled={loading}>
         {loading ? 'Entrando…' : 'Entrar'}
       </button>
+      <p style={{ marginTop: 14, fontSize: '0.85rem', textAlign: 'center' }}>
+        <Link href="/reset-password">Esqueci minha senha</Link>
+      </p>
     </form>
   );
 }
