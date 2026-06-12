@@ -217,7 +217,43 @@ export default function PerfilPage() {
   if (loading) {
     return (
       <div className={styles.wrap}>
-        <p className={styles.loading}>Carregando…</p>
+        <div className={styles.head}>
+          <div>
+            <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: 180, height: 26 }} />
+            <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: 320, marginTop: 10 }} />
+          </div>
+        </div>
+        <div className={styles.skelGrid}>
+          <div className={styles.col}>
+            <section className="card">
+              <div className={styles.skelRow}>
+                <div className={`${styles.skel} ${styles.skelAvatar}`} />
+                <div style={{ flex: 1 }}>
+                  <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '50%' }} />
+                  <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '70%', marginTop: 10 }} />
+                </div>
+              </div>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className={`${styles.skel} ${styles.skelLine}`} style={{ height: 40, marginTop: 12 }} />
+              ))}
+            </section>
+            <section className="card">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className={`${styles.skel} ${styles.skelLine}`} style={{ height: 32, marginTop: 12 }} />
+              ))}
+            </section>
+          </div>
+          <div className={styles.col}>
+            <section className="card">
+              <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '60%', height: 40 }} />
+            </section>
+            <section className="card">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className={`${styles.skel} ${styles.skelLine}`} style={{ height: 32, marginTop: 12 }} />
+              ))}
+            </section>
+          </div>
+        </div>
       </div>
     );
   }

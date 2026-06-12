@@ -153,11 +153,13 @@
 
 .tableScroll {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.88rem;
+  min-width: 680px;
 }
 .table thead th {
   text-align: left;
@@ -758,6 +760,53 @@
   margin-top: 18px;
 }
 
+/* ── Skeleton loading ── */
+.skel {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef0f4 25%, #f6f7f9 37%, #eef0f4 63%);
+  background-size: 400% 100%;
+  animation: skelShimmer 1.4s ease infinite;
+}
+.skelLine {
+  height: 12px;
+}
+.skelCircle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skelRow td {
+  padding: 14px 20px;
+}
+.skelUser {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.skelUserText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.skelList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 8px 0;
+}
+.skelDue {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+@keyframes skelShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
 @media (max-width: 1280px) {
   .wrap {
     grid-template-columns: 1fr;
@@ -770,8 +819,65 @@
     grid-template-columns: repeat(3, 1fr);
   }
 }
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .kpiGrid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .table {
+    min-width: 620px;
+  }
+}
+@media (max-width: 720px) {
+  .title {
+    font-size: 1.3rem;
+  }
+  .actions {
+    width: 100%;
+  }
+  .actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .searchWrap {
+    max-width: none;
+  }
+  .select {
+    max-width: none;
+  }
+  .tableHead {
+    padding: 16px 16px 12px;
+  }
+  .table thead th,
+  .table tbody td {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .pagination {
+    padding: 14px 16px;
+    justify-content: center;
+    text-align: center;
+  }
+  .grid2,
+  .grid12 {
+    grid-template-columns: 1fr;
+  }
+  .modalOverlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modalCard {
+    max-width: 100vw;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+}
+@media (max-width: 420px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
   }
 }

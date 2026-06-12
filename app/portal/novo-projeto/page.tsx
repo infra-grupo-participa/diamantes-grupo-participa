@@ -103,7 +103,16 @@ export default function NovoProjetoPage() {
   if (phase === 'loading') {
     return (
       <div className={styles.wrap}>
-        <p className={styles.loading}>Carregando…</p>
+        <div className={`${styles.skel}`} style={{ width: 80, height: 16, marginBottom: 20 }} />
+        <div className={`${styles.skel}`} style={{ width: '60%', height: 26, marginBottom: 10 }} />
+        <div className={`${styles.skel}`} style={{ width: '90%', height: 14, marginBottom: 28 }} />
+        <div className={`${styles.skel}`} style={{ width: 160, height: 16, marginBottom: 8 }} />
+        <div className={`${styles.skel}`} style={{ width: '100%', height: 44, marginBottom: 24 }} />
+        <div className={styles.serviceGrid}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`${styles.skel} ${styles.skelCard}`} />
+          ))}
+        </div>
       </div>
     );
   }

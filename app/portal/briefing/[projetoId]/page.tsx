@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import BriefingForm, { type BriefingUnit, type SaveState } from '@/components/briefing/BriefingForm';
+import BriefingSkeleton from '@/components/briefing/BriefingSkeleton';
 import {
   getGeneralFields,
   getProjectSections,
@@ -288,7 +289,7 @@ export default function ProjectBriefingPage() {
   }
 
   if (loading) {
-    return <p className="muted" style={{ padding: 24 }}>Carregando…</p>;
+    return <BriefingSkeleton />;
   }
   if (notFound) {
     return (

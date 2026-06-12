@@ -127,7 +127,15 @@ export default function BriefingModal({
         </div>
         <div className={s.briefingBody}>
           {loading ? (
-            <p className={s.bEmpty}>Carregando…</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }} aria-busy="true">
+              <span className={s.skelBlock} style={{ width: '40%', height: 18 }} />
+              <span className={s.skelBlock} style={{ width: '85%' }} />
+              <span className={s.skelBlock} style={{ width: '70%' }} />
+              <span className={s.skelBlock} style={{ width: '90%' }} />
+              <span className={s.skelBlock} style={{ width: '55%', height: 18, marginTop: 8 }} />
+              <span className={s.skelBlock} style={{ width: '80%' }} />
+              <span className={s.skelBlock} style={{ width: '65%' }} />
+            </div>
           ) : hasContent ? (
             sections
           ) : (

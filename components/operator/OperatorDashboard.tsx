@@ -179,7 +179,29 @@ export default function OperatorDashboard() {
   }, []);
 
   if (loading) {
-    return <div className={s.loading}>Carregando…</div>;
+    return (
+      <div className={s.wrap}>
+        <div className={s.greet}>
+          <div className={`${s.sk} ${s.skLine}`} style={{ width: 220, height: 26 }} />
+          <div className={`${s.sk} ${s.skLine}`} style={{ width: 300, marginTop: 8 }} />
+        </div>
+        <div className={s.kpiGrid}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`${s.sk} ${s.skKpi}`} />
+          ))}
+        </div>
+        <div className={s.grid3}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className={`${s.sk} ${s.skCard}`} />
+          ))}
+        </div>
+        <div className={s.grid2}>
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className={`${s.sk} ${s.skCard}`} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const kpi = dash.kpi || {};

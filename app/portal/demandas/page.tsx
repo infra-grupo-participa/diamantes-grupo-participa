@@ -117,6 +117,7 @@ export default function DemandasPage() {
   const [showNew, setShowNew] = useState(false);
   const [ratingFor, setRatingFor] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null);
+  const [showDetail, setShowDetail] = useState(false); // sheet de detalhes no mobile
 
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const detailRef = useRef<HTMLElement>(null);
@@ -435,7 +436,17 @@ export default function DemandasPage() {
             {loadError ? (
               <div className={styles.loadError}>Erro: {loadError}</div>
             ) : loading ? (
-              <div className={styles.empty}>Carregando…</div>
+              <>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className={styles.skItem}>
+                    <div className={`${styles.skBlock} ${styles.skIcon}`} />
+                    <div>
+                      <div className={`${styles.skBlock} ${styles.skLine}`} />
+                      <div className={`${styles.skBlock} ${styles.skLineSm}`} />
+                    </div>
+                  </div>
+                ))}
+              </>
             ) : filtered.length === 0 ? (
               <div className={styles.empty}>Nenhuma demanda nessa categoria.</div>
             ) : (
@@ -467,24 +478,42 @@ export default function DemandasPage() {
         </aside>
 
         {/* ── CHAT ── */}
-        <section className={styles.pane}>
+        <section className={`${styles.pane} ${styles.chatPane} ${currentId ? '' : styles.hideMobile}`}>
           <div className={styles.chatHead}>
-            <div>
-              <h2>{current ? current.title || 'Sem título' : 'Selecione uma demanda'}</h2>
-              {current && (
-                <div className={styles.chatMeta}>
-                  <span className={`${styles.statusBadge} ${styles[STATUS_TAG[current.status]]}`}>
-                    {STATUS_LABEL[current.status] || current.status}
-                  </span>
-                  <span>{current.starts_at ? `Início ${fmtDate(current.starts_at)}` : ''}</span>
-                </div>
-              )}
+            <div className={styles.chatHeadMain}>
+              <button
+                type="button"
+                className={styles.backBtn}
+                onClick={() => {
+                  setShowDetail(false);
+                  setCurrentId(null);
+                }}
+                aria-label="Voltar para a lista"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <div style={{ minWidth: 0 }}>
+                <h2>{current ? current.title || 'Sem título' : 'Selecione uma demanda'}</h2>
+                {current && (
+                  <div className={styles.chatMeta}>
+                    <span className={`${styles.statusBadge} ${styles[STATUS_TAG[current.status]]}`}>
+                      {STATUS_LABEL[current.status] || current.status}
+                    </span>
+                    <span>{current.starts_at ? `Início ${fmtDate(current.starts_at)}` : ''}</span>
+                  </div>
+                )}
+              </div>
             </div>
             {current && (
               <button
                 type="button"
                 className={styles.detailsLink}
-                onClick={() => detailRef.current?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.innerWidth <= 1180) setShowDetail(true);
+                  else detailRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
               >
                 Ver detalhes →
               </button>
@@ -555,7 +584,19 @@ export default function DemandasPage() {
         </section>
 
         {/* ── DETALHES ── */}
-        <aside className={`${styles.pane} ${styles.detailPane}`} ref={detailRef}>
+        {showDetail && <div className={styles.detailBackdrop} onClick={() => setShowDetail(false)} />}
+        <aside className={`${styles.pane} ${styles.detailPane} ${showDetail ? styles.detailOpen : ''}`} ref={detailRef}>
+          <button
+            type="button"
+            className={styles.detailClose}
+            onClick={() => setShowDetail(false)}
+            aria-label="Fechar detalhes"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
           {!current ? (
             <div className={styles.detailSection}>
               <p className="muted" style={{ fontSize: '0.86rem' }}>

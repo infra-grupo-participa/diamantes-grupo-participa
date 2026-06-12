@@ -287,7 +287,36 @@ export default function OperatorDemandas() {
   }
 
   if (loading) {
-    return <div className={s.loading}>Carregando…</div>;
+    return (
+      <div className={s.wrap}>
+        <div className={s.pageHead}>
+          <div>
+            <div className={`${s.sk} ${s.skLine}`} style={{ width: 200, height: 26 }} />
+            <div className={`${s.sk} ${s.skLine}`} style={{ width: 320, marginTop: 8 }} />
+          </div>
+        </div>
+        <div className={s.statusTabs}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className={`${s.sk} ${s.skLine}`} style={{ width: 96, height: 38, borderRadius: 12 }} />
+          ))}
+        </div>
+        <div className={s.workArea}>
+          <section className={s.listCard}>
+            <div className={s.skList}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className={s.skRow}>
+                  <div className={`${s.sk} ${s.skIcon}`} />
+                  <div>
+                    <div className={`${s.sk} ${s.skLine}`} style={{ width: '60%' }} />
+                    <div className={`${s.sk} ${s.skLine}`} style={{ width: '40%', marginTop: 6, height: 10 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    );
   }
 
   const msgs = (currentId && messages[currentId]) || [];
@@ -327,7 +356,7 @@ export default function OperatorDemandas() {
         ))}
       </div>
 
-      <div className={s.workArea}>
+      <div className={`${s.workArea} ${currentId ? s.detailOpen : ''}`}>
         <section className={s.listCard}>
           {filtered.length === 0 ? (
             <div className={s.listEmpty}>
@@ -367,6 +396,12 @@ export default function OperatorDemandas() {
           <div className={s.detailHead}>
             {current ? (
               <>
+                <button className={s.backBtn} onClick={() => setCurrentId(null)} title="Voltar para a lista">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                  Voltar
+                </button>
                 <div className={`${s.demandIcon} ${s[inferIconClass(current.title)]}`}>
                   <DemandIcon cls={inferIconClass(current.title)} />
                 </div>

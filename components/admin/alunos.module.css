@@ -154,11 +154,13 @@
 
 .tableScroll {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.88rem;
+  min-width: 640px;
 }
 .table thead th {
   text-align: left;
@@ -794,6 +796,65 @@
   line-height: 1.5;
 }
 
+/* ── Skeleton loading ── */
+.skelRow td {
+  padding: 16px 24px;
+}
+.skel {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef0f4 25%, #f6f7f9 37%, #eef0f4 63%);
+  background-size: 400% 100%;
+  animation: skelShimmer 1.4s ease infinite;
+}
+.skelLine {
+  height: 12px;
+}
+.skelCircle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.skelUser {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.skelUserText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+@keyframes skelShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Skeleton de bloco (detalhe / placeholders) */
+.skelBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+.skelBar {
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef0f4 25%, #f6f7f9 37%, #eef0f4 63%);
+  background-size: 400% 100%;
+  animation: skelShimmer 1.4s ease infinite;
+}
+.skelBar.w60 { width: 60%; }
+.skelBar.w80 { width: 80%; }
+.skelBar.w40 { width: 40%; }
+
+/* Backdrop do detalhe (overlay no mobile/tablet) */
+.detailBackdrop {
+  display: none;
+}
+
 @media (max-width: 1280px) {
   .wrap.withDetail {
     grid-template-columns: 1fr;
@@ -807,12 +868,93 @@
     max-width: 440px;
     border-radius: 0;
     max-height: 100vh;
-    z-index: 50;
+    z-index: 110;
     box-shadow: -8px 0 32px rgba(0, 0, 0, 0.16);
+    animation: detailSlideIn 0.22s ease;
+  }
+  .detailBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    z-index: 105;
+    animation: fadeIn 0.18s ease;
+  }
+  @keyframes detailSlideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
   .kpiGrid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  .table {
+    min-width: 560px;
+  }
+}
+@media (max-width: 720px) {
+  .head {
+    flex-direction: column;
+  }
+  .title {
+    font-size: 1.3rem;
+  }
+  .tableHead {
+    padding: 16px 16px 12px;
+  }
+  .table thead th,
+  .table tbody td {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .pagination {
+    padding: 14px 16px;
+  }
+  .actions {
+    width: 100%;
+  }
+  .actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .detail {
+    max-width: 100%;
+  }
+  .detailStats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .searchWrap {
+    max-width: none;
+  }
+  .select {
+    max-width: none;
+  }
+  .modalOverlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modalCard {
+    max-width: 100vw;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+  .pagination {
+    justify-content: center;
+    text-align: center;
+  }
+}
+@media (max-width: 420px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
   }
 }

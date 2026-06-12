@@ -375,11 +375,7 @@ export default function AlunosClient() {
               </thead>
               <tbody>
                 {loadingTable ? (
-                  <tr>
-                    <td colSpan={6} className={s.cellEmpty}>
-                      Carregando…
-                    </td>
-                  </tr>
+                  Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : tableError ? (
                   <tr>
                     <td colSpan={6} className={s.cellError}>
@@ -449,6 +445,8 @@ export default function AlunosClient() {
 
       {/* Coluna 2: detalhe */}
       {current && (
+        <>
+        <div className={s.detailBackdrop} onClick={closeDetail} aria-hidden="true" />
         <aside className={s.detail}>
           <div className={s.detailHead}>
             <button className={s.detailClose} title="Fechar" onClick={closeDetail}>
@@ -487,7 +485,7 @@ export default function AlunosClient() {
               </span>
             </h4>
             {detailLoading ? (
-              <div className={s.placeholder}>Carregando…</div>
+              <DetailSkeleton />
             ) : team.length === 0 ? (
               <div className={s.placeholder}>Nenhum integrante atribuído ainda.</div>
             ) : (
@@ -538,7 +536,7 @@ export default function AlunosClient() {
 
           <div className={s.section}>
             <h4 className={s.sectionTitle}>Serviços contratados</h4>
-            {detailLoading ? <div className={s.placeholder}>Carregando…</div> : <ServiceGrid services={services} />}
+            {detailLoading ? <DetailSkeleton /> : <ServiceGrid services={services} />}
           </div>
 
           <div className={s.section}>
@@ -563,6 +561,7 @@ export default function AlunosClient() {
             </div>
           </div>
         </aside>
+        </>
       )}
 
       {studentModal && (
@@ -595,6 +594,37 @@ export default function AlunosClient() {
 }
 
 // ── Subcomponentes ──
+function SkeletonRow() {
+  return (
+    <tr className={s.skelRow}>
+      <td>
+        <div className={s.skelUser}>
+          <span className={`${s.skel} ${s.skelCircle}`} />
+          <div className={s.skelUserText}>
+            <span className={`${s.skel} ${s.skelLine}`} style={{ width: '70%' }} />
+            <span className={`${s.skel} ${s.skelLine}`} style={{ width: '40%' }} />
+          </div>
+        </div>
+      </td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: '80%' }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 28 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 28 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 64, height: 20, borderRadius: 999 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 90, height: 28, marginLeft: 'auto' }} /></td>
+    </tr>
+  );
+}
+
+function DetailSkeleton() {
+  return (
+    <div className={s.skelBlock}>
+      <span className={`${s.skel} ${s.skelBar} ${s.w80}`} />
+      <span className={`${s.skel} ${s.skelBar} ${s.w60}`} />
+      <span className={`${s.skel} ${s.skelBar} ${s.w40}`} />
+    </div>
+  );
+}
+
 function Kpi({ label, value, bg, color, icon }: { label: string; value?: number; bg: string; color: string; icon: string }) {
   return (
     <div className={s.kpiCard}>

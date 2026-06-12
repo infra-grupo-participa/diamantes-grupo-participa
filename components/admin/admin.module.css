@@ -78,6 +78,10 @@
   font-size: 0.88rem;
   color: var(--muted);
   cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tabBtn:hover {
+  color: var(--text);
 }
 .tabBtn.active {
   font-weight: 700;
@@ -151,10 +155,12 @@
   background: var(--surface);
   color: var(--text);
   max-width: 190px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .selectInput:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
 }
 
 /* ── Table ─────────────────────────────────────────────────── */
@@ -517,6 +523,16 @@
   cursor: pointer;
   color: var(--muted);
   line-height: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s;
+}
+.modalClose:hover {
+  background: var(--accent-soft);
+  color: var(--text);
 }
 .modalForm {
   padding: 24px;
@@ -589,6 +605,7 @@
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 .projTable td {
   padding: 14px 16px;
@@ -606,13 +623,15 @@
 .progressPill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   background: var(--accent-soft);
+  border: 1px solid var(--border);
   border-radius: 20px;
   padding: 3px 10px;
   font-size: 0.76rem;
+  font-weight: 600;
   color: var(--text);
-  margin-top: 4px;
+  margin-top: 6px;
 }
 .bar {
   width: 56px;
@@ -629,15 +648,19 @@
 .btnView {
   background: none;
   border: 1.5px solid var(--border-strong);
-  border-radius: 6px;
-  padding: 5px 12px;
+  border-radius: 8px;
+  padding: 6px 14px;
   font-size: 0.8rem;
+  font-weight: 600;
   cursor: pointer;
   color: var(--text);
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .btnView:hover {
   border-color: var(--accent);
   color: var(--accent-strong);
+  background: var(--accent-soft);
 }
 .emptyState {
   text-align: center;
@@ -755,16 +778,216 @@
   padding: 20px;
 }
 
+/* ── Skeleton (loading) ────────────────────────────────────── */
+.skelRow td {
+  padding: 14px 18px;
+}
+.skelRow td:first-child {
+  padding-left: 24px;
+}
+.skelBlock {
+  display: block;
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, var(--accent-soft) 25%, var(--border) 37%, var(--accent-soft) 63%);
+  background-size: 400% 100%;
+  animation: skelShimmer 1.4s ease infinite;
+}
+.skelUser {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.skelAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, var(--accent-soft) 25%, var(--border) 37%, var(--accent-soft) 63%);
+  background-size: 400% 100%;
+  animation: skelShimmer 1.4s ease infinite;
+}
+@keyframes skelShimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+/* ── Responsividade ────────────────────────────────────────── */
 @media (max-width: 1100px) {
   .kpiGrid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
+  .kpiGrid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .pageHead {
+    margin-bottom: 24px;
+  }
+  /* abas roláveis horizontalmente sem estourar */
+  .tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tabBtn {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+@media (max-width: 720px) {
   .kpiGrid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .kpiCard {
+    padding: 12px;
+    gap: 10px;
+  }
+  .kpiIcon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+  }
+  .kpiIcon svg {
+    width: 19px;
+    height: 19px;
+  }
+  .kpiValue {
+    font-size: 1.15rem;
   }
   .fieldGrid2 {
     grid-template-columns: 1fr;
+  }
+  /* page head empilha e ações ocupam a largura */
+  .pageHead {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pageActions {
+    width: 100%;
+  }
+  .pageActions > * {
+    flex: 1;
+    justify-content: center;
+  }
+  /* head bar / filtros */
+  .tableHeadBar {
+    padding: 16px 16px 12px;
+  }
+  .tableControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .searchWrap {
+    max-width: none;
+  }
+  .selectInput {
+    max-width: none;
+    width: 100%;
+  }
+  .filters {
+    flex-direction: column;
+  }
+  .filters .selectInput {
+    width: 100%;
+  }
+  /* tabelas com células um pouco mais compactas (já rolam via .tableWrap) */
+  .usersTable thead th,
+  .usersTable tbody td {
+    padding: 10px 12px;
+  }
+  .usersTable thead th:first-child,
+  .usersTable tbody td:first-child {
+    padding-left: 16px;
+  }
+  .usersTable thead th:last-child,
+  .usersTable tbody td:last-child {
+    padding-right: 16px;
+  }
+  /* paginação empilha */
+  .pagination {
+    padding: 14px 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .pgInfo {
+    text-align: center;
+  }
+  .pageSizeWrap {
+    justify-content: center;
+  }
+  .pageNav {
+    justify-content: center;
+  }
+}
+@media (max-width: 420px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Responsividade modais ─────────────────────────────────── */
+@media (max-width: 720px) {
+  .modalOverlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .modalCard {
+    max-width: 100vw;
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modalHead {
+    padding: 16px 18px;
+  }
+  .modalForm {
+    padding: 18px;
+    overflow-y: auto;
+  }
+  .modalActions {
+    flex-direction: column-reverse;
+  }
+  .modalActions > * {
+    width: 100%;
+  }
+  /* briefing modal full-width rolável */
+  .briefingCard {
+    max-width: 100vw;
+    margin: 0;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+  .briefingHead {
+    padding: 16px 18px;
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
+  }
+  .briefingBody {
+    padding: 18px;
+    max-height: none;
+  }
+  .bRow {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .bRowLabel {
+    min-width: 0;
   }
 }
