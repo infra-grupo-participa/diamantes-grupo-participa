@@ -432,7 +432,7 @@ a {
 .avatar-sm {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--avatar-radius);
   display: grid;
   place-items: center;
   font-size: 0.72rem;
@@ -678,7 +678,7 @@ a {
 .avatar-md {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--avatar-radius);
   display: grid;
   place-items: center;
   color: #fff;
