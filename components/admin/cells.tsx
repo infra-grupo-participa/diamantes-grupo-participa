@@ -32,16 +32,16 @@ export function Stars({ rating }: { rating?: number | null }) {
 }
 
 const STATUS_MAP: Record<string, { cls: string; txt: string }> = {
-  approved: { cls: s.statusApproved, txt: 'Ativo' },
-  disabled: { cls: s.statusDisabled, txt: 'Desabilitado' },
-  rejected: { cls: s.statusRejected, txt: 'Rejeitado' },
-  pending: { cls: s.statusPending, txt: 'Pendente' },
+  approved: { cls: s.stApproved, txt: 'Ativo' },
+  disabled: { cls: s.stDisabled, txt: 'Desabilitado' },
+  rejected: { cls: s.stRejected, txt: 'Rejeitado' },
+  pending: { cls: s.stPending, txt: 'Pendente' },
 };
 
 export function StatusCell({ status }: { status: string }) {
-  const b = STATUS_MAP[status] || { cls: s.statusPending, txt: status || '—' };
+  const b = STATUS_MAP[status] || { cls: s.stPending, txt: status || '—' };
   return (
-    <span className={`${s.statusCell} ${b.cls}`}>
+    <span className={`${s.statusBadge} ${b.cls}`}>
       <span className={s.dot} />
       {b.txt}
     </span>
@@ -49,15 +49,15 @@ export function StatusCell({ status }: { status: string }) {
 }
 
 const OP_STATUS_MAP: Record<string, { cls: string; txt: string }> = {
-  active: { cls: s.statusApproved, txt: 'Ativo' },
-  inactive: { cls: s.statusDisabled, txt: 'Inativo' },
-  suspended: { cls: s.statusRejected, txt: 'Suspenso' },
+  active: { cls: s.stApproved, txt: 'Ativo' },
+  inactive: { cls: s.stDisabled, txt: 'Inativo' },
+  suspended: { cls: s.stRejected, txt: 'Suspenso' },
 };
 
 export function OpStatusCell({ status }: { status: string }) {
-  const b = OP_STATUS_MAP[status] || { cls: s.statusPending, txt: status || '—' };
+  const b = OP_STATUS_MAP[status] || { cls: s.stPending, txt: status || '—' };
   return (
-    <span className={`${s.statusCell} ${b.cls}`}>
+    <span className={`${s.statusBadge} ${b.cls}`}>
       <span className={s.dot} />
       {b.txt}
     </span>

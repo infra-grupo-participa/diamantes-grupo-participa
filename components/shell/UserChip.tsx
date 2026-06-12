@@ -9,7 +9,7 @@ import { initials } from '@/lib/format';
 type Props = {
   name: string;
   email: string;
-  profileHref?: string; // ex.: /portal/perfil ou /operator/perfil (admin não tem)
+  profileHref?: string; // ex.: /portal/perfil (admin não tem)
 };
 
 export default function UserChip({ name, email, profileHref }: Props) {
