@@ -14,9 +14,9 @@
 }
 .pageHead h1 {
   margin: 0;
-  font-size: 1.7rem;
+  font-size: var(--text-2xl);
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 .pageHead .sub {
   margin: 6px 0 0;

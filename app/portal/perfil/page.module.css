@@ -11,9 +11,9 @@
 }
 .head h1 {
   margin: 0;
-  font-size: 1.7rem;
+  font-size: var(--text-2xl);
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 .head .sub {
   margin: 6px 0 0;
@@ -76,7 +76,7 @@
   width: 92px;
   height: 92px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #fcd9a5, var(--accent));
+  background: var(--avatar-gradient);
   display: grid;
   place-items: center;
   color: #fff;

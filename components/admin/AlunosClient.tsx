@@ -289,7 +289,7 @@ export default function AlunosClient() {
   const ratingAvg = parseFloat(String(current?.rating_avg)) || 0;
 
   return (
-    <div className={`${s.wrap} ${current ? s.withDetail : ''}`}>
+    <div className={s.wrap}>
       <div className={s.head}>
         <div>
           <h1 className={s.title}>Alunos Diamantes</h1>
@@ -628,13 +628,13 @@ function DetailSkeleton() {
 function Kpi({ label, value, bg, color, icon }: { label: string; value?: number; bg: string; color: string; icon: string }) {
   return (
     <div className={s.kpiCard}>
-      <div className={s.kpiIcon} style={{ background: bg, color }}>
-        <KpiIcon name={icon} />
+      <div className={s.kpiHead}>
+        <span className={s.kpiLabel}>{label}</span>
+        <span className={s.kpiIcon} style={{ background: bg, color }}>
+          <KpiIcon name={icon} />
+        </span>
       </div>
-      <div>
-        <div className={s.kpiLabel}>{label}</div>
-        <div className={s.kpiValue}>{value ?? '—'}</div>
-      </div>
+      <div className={s.kpiValue}>{value ?? '—'}</div>
     </div>
   );
 }
@@ -725,7 +725,7 @@ function StudentRowView({
   const b = billingBadge(row.billing_status);
   return (
     <tr className={selected ? s.selected : ''} onClick={onOpen}>
-      <td>
+      <td className={s.cardHeader}>
         <div className={s.userCell}>
           <div className={s.avatar}>{initials(row.name || row.slug)}</div>
           <div>
@@ -735,19 +735,19 @@ function StudentRowView({
           </div>
         </div>
       </td>
-      <td>
+      <td data-label="Email do dono">
         <span style={{ color: 'var(--muted)' }}>{row.owner_email || '—'}</span>
       </td>
-      <td>
+      <td data-label="Equipe">
         <strong>{row.team_count ?? 0}</strong>
       </td>
-      <td>
+      <td data-label="Serviços">
         <strong>{row.services_count ?? 0}</strong>
       </td>
-      <td>
+      <td data-label="Status">
         <span className={`${s.badge} ${b.cls}`}>{b.txt}</span>
       </td>
-      <td style={{ textAlign: 'right' }}>
+      <td className={s.cardActions} data-label="Ação" style={{ textAlign: 'right' }}>
         <div className={s.rowActions} onClick={(e) => e.stopPropagation()}>
           <button className={s.iconBtn} title="Editar" onClick={onEdit}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -428,8 +428,8 @@
 .avatar {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #fcd9a5, var(--accent));
+  border-radius: var(--avatar-radius);
+  background: var(--avatar-gradient);
   display: grid;
   place-items: center;
   color: #fff;

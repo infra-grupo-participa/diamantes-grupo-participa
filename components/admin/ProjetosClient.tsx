@@ -92,12 +92,12 @@ export default function ProjetosClient() {
   }, [load]);
 
   return (
-    <div className="page">
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ margin: '0 0 4px', fontSize: '1.4rem', fontWeight: 800, letterSpacing: '-0.02em' }}>Projetos / Briefings</h1>
-        <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>
-          Briefings de abertura enviados pelos clientes.
-        </p>
+    <div className={s.shell}>
+      <div className={s.pageHead}>
+        <div>
+          <h1 className={s.pageTitle}>Projetos / Briefings</h1>
+          <p className={s.pageSub}>Briefings de abertura enviados pelos clientes.</p>
+        </div>
       </div>
 
       <div className={s.filters}>
