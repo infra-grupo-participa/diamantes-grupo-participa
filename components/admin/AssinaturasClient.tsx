@@ -291,16 +291,17 @@ export default function AssinaturasClient() {
         </div>
       </div>
 
-      {/* Coluna 1: KPIs + tabela */}
-      <div className={s.col}>
-        <div className={s.kpiGrid}>
-          <Kpi label="Receita" value={stats ? fmtBRL(stats.mrr) : '—'} bg="#eaf2ff" color="#3b82f6" icon="dollar" />
-          <Kpi label="Assinantes ativos" value={stats?.active ?? '—'} bg="#f1ecff" color="#8b5cf6" icon="users" />
-          <Kpi label="Inadimplentes" value={stats ? (stats.late || 0) + (stats.partial || 0) : '—'} bg="#fee2e2" color="#ef4444" icon="alert" />
-          <Kpi label="Pendentes" value={stats?.pending ?? '—'} bg="#fff4d6" color="#eab308" icon="clock" />
-          <Kpi label="Taxa de retenção" value={stats ? stats.retention + '%' : '—'} bg="#e7f7ee" color="#16a34a" icon="trend" />
-        </div>
+      {/* KPIs — faixa de largura total */}
+      <div className={s.kpiGrid}>
+        <Kpi label="Receita" value={stats ? fmtBRL(stats.mrr) : '—'} bg="#eaf2ff" color="#3b82f6" icon="dollar" />
+        <Kpi label="Assinantes ativos" value={stats?.active ?? '—'} bg="#f1ecff" color="#8b5cf6" icon="users" />
+        <Kpi label="Inadimplentes" value={stats ? (stats.late || 0) + (stats.partial || 0) : '—'} bg="#fee2e2" color="#ef4444" icon="alert" />
+        <Kpi label="Pendentes" value={stats?.pending ?? '—'} bg="#fff4d6" color="#eab308" icon="clock" />
+        <Kpi label="Taxa de retenção" value={stats ? stats.retention + '%' : '—'} bg="#e7f7ee" color="#16a34a" icon="trend" />
+      </div>
 
+      {/* Coluna 1: tabela */}
+      <div className={s.col}>
         <div className={s.tableCard}>
           <div className={s.tableHead}>
             <div>

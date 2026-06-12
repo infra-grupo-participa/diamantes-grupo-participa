@@ -39,10 +39,11 @@
   min-width: 0;
 }
 
-/* KPIs — padrão premium (vertical, valor grande) */
+/* KPIs — padrão premium (vertical, valor grande), faixa de largura total */
 .kpiGrid {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-3);
 }
 .kpiCard {
@@ -845,15 +846,20 @@
     max-height: none;
   }
   .kpiGrid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 }
 @media (max-width: 1024px) {
   .kpiGrid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .table {
     min-width: 620px;
+  }
+}
+@media (max-width: 640px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 720px) {
