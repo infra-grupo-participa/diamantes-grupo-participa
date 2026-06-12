@@ -181,7 +181,20 @@ export default function OperatorPerfil() {
   }
 
   if (loading) {
-    return <div className={s.loading}>Carregando…</div>;
+    return (
+      <div className={s.wrap}>
+        <div className={s.pageHead}>
+          <div className={`${s.sk} ${s.skLine}`} style={{ width: 180, height: 24 }} />
+          <div className={`${s.sk} ${s.skLine}`} style={{ width: 320, marginTop: 8 }} />
+        </div>
+        <div className={`${s.sk} ${s.skHero}`} />
+        <div className={s.grid2}>
+          <div className={`${s.sk} ${s.skCard}`} />
+          <div className={`${s.sk} ${s.skCard}`} />
+        </div>
+        <div className={`${s.sk} ${s.skCard}`} />
+      </div>
+    );
   }
 
   const kpi = dash.kpi || {};

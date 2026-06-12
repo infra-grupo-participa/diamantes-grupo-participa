@@ -91,6 +91,7 @@
 .fieldFull { grid-column: 1 / -1; }
 
 .statsGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (max-width: 420px) { .statsGrid { grid-template-columns: 1fr; } }
 .statTile {
   padding: 14px;
   border-radius: 12px;
@@ -131,6 +132,34 @@
 .empty { text-align: center; padding: 24px; color: var(--muted); font-size: 0.85rem; }
 
 .loading { display: grid; place-items: center; min-height: 240px; color: var(--muted); font-size: 0.9rem; }
+
+/* Skeletons */
+.sk { position: relative; overflow: hidden; background: #eef0f7; border-radius: 8px; }
+.sk::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: skShimmer 1.3s infinite;
+}
+@keyframes skShimmer { 100% { transform: translateX(100%); } }
+.skLine { height: 12px; }
+.skHero { height: 148px; border-radius: 16px; }
+.skCard { height: 240px; border-radius: 16px; }
+
+/* Mobile polish */
+@media (max-width: 720px) {
+  .wrap { gap: 16px; }
+  .hero { padding: 22px 18px; }
+  .actions { flex-direction: column; }
+  .actions :global(.btn-primary),
+  .actions :global(.btn-secondary) { width: 100%; }
+  .pageHead h1 { font-size: 1.35rem; }
+  .ratingNum { font-size: 2rem; }
+  .modalActions :global(.btn-primary),
+  .modalActions :global(.btn-secondary) { flex: 1; }
+}
 
 /* Modal de senha */
 .modalBackdrop {

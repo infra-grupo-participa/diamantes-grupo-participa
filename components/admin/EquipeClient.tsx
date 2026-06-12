@@ -341,11 +341,7 @@ export default function EquipeClient() {
               </thead>
               <tbody>
                 {aLoading ? (
-                  <tr>
-                    <td colSpan={5} className={s.emptyCell}>
-                      Carregando…
-                    </td>
-                  </tr>
+                  <SkeletonRows cols={5} withUser />
                 ) : aError ? (
                   <tr>
                     <td colSpan={5} className={s.errCell}>
@@ -454,11 +450,7 @@ export default function EquipeClient() {
               </thead>
               <tbody>
                 {oLoading && !oLoaded ? (
-                  <tr>
-                    <td colSpan={8} className={s.emptyCell}>
-                      Carregando…
-                    </td>
-                  </tr>
+                  <SkeletonRows cols={8} withUser />
                 ) : oError ? (
                   <tr>
                     <td colSpan={8} className={s.errCell}>
@@ -549,6 +541,30 @@ export default function EquipeClient() {
         }}
       />
     </div>
+  );
+}
+
+function SkeletonRows({ cols, withUser }: { cols: number; withUser?: boolean }) {
+  const widths = ['70%', '55%', '40%', '60%', '45%', '50%', '38%', '52%'];
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, r) => (
+        <tr key={r} className={s.skelRow}>
+          {Array.from({ length: cols }).map((__, c) => (
+            <td key={c}>
+              {withUser && c === 0 ? (
+                <div className={s.skelUser}>
+                  <span className={s.skelAvatar} />
+                  <span className={s.skelBlock} style={{ width: 120 }} />
+                </div>
+              ) : (
+                <span className={s.skelBlock} style={{ width: widths[c % widths.length] }} />
+              )}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
   );
 }
 

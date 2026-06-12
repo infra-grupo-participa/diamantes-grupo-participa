@@ -33,17 +33,22 @@
 }
 
 .gate {
-  background: #fff7ed;
-  border: 1px solid #fdba74;
-  border-radius: 10px;
-  padding: 16px 18px;
-  color: #9a3412;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  color: var(--accent-strong);
   font-size: 0.92rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .gate a {
-  color: #9a3412;
+  color: var(--accent-strong);
   font-weight: 700;
+  text-decoration: underline;
+}
+.gate a:hover {
+  opacity: 0.85;
 }
 
 .fieldGroup {
@@ -78,6 +83,11 @@
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
 }
+@media (max-width: 480px) {
+  .serviceGrid {
+    grid-template-columns: 1fr;
+  }
+}
 .serviceCard {
   border: 2px solid var(--border-strong);
   border-radius: 12px;
@@ -90,11 +100,19 @@
 }
 .serviceCard:hover {
   border-color: var(--accent);
-  background: #fffbf4;
+  background: var(--accent-soft);
+}
+.serviceCard:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
+}
+.serviceCard:active {
+  transform: scale(0.99);
 }
 .serviceCard.selected {
   border-color: var(--accent);
-  background: #fffbf4;
+  background: var(--accent-soft);
 }
 .serviceCard :global(.chk) {
   position: absolute;
@@ -147,4 +165,29 @@
 .loading {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+/* ── Skeleton ── */
+.skel {
+  position: relative;
+  overflow: hidden;
+  background: var(--border);
+  border-radius: 8px;
+}
+.skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: shimmer 1.3s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skelCard {
+  height: 118px;
+  border-radius: 12px;
 }

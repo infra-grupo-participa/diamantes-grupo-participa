@@ -148,7 +148,30 @@
 .send:hover {
   background: var(--accent-strong);
 }
+.send:active {
+  transform: scale(0.94);
+}
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .composer {
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  }
+  .wrap {
+    gap: 6px;
+    padding: 8px 8px 8px 12px;
+  }
+  .btn {
+    width: 40px;
+    height: 40px;
+  }
+  .textarea {
+    font-size: 16px; /* evita zoom no iOS ao focar */
+  }
+  .preview {
+    max-width: 100%;
+  }
 }

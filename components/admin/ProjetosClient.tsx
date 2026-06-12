@@ -51,6 +51,23 @@ function statusClass(status: string): string {
   )[status] || s.bBriefing;
 }
 
+function ProjSkeletonRows() {
+  const widths = ['65%', '50%', '55%', '40%', '45%', '48%', '30%'];
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, r) => (
+        <tr key={r} className={s.skelRow}>
+          {widths.map((w, c) => (
+            <td key={c}>
+              <span className={s.skelBlock} style={{ width: w }} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function ProjetosClient() {
   const [service, setService] = useState('');
   const [status, setStatus] = useState('');
@@ -120,11 +137,7 @@ export default function ProjetosClient() {
           </thead>
           <tbody>
             {rows === null ? (
-              <tr>
-                <td colSpan={7} className={s.emptyState}>
-                  Carregando...
-                </td>
-              </tr>
+              <ProjSkeletonRows />
             ) : error ? (
               <tr>
                 <td colSpan={7} className={s.emptyState}>

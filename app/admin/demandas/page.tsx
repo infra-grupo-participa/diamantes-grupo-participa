@@ -56,6 +56,7 @@ export default function AdminDemandasPage() {
   const [view, setView] = useState<ViewMode>('kanban');
   const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed());
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Filtro corrente sempre fresco para o realtime/reload.
   const filterRef = useRef<DemandFilter>({ search: '', clientSlug: 'all' });
@@ -86,6 +87,8 @@ export default function AdminDemandasPage() {
     } catch (e) {
       console.error(e);
       toast('Erro ao carregar demandas: ' + ((e as Error).message || e), 'error');
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -321,17 +324,27 @@ export default function AdminDemandasPage() {
 
       {/* KPIs */}
       <div className={styles.kpiGrid}>
-        {kpis.map((k) => (
-          <div className={styles.kpiCard} key={k.key}>
-            <div className={styles.kpiIcon} style={{ background: k.bg, color: k.color }}>
-              {k.icon}
-            </div>
-            <div>
-              <div className={styles.kpiLabel}>{k.label}</div>
-              <div className={styles.kpiValue}>{stats[k.key]}</div>
-            </div>
-          </div>
-        ))}
+        {loading
+          ? Array.from({ length: 5 }).map((_, i) => (
+              <div className={styles.skelKpi} key={i}>
+                <div className={`${styles.skel} ${styles.skelIcon}`} />
+                <div style={{ flex: 1 }}>
+                  <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '60%', marginBottom: 6 }} />
+                  <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '36%', height: 18 }} />
+                </div>
+              </div>
+            ))
+          : kpis.map((k) => (
+              <div className={styles.kpiCard} key={k.key}>
+                <div className={styles.kpiIcon} style={{ background: k.bg, color: k.color }}>
+                  {k.icon}
+                </div>
+                <div>
+                  <div className={styles.kpiLabel}>{k.label}</div>
+                  <div className={styles.kpiValue}>{stats[k.key]}</div>
+                </div>
+              </div>
+            ))}
       </div>
 
       {/* Filtros + toggle */}
@@ -402,7 +415,21 @@ export default function AdminDemandasPage() {
       {/* View: por aluno */}
       {view === 'students' && (
         <div className={styles.studentsView}>
-          {studentGroups.length === 0 ? (
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div className={styles.studentBlock} key={i}>
+                <div className={styles.studentHead} style={{ cursor: 'default' }}>
+                  <div className={styles.studentHeadLeft}>
+                    <div className={`${styles.skel} ${styles.skelIcon}`} style={{ borderRadius: '50%' }} />
+                    <div style={{ flex: 1 }}>
+                      <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: 160, marginBottom: 6 }} />
+                      <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: 90, height: 9 }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          ) : studentGroups.length === 0 ? (
             <div className={styles.studentsEmpty}>Nenhum aluno encontrado.</div>
           ) : (
             studentGroups.map(({ client, total, open, prog, review, done, sorted }) => {
@@ -490,7 +517,15 @@ export default function AdminDemandasPage() {
                   <span className={styles.kcolCount}>{items.length}</span>
                 </div>
                 <div className={styles.kcards}>
-                  {items.length > 0 ? (
+                  {loading ? (
+                    Array.from({ length: 2 }).map((_, i) => (
+                      <div className={styles.skelCard} key={i}>
+                        <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '80%' }} />
+                        <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '50%', height: 9 }} />
+                        <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '100%', height: 9 }} />
+                      </div>
+                    ))
+                  ) : items.length > 0 ? (
                     items.map((d) => (
                       <DemandCard
                         key={d.id}

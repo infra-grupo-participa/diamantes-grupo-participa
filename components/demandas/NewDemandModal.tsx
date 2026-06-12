@@ -225,7 +225,11 @@ export default function NewDemandModal({
               <label className={styles.label}>Equipe responsável</label>
               <div className={styles.operators}>
                 {operators === null ? (
-                  <div className="muted" style={{ fontSize: '0.84rem', padding: 8 }}>
+                  <div
+                    className="muted"
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.84rem', padding: 10 }}
+                  >
+                    <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
                     Carregando operadores…
                   </div>
                 ) : opsError ? (

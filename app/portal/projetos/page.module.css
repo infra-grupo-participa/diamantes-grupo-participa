@@ -41,6 +41,27 @@
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
+@media (max-width: 720px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 20px;
+  }
+  .header .btnNew {
+    justify-content: center;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
 
 .card {
   display: block;
@@ -53,8 +74,14 @@
   transition: box-shadow 0.15s, transform 0.12s;
 }
 .card:hover {
-  box-shadow: 0 4px 16px rgba(85, 60, 30, 0.1);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+.card:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
 }
 
 .tags {
@@ -136,19 +163,23 @@
 }
 .progressBar {
   width: 80px;
-  height: 5px;
-  background: #e8e0d4;
-  border-radius: 3px;
+  height: 6px;
+  background: var(--accent-soft);
+  border-radius: 999px;
   overflow: hidden;
 }
 .progressFill {
   height: 100%;
   background: var(--accent);
-  border-radius: 3px;
+  border-radius: 999px;
+  transition: width 0.3s ease;
 }
 .progressPct {
   font-size: 0.75rem;
+  font-weight: 600;
   color: var(--muted);
+  min-width: 30px;
+  text-align: right;
 }
 
 .pill {

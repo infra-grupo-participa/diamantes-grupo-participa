@@ -42,6 +42,17 @@
   grid-template-columns: repeat(5, 1fr);
   gap: 12px;
 }
+@media (max-width: 1024px) {
+  .kpiGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 720px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+}
 .kpiCard {
   background: var(--d-surface);
   border: 1px solid var(--d-border);
@@ -189,9 +200,26 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+/* Phone: rola horizontalmente — 4 colunas com largura mínima tocável,
+   scroll suave e snap por coluna. Mantém o paradigma Kanban no mobile. */
 @media (max-width: 720px) {
   .kanban {
-    grid-template-columns: 1fr;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(80vw, 300px);
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    gap: 10px;
+    padding-bottom: 8px;
+    margin: 0 -4px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+  .kcol {
+    scroll-snap-align: start;
   }
 }
 .kcol {
@@ -271,6 +299,16 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
   border-color: var(--d-border-strong);
+}
+.kcard:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  border-color: var(--accent);
+}
+.kcard:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
 }
 .cardTop {
   display: flex;
@@ -840,8 +878,148 @@
   text-align: center;
 }
 
-@media (max-width: 900px) {
-  .kpiGrid {
-    grid-template-columns: repeat(2, 1fr);
+/* ── Skeletons (loading) ────────────────────────────────────── */
+.skelKpi {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.skel {
+  position: relative;
+  overflow: hidden;
+  background: #eef1f5;
+  border-radius: 8px;
+}
+.skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: dShimmer 1.2s infinite;
+}
+@keyframes dShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skelIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.skelCard {
+  background: var(--d-surface);
+  border: 1px solid var(--d-border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.skelLine {
+  height: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel::after {
+    animation: none;
+  }
+}
+
+/* ── Responsividade geral ───────────────────────────────────── */
+@media (max-width: 1024px) {
+  .title {
+    font-size: 1.3rem;
+  }
+}
+@media (max-width: 720px) {
+  .wrap {
+    gap: 14px;
+  }
+  .filters {
+    gap: 8px;
+  }
+  .searchWrap {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+  .selectPill {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .viewToggle {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  .viewToggle button {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 8px;
+  }
+  .btnRefresh {
+    margin-left: 0;
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .studentHead {
+    padding: 12px 14px;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .studentHeadRight {
+    gap: 6px;
+  }
+  .studentBody {
+    grid-template-columns: 1fr;
+    padding: 6px 12px 12px;
+  }
+}
+
+/* Modal: full-width e rolável no phone */
+@media (max-width: 720px) {
+  .modalBg {
+    padding: 0;
+    align-items: stretch;
+  }
+  .modal {
+    max-width: 100vw;
+    width: 100vw;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .modalHead {
+    padding: 16px 16px;
+    position: sticky;
+    top: 0;
+    background: var(--d-surface);
+    z-index: 1;
+  }
+  .modalHead h3 {
+    font-size: 1.05rem;
+  }
+  .modalBody {
+    padding: 16px;
+    gap: 16px;
+  }
+  .metaGrid {
+    grid-template-columns: 1fr;
+  }
+  .chatBox {
+    max-height: none;
+  }
+  .msg {
+    max-width: 100%;
   }
 }

@@ -358,6 +358,17 @@ export default function BriefingForm(props: BriefingFormProps) {
 
       {/* Main */}
       <div className={styles.main}>
+        {/* Barra de progresso visível só no mobile (substitui a sidebar) */}
+        <div className={styles.mobileProgress}>
+          <div className={styles.mobileProgressTop}>
+            <span style={{ color: 'var(--bf-sidebar-text)' }}>Progresso do briefing</span>
+            <span>{progress.pct}%</span>
+          </div>
+          <div className={styles.progressTrack}>
+            <div className={styles.progressFill} style={{ width: `${progress.pct}%` }} />
+          </div>
+        </div>
+
         <div className={styles.pageHeader}>
           {backHref && (
             <button type="button" className={styles.pageBack} onClick={() => (onGhost ? onGhost() : (window.location.href = backHref))}>

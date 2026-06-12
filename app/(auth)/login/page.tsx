@@ -19,6 +19,7 @@ export default function LoginPage() {
         </section>
 
         <section className="auth-panel">
+          <span className="auth-panel-brand" aria-hidden>◆ Programa Diamantes</span>
           <h2>Acessar</h2>
           <p className="sub">Entre com seu e-mail e senha.</p>
           <LoginForm />

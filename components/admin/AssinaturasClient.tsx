@@ -352,11 +352,7 @@ export default function AssinaturasClient() {
               </thead>
               <tbody>
                 {loadingTable ? (
-                  <tr>
-                    <td colSpan={6} className={s.cellEmpty}>
-                      Carregando…
-                    </td>
-                  </tr>
+                  Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : tableError ? (
                   <tr>
                     <td colSpan={6} className={s.cellError}>
@@ -569,6 +565,43 @@ export default function AssinaturasClient() {
 }
 
 // ── Subcomponentes ──
+function SkeletonRow() {
+  return (
+    <tr className={s.skelRow}>
+      <td>
+        <div className={s.skelUser}>
+          <span className={`${s.skel} ${s.skelCircle}`} />
+          <div className={s.skelUserText}>
+            <span className={`${s.skel} ${s.skelLine}`} style={{ width: '70%' }} />
+            <span className={`${s.skel} ${s.skelLine}`} style={{ width: '45%' }} />
+          </div>
+        </div>
+      </td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 70 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 80 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 70 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 64, height: 20, borderRadius: 999 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 60, height: 28, marginLeft: 'auto' }} /></td>
+    </tr>
+  );
+}
+
+function ListSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className={s.skelList}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div className={s.skelDue} key={i}>
+          <span className={`${s.skel} ${s.skelCircle}`} style={{ width: 30, height: 30 }} />
+          <div className={s.skelUserText}>
+            <span className={`${s.skel} ${s.skelLine}`} style={{ width: '60%' }} />
+            <span className={`${s.skel} ${s.skelLine}`} style={{ width: '35%' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ExportIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -799,7 +832,7 @@ function SubRow({ sub, onEdit, onDelete }: { sub: SubscriptionRow; onEdit: () =>
 }
 
 function RenewalsList({ renewals }: { renewals: ServiceRenewal[] | null }) {
-  if (renewals == null) return <div className={s.placeholder}>Carregando…</div>;
+  if (renewals == null) return <ListSkeleton rows={4} />;
   if (renewals.length === 0)
     return (
       <div style={{ textAlign: 'center', padding: 24, color: 'var(--muted)', fontSize: '0.84rem' }}>
@@ -874,7 +907,7 @@ function pmLabel(type?: string | null): { icon: string; label: string } {
 }
 
 function HistList({ loading, data }: { loading: boolean; data: PurchaseRow[] }) {
-  if (loading) return <div className={s.placeholder}>Carregando…</div>;
+  if (loading) return <ListSkeleton rows={4} />;
   if (data.length === 0) return <div className={s.placeholder}>Nenhuma cobrança encontrada.</div>;
   return (
     <>

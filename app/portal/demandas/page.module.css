@@ -55,18 +55,106 @@
 }
 @media (max-width: 1180px) {
   .layout {
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: 300px minmax(0, 1fr);
   }
+  /* Detalhe vira drawer acionado pelo botão "Ver detalhes" */
   .detailPane {
     display: none;
   }
+  .detailPane.detailOpen {
+    display: flex;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 92vw);
+    max-height: none;
+    height: 100%;
+    z-index: 220;
+    border-radius: 18px 0 0 18px;
+    box-shadow: -12px 0 40px rgba(26, 20, 48, 0.22);
+    animation: detailIn 0.2s ease;
+    padding-top: 8px;
+  }
+  .detailBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 210;
+  }
+  .detailClose {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: var(--hero-tint);
+    color: var(--muted);
+    cursor: pointer;
+    z-index: 2;
+  }
+  .detailClose svg {
+    width: 16px;
+    height: 16px;
+  }
 }
+@keyframes detailIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+.detailClose {
+  display: none;
+}
+/* Backdrop só aparece quando o drawer está ativo (<=1180px) */
+.detailBackdrop {
+  display: none;
+}
+
 @media (max-width: 880px) {
   .layout {
     grid-template-columns: 1fr;
+    gap: 0;
   }
-  .listPane.hideMobile {
+  .listPane.hideMobile,
+  .chatPane.hideMobile {
     display: none;
+  }
+  /* Quando uma demanda está aberta, o chat ocupa a tela inteira */
+  .pane {
+    max-height: calc(100vh - 150px);
+  }
+  .detailPane.detailOpen {
+    width: 100vw;
+    border-radius: 0;
+  }
+  .detailClose {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: none;
+    background: var(--hero-tint);
+    color: var(--muted);
+    cursor: pointer;
+    z-index: 2;
+  }
+  .detailClose svg {
+    width: 16px;
+    height: 16px;
   }
 }
 
@@ -202,8 +290,26 @@
   background: var(--accent-soft);
   border-color: rgba(242, 151, 37, 0.28);
 }
+.listItem:active {
+  background: var(--accent-soft);
+}
 .listItem.awaiting {
   border-left: 3px solid var(--accent);
+}
+@media (max-width: 720px) {
+  .listItem {
+    padding: 14px 12px;
+  }
+  .listTitle {
+    font-size: 0.94rem;
+  }
+  .pageHead h1 {
+    font-size: 1.45rem;
+  }
+  .newBtn {
+    flex: 1;
+    justify-content: center;
+  }
 }
 .listIcon {
   width: 34px;
@@ -255,6 +361,38 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+.chatHeadMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.backBtn {
+  display: none;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--hero-tint);
+  color: var(--text);
+  cursor: pointer;
+  place-items: center;
+  margin-top: 1px;
+}
+.backBtn:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.backBtn svg {
+  width: 18px;
+  height: 18px;
+}
+@media (max-width: 880px) {
+  .backBtn {
+    display: grid;
+  }
 }
 .chatHead h2 {
   margin: 0;
@@ -338,6 +476,17 @@
   gap: 10px;
   max-width: 78%;
 }
+@media (max-width: 720px) {
+  .msg {
+    max-width: 90%;
+  }
+  .chatScroll {
+    padding: 16px 14px;
+  }
+  .chatHead {
+    padding: 14px 16px;
+  }
+}
 .msg.mine {
   margin-left: auto;
   grid-template-columns: 1fr 32px;
@@ -370,6 +519,7 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+  box-shadow: 0 1px 2px rgba(26, 20, 48, 0.04);
 }
 .msg.mine .msgBubble {
   background: var(--accent-soft);
@@ -696,4 +846,38 @@
 .lightboxClose svg {
   width: 18px;
   height: 18px;
+}
+
+/* ── Skeletons (loading) ── */
+.skBlock {
+  background: linear-gradient(100deg, var(--border) 30%, var(--hero-tint) 50%, var(--border) 70%);
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: skShimmer 1.3s ease-in-out infinite;
+}
+@keyframes skShimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+.skItem {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 12px;
+  padding: 12px;
+  margin: 4px 0;
+  align-items: center;
+}
+.skIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+.skLine {
+  height: 11px;
+}
+.skLineSm {
+  height: 9px;
+  margin-top: 7px;
+  width: 65%;
 }
