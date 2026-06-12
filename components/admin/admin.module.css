@@ -1,111 +1,178 @@
 /* CSS Module co-local para o painel admin (Equipe + Projetos).
-   Tokens vêm de globals.css (var(--accent) etc.). Fiel ao legado. */
+   Tokens vêm de globals.css (var(--accent) etc.). Estética Diamantes,
+   elevada para um padrão SaaS premium (data-table, KPIs, mobile-first). */
 
-/* ── KPIs ──────────────────────────────────────────────────── */
-.kpiGrid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 14px;
-  margin-bottom: 28px;
-}
-.kpiCard {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 16px;
+/* ── Shell / container da página ───────────────────────────── */
+.shell {
+  width: 100%;
   display: flex;
-  align-items: center;
-  gap: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-}
-.kpiIcon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-.kpiIcon svg {
-  width: 22px;
-  height: 22px;
-}
-.kpiInfo {
-  min-width: 0;
-}
-.kpiLabel {
-  font-size: 0.78rem;
-  color: var(--muted);
-  font-weight: 500;
-  margin-bottom: 2px;
-}
-.kpiValue {
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  flex-direction: column;
 }
 
 /* ── Page head ─────────────────────────────────────────────── */
 .pageHead {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  margin-bottom: 28px;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 26px;
   flex-wrap: wrap;
+}
+.pageTitle {
+  margin: 0 0 4px;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+.pageSub {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
 }
 .pageActions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
 }
+.pageActions .btn-primary,
+.pageActions .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
 
-/* ── Abas ──────────────────────────────────────────────────── */
-.tabs {
+/* ── KPIs ──────────────────────────────────────────────────── */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.kpiCard {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 18px 16px;
   display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--border);
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 1px 2px rgba(26, 20, 48, 0.04);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.kpiCard:hover {
+  transform: translateY(-3px);
+  border-color: var(--border-strong);
+  box-shadow: 0 12px 28px rgba(26, 20, 48, 0.1);
+}
+.kpiHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.kpiLabel {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+}
+.kpiIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.kpiIcon svg {
+  width: 21px;
+  height: 21px;
+}
+.kpiValue {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--text);
+}
+
+/* ── Abas (segmented control) ──────────────────────────────── */
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--hero-tint);
+  border-radius: 12px;
+  margin-bottom: 18px;
+  max-width: 100%;
 }
 .tabBtn {
-  padding: 10px 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
+  border-radius: 9px;
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
   color: var(--muted);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 .tabBtn:hover {
   color: var(--text);
 }
 .tabBtn.active {
-  font-weight: 700;
   color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(26, 20, 48, 0.1);
+}
+.tabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(26, 20, 48, 0.07);
+  color: var(--muted);
+}
+.tabBtn.active .tabCount {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 /* ── Table card ────────────────────────────────────────────── */
 .tableCard {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px rgba(26, 20, 48, 0.04), 0 6px 20px rgba(26, 20, 48, 0.04);
 }
 .tableHeadBar {
-  padding: 20px 24px 14px;
+  padding: 20px 24px 16px;
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
 }
 .tableHeadTitle h2 {
   margin: 0 0 4px;
-  font-size: 1.05rem;
+  font-size: 1.08rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .tableHeadTitle p {
   margin: 0;
@@ -120,30 +187,37 @@
 }
 .searchWrap {
   flex: 1;
-  max-width: 360px;
+  min-width: 220px;
+  max-width: 320px;
   position: relative;
 }
 .searchWrap svg {
   position: absolute;
-  left: 12px;
+  left: 13px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--muted);
   width: 16px;
   height: 16px;
+  pointer-events: none;
 }
 .searchInput {
   width: 100%;
-  padding: 10px 12px 10px 36px;
+  padding: 10px 12px 10px 38px;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   font-size: 0.88rem;
-  background: var(--surface);
+  font-family: inherit;
+  background: var(--bg);
   color: var(--text);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+.searchInput::placeholder {
+  color: var(--muted);
 }
 .searchInput:focus {
   outline: none;
+  background: var(--surface);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
 }
@@ -152,20 +226,24 @@
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   font-size: 0.88rem;
-  background: var(--surface);
+  font-family: inherit;
+  background: var(--bg);
   color: var(--text);
-  max-width: 190px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  max-width: 200px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
 }
 .selectInput:focus {
   outline: none;
+  background: var(--surface);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(242, 151, 37, 0.16);
 }
 
-/* ── Table ─────────────────────────────────────────────────── */
+/* ── Table (data-table) ────────────────────────────────────── */
 .tableWrap {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .usersTable {
   width: 100%;
@@ -174,12 +252,13 @@
 }
 .usersTable thead th {
   text-align: left;
-  padding: 12px 18px;
+  padding: 13px 18px;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
+  background: rgba(239, 232, 251, 0.4);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
@@ -190,7 +269,7 @@
   padding-right: 24px;
 }
 .usersTable tbody td {
-  padding: 12px 18px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
   vertical-align: middle;
@@ -204,16 +283,19 @@
 .usersTable tbody tr:last-child td {
   border-bottom: none;
 }
+.usersTable tbody tr {
+  transition: background 0.12s ease;
+}
 .usersTable tbody tr:hover {
-  background: #fafbfc;
+  background: rgba(239, 232, 251, 0.35);
 }
 .emptyCell {
-  padding: 32px;
+  padding: 48px 32px;
   text-align: center;
   color: var(--muted);
 }
 .errCell {
-  padding: 24px;
+  padding: 32px;
   text-align: center;
   color: var(--danger);
 }
@@ -224,16 +306,17 @@
   gap: 12px;
 }
 .avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   background: linear-gradient(135deg, #fcd9a5, var(--accent));
   display: grid;
   place-items: center;
   color: #fff;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(242, 151, 37, 0.28);
 }
 .userCellInfo {
   display: flex;
@@ -248,7 +331,7 @@
   text-overflow: ellipsis;
 }
 .userCellId {
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   color: var(--muted);
   margin-top: 1px;
 }
@@ -256,8 +339,13 @@
   color: var(--muted);
 }
 .mono {
+  font-family: ui-monospace, "SFMono-Regular", "Menlo", monospace;
   font-size: 0.78rem;
   color: var(--text-secondary, #475569);
+  background: var(--bg);
+  padding: 2px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
 }
 
 /* Role pill */
@@ -332,45 +420,66 @@
   padding: 0 10px;
   border-radius: 8px;
   background: var(--accent-soft);
-  color: var(--text);
+  color: var(--accent-strong);
   font-weight: 700;
   font-size: 0.84rem;
-  border: 1px solid var(--border-strong);
+  border: 1px solid rgba(242, 151, 37, 0.2);
 }
 .countPill.zero {
   color: var(--muted);
-  background: transparent;
+  background: var(--bg);
+  border-color: var(--border);
 }
 
-/* Status cell */
-.statusCell {
+/* Status badge (sólida, moderna) */
+.statusBadge {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.82rem;
+  padding: 5px 11px;
+  border-radius: 8px;
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--text);
+  white-space: nowrap;
+  border: 1px solid transparent;
 }
-.statusCell .dot {
-  width: 8px;
-  height: 8px;
+.statusBadge .dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
-.statusApproved .dot {
+.stApproved {
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+  border-color: rgba(22, 163, 74, 0.18);
+}
+.stApproved .dot {
   background: var(--success);
-  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
 }
-.statusDisabled .dot {
+.stDisabled {
+  background: rgba(242, 151, 37, 0.12);
+  color: var(--accent-strong);
+  border-color: rgba(242, 151, 37, 0.22);
+}
+.stDisabled .dot {
   background: var(--accent);
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
 }
-.statusRejected .dot {
+.stRejected {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.18);
+}
+.stRejected .dot {
   background: var(--danger);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
 }
-.statusPending .dot {
+.stPending {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border-color: rgba(59, 130, 246, 0.18);
+}
+.stPending .dot {
   background: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
 }
 
 /* Row actions */
@@ -380,14 +489,15 @@
   justify-content: flex-end;
 }
 .iconBtn {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted);
   display: grid;
   place-items: center;
+  cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .usersTable tbody tr:hover .iconBtn {
@@ -397,7 +507,8 @@
 }
 .iconBtn:hover {
   background: var(--accent-soft);
-  color: var(--text);
+  color: var(--accent-strong);
+  border-color: rgba(242, 151, 37, 0.3);
 }
 .iconBtn.danger:hover {
   background: #fee2e2;
@@ -413,8 +524,8 @@
   border-color: #bbf7d0;
 }
 .iconBtn svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
 
 /* Pagination */
@@ -464,6 +575,7 @@
 }
 .pageBtn:hover {
   background: var(--accent-soft);
+  border-color: var(--accent);
 }
 .pageBtn.active {
   background: var(--accent);
@@ -780,7 +892,7 @@
 
 /* ── Skeleton (loading) ────────────────────────────────────── */
 .skelRow td {
-  padding: 14px 18px;
+  padding: 16px 18px;
 }
 .skelRow td:first-child {
   padding-left: 24px;
@@ -799,9 +911,9 @@
   gap: 12px;
 }
 .skelAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
   flex-shrink: 0;
   background: linear-gradient(90deg, var(--accent-soft) 25%, var(--border) 37%, var(--accent-soft) 63%);
   background-size: 400% 100%;
@@ -817,9 +929,13 @@
 }
 
 /* ── Responsividade ────────────────────────────────────────── */
-@media (max-width: 1100px) {
+@media (max-width: 1180px) {
   .kpiGrid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  .kpiValue {
+    font-size: 1.8rem;
   }
 }
 @media (max-width: 1024px) {
@@ -829,9 +945,8 @@
     margin-bottom: 24px;
   }
   .pageHead {
-    margin-bottom: 24px;
+    margin-bottom: 22px;
   }
-  /* abas roláveis horizontalmente sem estourar */
   .tabs {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -841,7 +956,6 @@
     display: none;
   }
   .tabBtn {
-    white-space: nowrap;
     flex-shrink: 0;
   }
 }
@@ -851,20 +965,23 @@
     gap: 10px;
   }
   .kpiCard {
-    padding: 12px;
-    gap: 10px;
+    padding: 14px 14px 13px;
+    gap: 12px;
   }
   .kpiIcon {
-    width: 38px;
-    height: 38px;
+    width: 36px;
+    height: 36px;
     border-radius: 10px;
   }
   .kpiIcon svg {
-    width: 19px;
-    height: 19px;
+    width: 18px;
+    height: 18px;
   }
   .kpiValue {
-    font-size: 1.15rem;
+    font-size: 1.5rem;
+  }
+  .pageTitle {
+    font-size: 1.35rem;
   }
   .fieldGrid2 {
     grid-template-columns: 1fr;
@@ -883,14 +1000,20 @@
   }
   /* head bar / filtros */
   .tableHeadBar {
-    padding: 16px 16px 12px;
+    padding: 16px 16px 14px;
+    align-items: stretch;
+  }
+  .tableHeadTitle {
+    margin-bottom: 4px;
   }
   .tableControls {
     flex-direction: column;
     align-items: stretch;
+    width: 100%;
   }
   .searchWrap {
     max-width: none;
+    min-width: 0;
   }
   .selectInput {
     max-width: none;
@@ -902,18 +1025,107 @@
   .filters .selectInput {
     width: 100%;
   }
-  /* tabelas com células um pouco mais compactas (já rolam via .tableWrap) */
-  .usersTable thead th,
-  .usersTable tbody td {
-    padding: 10px 12px;
+  .tabs {
+    width: 100%;
   }
-  .usersTable thead th:first-child,
-  .usersTable tbody td:first-child {
-    padding-left: 16px;
+  .tabBtn {
+    flex: 1;
+    justify-content: center;
   }
-  .usersTable thead th:last-child,
+
+  /* ── Tabela vira lista de cards empilhados ── */
+  .tableWrap {
+    overflow-x: visible;
+    padding: 12px;
+  }
+  .usersTable {
+    font-size: 0.9rem;
+  }
+  .usersTable thead {
+    display: none;
+  }
+  .usersTable,
+  .usersTable tbody,
+  .usersTable tr,
+  .usersTable td {
+    display: block;
+    width: 100%;
+  }
+  .usersTable tbody tr {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 8px 16px;
+    margin-bottom: 12px;
+    background: var(--surface);
+    box-shadow: 0 1px 2px rgba(26, 20, 48, 0.04);
+  }
+  .usersTable tbody tr:hover {
+    background: var(--surface);
+  }
+  .usersTable tbody tr:last-child {
+    margin-bottom: 0;
+  }
+  .usersTable tbody td,
+  .usersTable tbody td:first-child,
   .usersTable tbody td:last-child {
-    padding-right: 16px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: right;
+  }
+  .usersTable tbody tr td:last-child {
+    border-bottom: none;
+  }
+  /* rótulo da célula (vem do data-label) */
+  .usersTable tbody td::before {
+    content: attr(data-label);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    text-align: left;
+    flex-shrink: 0;
+  }
+  /* célula do usuário vira cabeçalho do card (sem rótulo) */
+  .usersTable tbody td.cardHeader {
+    justify-content: flex-start;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+    margin-bottom: 2px;
+  }
+  .usersTable tbody td.cardHeader::before {
+    display: none;
+  }
+  .avatar {
+    width: 42px;
+    height: 42px;
+  }
+  /* ações: botões maiores e acessíveis */
+  .rowActions {
+    gap: 8px;
+  }
+  .usersTable tbody td.cardActions .iconBtn {
+    width: 40px;
+    height: 40px;
+    border-color: var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+  }
+  /* estados vazio / erro / skeleton: sem rótulo, centralizados */
+  .skelRow td::before,
+  .usersTable tbody td.emptyCell::before,
+  .usersTable tbody td.errCell::before {
+    display: none;
+  }
+  .usersTable tbody td.emptyCell,
+  .usersTable tbody td.errCell {
+    display: block;
+    text-align: center;
+    border-bottom: none;
   }
   /* paginação empilha */
   .pagination {

@@ -246,14 +246,12 @@ export default function EquipeClient() {
   }
 
   return (
-    <div className="page">
+    <div className={s.shell}>
       {/* ── Page head ── */}
       <div className={s.pageHead}>
         <div>
-          <h1 style={{ margin: '0 0 6px', fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em' }}>Equipe</h1>
-          <p className="muted" style={{ margin: 0, fontSize: '0.92rem' }}>
-            Gerencie administradores e equipe operacional ClickUp.
-          </p>
+          <h1 className={s.pageTitle}>Equipe</h1>
+          <p className={s.pageSub}>Gerencie administradores e equipe operacional ClickUp.</p>
         </div>
         <div className={s.pageActions}>
           <button className="btn-secondary" onClick={doExport}>
@@ -282,19 +280,13 @@ export default function EquipeClient() {
 
       {/* ── Tabs ── */}
       <div className={s.tabs}>
-        <button
-          className={`${s.tabBtn} ${tab === 'admins' ? s.active : ''}`}
-          style={tab === 'admins' ? { borderBottomColor: 'var(--accent)' } : undefined}
-          onClick={() => setTab('admins')}
-        >
+        <button className={`${s.tabBtn} ${tab === 'admins' ? s.active : ''}`} onClick={() => setTab('admins')}>
           Administradores
+          {stats && <span className={s.tabCount}>{stats.admins}</span>}
         </button>
-        <button
-          className={`${s.tabBtn} ${tab === 'operators' ? s.active : ''}`}
-          style={tab === 'operators' ? { borderBottomColor: '#6366f1' } : undefined}
-          onClick={() => setTab('operators')}
-        >
-          Equipe Operacional (ClickUp)
+        <button className={`${s.tabBtn} ${tab === 'operators' ? s.active : ''}`} onClick={() => setTab('operators')}>
+          Equipe Operacional
+          {stats && <span className={s.tabCount}>{stats.operators}</span>}
         </button>
       </div>
 
@@ -357,7 +349,7 @@ export default function EquipeClient() {
                 ) : (
                   admins.map((u) => (
                     <tr key={u.id}>
-                      <td>
+                      <td className={s.cardHeader}>
                         <div className={s.userCell}>
                           <div className={s.avatar}>{initials(u.name)}</div>
                           <div className={s.userCellInfo}>
@@ -366,18 +358,18 @@ export default function EquipeClient() {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Email">
                         <span className={s.subtle}>{u.email || '—'}</span>
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <StatusCell status={u.status} />
                       </td>
-                      <td>
+                      <td data-label="Último login">
                         <span className={s.subtle} style={{ fontSize: '0.82rem' }}>
                           {u.last_login_at ? fmtDateTime(u.last_login_at) : 'Nunca acessou'}
                         </span>
                       </td>
-                      <td>
+                      <td className={s.cardActions} data-label="Ações">
                         <div className={s.rowActions}>
                           <button className={s.iconBtn} title="Editar" onClick={() => setEmpModal({ open: true, editing: u })}>
                             <IconEdit />
@@ -466,7 +458,7 @@ export default function EquipeClient() {
                 ) : (
                   operators.map((o) => (
                     <tr key={o.id}>
-                      <td>
+                      <td className={s.cardHeader}>
                         <div className={s.userCell}>
                           <div className={s.avatar}>{initials(o.name)}</div>
                           <div className={s.userCellInfo}>
@@ -475,25 +467,25 @@ export default function EquipeClient() {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Email">
                         <span className={s.subtle}>{o.email || '—'}</span>
                       </td>
-                      <td>
+                      <td data-label="Cargo">
                         <PositionPill name={o.position_name} color={o.position_color} />
                       </td>
-                      <td>
+                      <td data-label="ClickUp ID">
                         <code className={s.mono}>{o.clickup_user_id || '—'}</code>
                       </td>
-                      <td>
+                      <td data-label="Avaliação">
                         <Stars rating={o.rating_avg} />
                       </td>
-                      <td style={{ textAlign: 'center' }}>
+                      <td data-label="Alunos" style={{ textAlign: 'center' }}>
                         <span className={`${s.countPill} ${(o.students_count ?? 0) === 0 ? s.zero : ''}`}>{o.students_count ?? 0}</span>
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <OpStatusCell status={o.status} />
                       </td>
-                      <td>
+                      <td className={s.cardActions} data-label="Ações">
                         <div className={s.rowActions}>
                           <button className={s.iconBtn} title="Editar" onClick={() => setOpModal({ open: true, editing: o })}>
                             <IconEdit />
