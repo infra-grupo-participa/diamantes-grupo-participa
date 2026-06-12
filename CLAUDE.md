@@ -7,7 +7,7 @@ Portal cliente do programa Diamantes (Grupo Participa). **Webapp Next.js** (migr
 - **App:** Next.js 14 (App Router) + TypeScript. Na **raiz do repo** (sem subpasta).
 - **Backend:** Supabase (Auth + Postgres `portal` + Storage + RLS). Não muda — o app só **chama** RPCs/views/tabelas.
   Projeto: `npqyvjhvtfahuxfmuhie`.
-- **Auth/sessão:** `@supabase/ssr` (cookies SSR) + middleware. 3 áreas por role: cliente (`user`), `admin`, `operator`.
+- **Auth/sessão:** `@supabase/ssr` (cookies SSR) + middleware. 2 áreas por role: cliente (`user`) e `admin`. (Operadores são membros de equipe geridos no admin — não têm login próprio.)
 - **Deploy:** Hostinger **Node App** (hPanel). Startup `server.js` (lê `process.env.PORT`). Build no deploy.
 
 ## Estrutura
@@ -19,7 +19,6 @@ Portal cliente do programa Diamantes (Grupo Participa). **Webapp Next.js** (migr
 │   ├── portal/               ← cliente: dashboard, perfil, projetos, novo-projeto,
 │   │                            briefing-basico, briefing/[projetoId], demandas
 │   ├── admin/                ← equipe, alunos, assinaturas, projetos, demandas
-│   ├── operator/             ← dashboard, demandas, perfil
 │   ├── api/                  ← Route Handlers (clickup, clickup-comment,
 │   │                            briefing-to-clickup, clickup-webhook, hotmart-webhook)
 │   ├── layout.tsx · globals.css

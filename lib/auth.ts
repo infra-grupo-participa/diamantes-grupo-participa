@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
-export type Role = 'admin' | 'user' | 'operator' | 'client';
+export type Role = 'admin' | 'user' | 'client';
 
 export type Profile = {
   id: number;
@@ -41,7 +41,6 @@ export async function getProfile(): Promise<Profile | null> {
 
 function homeFor(role: Role): string {
   if (role === 'admin') return '/admin';
-  if (role === 'operator') return '/operator';
   return '/portal';
 }
 
