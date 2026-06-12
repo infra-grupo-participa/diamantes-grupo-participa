@@ -615,13 +615,13 @@ function ExportIcon() {
 function Kpi({ label, value, bg, color, icon }: { label: string; value: React.ReactNode; bg: string; color: string; icon: string }) {
   return (
     <div className={s.kpiCard}>
-      <div className={s.kpiIcon} style={{ background: bg, color }}>
-        <KpiIcon name={icon} />
+      <div className={s.kpiHead}>
+        <span className={s.kpiLabel}>{label}</span>
+        <span className={s.kpiIcon} style={{ background: bg, color }}>
+          <KpiIcon name={icon} />
+        </span>
       </div>
-      <div>
-        <div className={s.kpiLabel}>{label}</div>
-        <div className={s.kpiValue}>{value}</div>
-      </div>
+      <div className={s.kpiValue}>{value}</div>
     </div>
   );
 }
@@ -788,7 +788,7 @@ function SubRow({ sub, onEdit, onDelete }: { sub: SubscriptionRow; onEdit: () =>
   const b = statusBadge(sub.status);
   return (
     <tr className={sub.status === 'overdue' ? s.rowOverdue : ''}>
-      <td>
+      <td className={s.cardHeader}>
         <div className={s.userCell}>
           <div className={s.avatar}>{initials(sub.client_name)}</div>
           <div>
@@ -797,21 +797,21 @@ function SubRow({ sub, onEdit, onDelete }: { sub: SubscriptionRow; onEdit: () =>
           </div>
         </div>
       </td>
-      <td>
+      <td data-label="Valor mensal">
         <div className={s.amount}>{fmtBRL(sub.monthly_value)}</div>
         <div className={s.amountSub}>mensal</div>
       </td>
-      <td>{nextBillingCell(sub)}</td>
-      <td>
+      <td data-label="Próxima cobrança">{nextBillingCell(sub)}</td>
+      <td data-label="Pagamento">
         <div className={s.paymentMethod}>
           <span className={`${s.pmIcon} ${pm.cls}`}>{pm.label}</span>
           <span>{pmText(sub)}</span>
         </div>
       </td>
-      <td>
+      <td data-label="Status">
         <span className={`${s.badge} ${b.cls}`}>{b.txt}</span>
       </td>
-      <td style={{ textAlign: 'right' }}>
+      <td className={s.cardActions} data-label="Ação" style={{ textAlign: 'right' }}>
         <div className={s.rowActions}>
           <button className={s.iconBtn} title="Editar" onClick={onEdit}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

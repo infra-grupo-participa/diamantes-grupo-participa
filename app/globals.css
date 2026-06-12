@@ -13,8 +13,54 @@
   --hero-tint-strong: #e2d5f7;
   --danger: #ef4444;
   --success: #16a34a;
-  --radius: 16px;
-  --shadow: 0 18px 48px rgba(26, 20, 48, 0.12);
+  --warning: #b45309;
+  --info: #2563eb;
+
+  /* ── Escala de espaçamento (base 4px) ───────────────────────── */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ── Escala de raio ─────────────────────────────────────────── */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+  --radius: 16px; /* legado = --radius-xl */
+
+  /* ── Escala tipográfica ─────────────────────────────────────── */
+  --text-xs: 0.72rem; /* labels uppercase, hints */
+  --text-sm: 0.82rem; /* texto secundário, labels de form */
+  --text-base: 0.9rem; /* corpo */
+  --text-md: 1rem;
+  --text-lg: 1.1rem; /* títulos de card/seção */
+  --text-2xl: 1.6rem; /* título de página (h1) */
+  --kpi-value: 2rem; /* número grande de KPI */
+  --kpi-value-sm: 1.5rem; /* KPI denso / valores monetários */
+
+  /* ── Escala de sombra ───────────────────────────────────────── */
+  --shadow-xs: 0 1px 2px rgba(26, 20, 48, 0.04);
+  --shadow-sm: 0 2px 8px rgba(26, 20, 48, 0.06);
+  --shadow-md: 0 6px 20px rgba(26, 20, 48, 0.06);
+  --shadow-lg: 0 12px 28px rgba(26, 20, 48, 0.1);
+  --shadow-xl: 0 18px 48px rgba(26, 20, 48, 0.12);
+  --shadow-cta: 0 4px 12px rgba(242, 151, 37, 0.28);
+  --shadow: 0 18px 48px rgba(26, 20, 48, 0.12); /* legado = --shadow-xl */
+
+  /* Header de tabela (lavanda tênue) — padrão data-table premium */
+  --table-head-bg: rgba(239, 232, 251, 0.4);
+  --table-row-hover: rgba(239, 232, 251, 0.35);
+
+  /* Avatar de conteúdo (squircle, gradiente da marca) */
+  --avatar-radius: 11px;
+  --avatar-gradient: linear-gradient(135deg, #fcd9a5, var(--accent));
 }
 
 * {
@@ -386,7 +432,7 @@ a {
 .avatar-sm {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: var(--avatar-radius);
   display: grid;
   place-items: center;
   font-size: 0.72rem;
@@ -558,7 +604,9 @@ a {
 }
 .dash-hero h1 {
   margin: 0 0 4px;
-  font-size: 1.8rem;
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 .dash-badges {
   display: flex;
@@ -630,7 +678,7 @@ a {
 .avatar-md {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--avatar-radius);
   display: grid;
   place-items: center;
   color: #fff;
