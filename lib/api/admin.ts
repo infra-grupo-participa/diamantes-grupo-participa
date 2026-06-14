@@ -449,6 +449,14 @@ export async function listProjects({
   return (data ?? []) as ProjectRow[];
 }
 
+// Conclui um projeto (status → completed). O banco dispara o convite de
+// avaliação do cliente (migration 036). Só admin (RLS/RPC bloqueia o resto).
+export async function completeProject(id: string): Promise<true> {
+  const { error } = await client().rpc('complete_project', { p_project_id: id });
+  if (error) throw error;
+  return true;
+}
+
 // Acessos herdados do Briefing Básico do cliente (read-only) para um slug.
 export async function getClientBriefingAccess(slug: string): Promise<Record<string, Record<string, unknown>>> {
   try {

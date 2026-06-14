@@ -91,3 +91,39 @@ export async function getClientBriefingBrowser(): Promise<ClientBriefingInfo | n
   if (error) throw error;
   return (data ?? null) as ClientBriefingInfo | null;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Avaliação de projeto (CSAT 5★ ao concluir) — migration 036
+// ─────────────────────────────────────────────────────────────
+
+export interface PendingProjectRating {
+  project_id: string;
+  title: string;
+  completed_at: string | null;
+  rating_id: string;
+}
+
+/** Projetos concluídos do cliente que ainda aguardam avaliação. */
+export async function getMyPendingProjectRatings(): Promise<PendingProjectRating[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('get_my_pending_project_ratings');
+  if (error) throw error;
+  return (data ?? []) as PendingProjectRating[];
+}
+
+/** Envia a avaliação do projeto: estrelas (1-5) + comentário e NPS opcionais. */
+export async function submitProjectRating(input: {
+  projectId: string;
+  stars: number;
+  comment?: string;
+  nps?: number | null;
+}): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('submit_project_rating', {
+    p_project_id: input.projectId,
+    p_stars: input.stars,
+    p_comment: input.comment?.trim() || null,
+    p_nps: input.nps ?? null,
+  });
+  if (error) throw error;
+}
