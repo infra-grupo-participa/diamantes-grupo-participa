@@ -118,7 +118,7 @@ export async function postMessage(
     } = await supabase.auth.getSession();
     if (session?.access_token) {
       const body = { demand_id: demandId, client_slug: clientSlug || '', content: text, attachments: attachments || [] };
-      void fetch('/api/clickup-comment.php', {
+      void fetch('/api/clickup-comment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

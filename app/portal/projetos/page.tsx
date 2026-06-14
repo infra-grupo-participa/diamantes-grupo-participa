@@ -80,7 +80,13 @@ export default async function ProjetosPage() {
       <ProjectRatingBanner />
 
       <div className={styles.grid}>
-        {error || projects.length === 0 ? (
+        {error ? (
+          <div className={styles.empty}>
+            <div className={styles.icon}>⚠️</div>
+            <h2>Não foi possível carregar seus projetos</h2>
+            <p>Ocorreu um erro ao buscar os dados. Atualize a página e tente novamente.</p>
+          </div>
+        ) : projects.length === 0 ? (
           <div className={styles.empty}>
             <div className={styles.icon}>📁</div>
             <h2>Nenhum projeto ainda</h2>
