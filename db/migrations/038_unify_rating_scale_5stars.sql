@@ -189,15 +189,17 @@ GROUP BY o.id, p.name, p.color;
 
 GRANT SELECT ON portal.v_operators TO authenticated;
 
+-- ⚠️ A ordem das colunas precisa casar EXATAMENTE com a view em produção
+-- (CREATE OR REPLACE não permite renomear coluna). Ordem real abaixo.
 CREATE OR REPLACE VIEW portal.v_employees
 WITH (security_invoker = on)
 AS
 SELECT
-  u.id, u.name, u.email, u.role, u.status, u.auth_user_id, u.position_id,
+  u.id, u.auth_user_id, u.email, u.name, u.role, u.status, u.position_id,
+  p.name AS position_name, p.name AS position_slug, p.color AS position_color,
   u.created_at, u.updated_at, u.last_login_at,
-  p.name AS position_name, p.color AS position_color, p.name AS position_slug,
-  COUNT(DISTINCT ta.client_slug)::int AS students_count,
-  COALESCE(ROUND(AVG(r.score)::numeric, 2), 0.00) AS rating_avg
+  COALESCE(ROUND(AVG(r.score)::numeric, 2), 0.00) AS rating_avg,
+  COUNT(DISTINCT ta.client_slug)::int AS students_count
 FROM portal.users u
 LEFT JOIN portal.positions        p   ON p.id = u.position_id
 LEFT JOIN portal.operators        op  ON op.email = u.email
@@ -209,8 +211,10 @@ GROUP BY u.id, p.name, p.color;
 
 GRANT SELECT ON portal.v_employees TO authenticated;
 
--- get_student_team: média por operador, sem dividir por 2
-CREATE OR REPLACE FUNCTION portal.get_student_team(p_slug text)
+-- get_student_team: média por operador, sem dividir por 2.
+-- DROP antes do CREATE (a versão em produção pode ter retorno diferente).
+DROP FUNCTION IF EXISTS portal.get_student_team(text);
+CREATE FUNCTION portal.get_student_team(p_slug text)
 RETURNS TABLE (
   assignment_id uuid, operator_id uuid, user_id uuid,
   user_name text, user_email text, user_status text,
