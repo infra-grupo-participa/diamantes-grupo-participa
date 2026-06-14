@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import s from './admin.module.css';
-import { listProjects, type ProjectRow } from '@/lib/api/admin';
+import { listProjects, completeProject, type ProjectRow } from '@/lib/api/admin';
+import { toast } from '@/lib/toast';
 import {
   getGeneralFields,
   getProjectSections,
@@ -90,6 +91,17 @@ export default function ProjetosClient() {
   useEffect(() => {
     load();
   }, [load]);
+
+  async function onComplete(p: ProjectRow) {
+    if (!confirm(`Concluir o projeto "${p.title}"?\n\nO cliente receberá o convite para avaliar.`)) return;
+    try {
+      await completeProject(p.id);
+      toast('Projeto concluído. Avaliação solicitada ao cliente.');
+      await load();
+    } catch (e: unknown) {
+      toast('Erro ao concluir: ' + (e instanceof Error ? e.message : String(e)), 'error');
+    }
+  }
 
   return (
     <div className={s.shell}>
@@ -180,9 +192,16 @@ export default function ProjetosClient() {
                     </td>
                     <td>{fmtDate(p.created_at)}</td>
                     <td>
-                      <button className={s.btnView} onClick={() => setSelected(p)}>
-                        Ver briefing
-                      </button>
+                      <div style={{ display: 'inline-flex', gap: 8 }}>
+                        <button className={s.btnView} onClick={() => setSelected(p)}>
+                          Ver briefing
+                        </button>
+                        {p.status === 'active' && (
+                          <button className={s.btnView} onClick={() => onComplete(p)} title="Concluir projeto e solicitar avaliação">
+                            Concluir
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

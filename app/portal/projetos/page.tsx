@@ -7,6 +7,7 @@ import {
   validateProjectBriefing,
   type ProjectBriefing,
 } from '@/lib/briefing-templates';
+import ProjectRatingBanner from '@/components/projetos/ProjectRatingBanner';
 import styles from './page.module.css';
 
 export const metadata = { title: 'Meus Projetos — Portal Diamantes' };
@@ -75,6 +76,8 @@ export default async function ProjetosPage() {
           + Novo Projeto
         </Link>
       </div>
+
+      <ProjectRatingBanner />
 
       <div className={styles.grid}>
         {error || projects.length === 0 ? (
