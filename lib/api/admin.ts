@@ -261,11 +261,15 @@ export async function getEmployeeStats(): Promise<EmployeeStats> {
       .gte('last_login_at', todayIso),
   ]);
 
+  for (const r of [admins, operators, students, ratingsCount, ratingsScores, activeToday]) {
+    if (r.error) throw r.error;
+  }
+
   let avg = 0;
   const scores = (ratingsScores.data ?? []) as Array<{ score: number | null }>;
   if (scores.length) {
     const sum = scores.reduce((s, r) => s + (Number(r.score) || 0), 0);
-    avg = sum / scores.length / 2.0; // 1-10 → 0-5
+    avg = sum / scores.length; // escala já é 1-5 (migration 038)
   }
 
   return {

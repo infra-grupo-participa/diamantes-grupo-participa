@@ -78,9 +78,9 @@ export function canonicalSector(raw?: string | null): string {
   return serviceMeta(raw).sector;
 }
 
-/** Estrelas 0-5 a partir de score 1-10 (escala do legado: score/2). */
+/** Estrelas a partir de score já em escala 0-5 (avaliações são 1-5 desde a migration 038). */
 export function stars(score?: number | null): string {
-  const n = Math.round(((score ?? 0) / 2) * 2) / 2; // meio-estrela
+  const n = Math.round((score ?? 0) * 2) / 2; // meio-estrela
   const full = Math.floor(n);
   const half = n - full >= 0.5;
   return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(5 - full - (half ? 1 : 0));

@@ -107,10 +107,11 @@ export async function loadMembersByDemand(
   const out: Record<string, DemandMemberLite[]> = {};
   await Promise.all(
     demandIds.map(async (id) => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('demand_members')
         .select('user_id, role, approved_finish')
         .eq('demand_id', id);
+      if (error) throw error;
       out[id] = (data ?? []) as DemandMemberLite[];
     }),
   );
@@ -135,11 +136,15 @@ export async function getDemandFullDetails(demandId: string): Promise<{
   messages: DemandMessage[];
 } | null> {
   const supabase = createClient();
-  const [{ data: demand }, { data: members }, { data: messages }] = await Promise.all([
-    supabase.from('v_demands').select('*').eq('id', demandId).maybeSingle(),
-    supabase.from('demand_members').select('*').eq('demand_id', demandId),
-    supabase.from('demand_messages').select('*').eq('demand_id', demandId).order('created_at'),
-  ]);
+  const [{ data: demand, error: demandErr }, { data: members, error: membersErr }, { data: messages, error: messagesErr }] =
+    await Promise.all([
+      supabase.from('v_demands').select('*').eq('id', demandId).maybeSingle(),
+      supabase.from('demand_members').select('*').eq('demand_id', demandId),
+      supabase.from('demand_messages').select('*').eq('demand_id', demandId).order('created_at'),
+    ]);
+  if (demandErr) throw demandErr;
+  if (membersErr) throw membersErr;
+  if (messagesErr) throw messagesErr;
   if (!demand) return null;
 
   const memberRows = (members ?? []) as Array<Record<string, unknown>>;
@@ -249,6 +254,9 @@ export async function adminDemandStats(): Promise<DemandStats> {
     supabase.from('demands').select('id', { count: 'exact', head: true }).eq('status', 'canceled'),
     supabase.from('demands').select('id', { count: 'exact', head: true }),
   ]);
+  for (const r of [open, prog, review, done, canceled, all]) {
+    if (r.error) throw r.error;
+  }
   return {
     total: all.count ?? 0,
     open: open.count ?? 0,

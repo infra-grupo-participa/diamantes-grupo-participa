@@ -46,9 +46,15 @@ export async function POST(req: Request) {
     .eq('auth_user_id', user.id)
     .maybeSingle();
 
-  const userRole = (profile?.role as string) || 'client';
-  const userStatus = (profile?.status as string) || 'approved';
-  const userClientSlug = (profile?.client_slug as string) || '';
+  // Fail-safe: sessão sem perfil no portal não recebe acesso (evita escalonamento
+  // por default 'approved' quando profile é null).
+  if (!profile) {
+    return jsonResponse({ ok: false, error: 'Perfil não encontrado para esta sessão.' }, 403);
+  }
+
+  const userRole = (profile.role as string) || 'client';
+  const userStatus = (profile.status as string) || 'pending';
+  const userClientSlug = (profile.client_slug as string) || '';
 
   // ── Parse body (JSON; multipart não suportado por este endpoint) ─────────
   let payload: Json = {};
@@ -129,9 +135,12 @@ export async function POST(req: Request) {
       }
     }
 
+    // BOLA guard com match ESTRITO de segmentos (evita que 'task/123' libere
+    // 'task/12345...'). Segmenta o path ignorando query string.
     const pathClean = path.replace(/^\/+/, '');
-    const isOwnTask = allowedTaskId !== '' && pathClean.includes('task/' + allowedTaskId);
-    const isOwnList = allowedListId !== '' && pathClean.indexOf('list/' + allowedListId) === 0;
+    const seg = pathClean.split('?')[0].split('/');
+    const isOwnTask = allowedTaskId !== '' && seg[0] === 'task' && seg[1] === allowedTaskId;
+    const isOwnList = allowedListId !== '' && seg[0] === 'list' && seg[1] === allowedListId;
 
     if (!isOwnTask && !isOwnList) {
       return jsonResponse(

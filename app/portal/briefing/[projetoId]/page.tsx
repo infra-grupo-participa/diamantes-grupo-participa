@@ -241,7 +241,8 @@ export default function ProjectBriefingPage() {
       });
       await submitProjectBriefing(projectId);
       setSubmitted(true);
-      // PDF + ClickUp (falha não bloqueia)
+      // PDF + ClickUp (falha não bloqueia o envio do briefing, mas avisa o usuário)
+      let pdfOk = true;
       try {
         setSubmitBtn('Gerando PDF...');
         const blob = await buildPdf();
@@ -249,10 +250,15 @@ export default function ProjectBriefingPage() {
         await attachPdf(blob);
       } catch (e) {
         console.warn('PDF/ClickUp:', e);
+        pdfOk = false;
       }
       setSubmitBtn('Enviado ✓');
-      toast('Briefing enviado para a equipe!', 'success');
-      setTimeout(() => router.push(BACK_HREF), 2200);
+      if (pdfOk) {
+        toast('Briefing enviado para a equipe!', 'success');
+      } else {
+        toast('Briefing salvo, mas houve um problema ao anexar o PDF no ClickUp. Avise o suporte se persistir.', 'warning');
+      }
+      setTimeout(() => router.push(BACK_HREF), pdfOk ? 2200 : 3500);
     } catch (err) {
       setSubmitting(false);
       setSubmitBtn('Enviar para a Equipe');

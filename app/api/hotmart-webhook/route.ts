@@ -149,7 +149,11 @@ export async function POST(req: Request) {
 
   if (isCancellation) {
     // Grava o evento de cancelamento no histórico.
-    await admin.rpc('process_hotmart_purchase', purchaseParams);
+    const { error: cancelInsertErr } = await admin.rpc('process_hotmart_purchase', purchaseParams);
+    if (cancelInsertErr) {
+      // Retorna erro p/ a Hotmart reenviar — não engole o cancelamento/refund.
+      return jsonOut({ ok: false, error: 'Erro ao gravar cancelamento.', detail: cancelInsertErr.message }, 500);
+    }
 
     // Resolve client_slug pelo email.
     const { data: slugData } = await admin.rpc('get_client_slug_by_email', {
@@ -189,8 +193,11 @@ export async function POST(req: Request) {
     return jsonOut({ ok: false, error: 'Erro ao gravar no banco.', detail: rpcError.message }, 500);
   }
 
-  // Atualiza status overdue/paid após cada compra processada.
-  await admin.rpc('run_overdue_sync', {});
+  // Atualiza status overdue/paid após cada compra processada (best-effort).
+  const { error: syncErr } = await admin.rpc('run_overdue_sync', {});
+  if (syncErr) {
+    console.warn('[hotmart-webhook] run_overdue_sync falhou:', syncErr.message);
+  }
 
   return jsonOut({ ok: true, event, result: rpcData });
 }

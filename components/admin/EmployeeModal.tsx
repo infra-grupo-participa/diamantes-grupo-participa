@@ -53,7 +53,7 @@ export default function EmployeeModal({
         await updateEmployee(editing.id, { name: name.trim(), email: email.trim(), status, role: 'admin' });
         toast('Administrador atualizado.');
       } else {
-        await createEmployee({ name: name.trim(), email: email.trim(), password, role: 'admin' });
+        await createEmployee({ name: name.trim(), email: email.trim(), password: password.trim(), role: 'admin' });
         toast('Administrador criado.');
       }
       onSaved();
