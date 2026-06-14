@@ -204,6 +204,39 @@
 }
 
 /* Rating modal */
+/* Estrelas (avaliação 1-5) */
+.starsRow {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 2px;
+}
+.starBtn {
+  border: none;
+  background: transparent;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--border-strong);
+  line-height: 0;
+  transition: transform 0.1s ease, color 0.12s ease;
+}
+.starBtn svg {
+  width: 34px;
+  height: 34px;
+}
+.starBtn:hover {
+  transform: scale(1.12);
+}
+.starBtn.starOn {
+  color: #f59e0b;
+}
+.starHint {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  min-height: 1.2em;
+  margin-bottom: 14px;
+}
+
 .scoreRow {
   display: flex;
   gap: 6px;

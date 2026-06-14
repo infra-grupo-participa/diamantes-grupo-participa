@@ -648,7 +648,10 @@ export default function DemandasPage() {
               {current.status === 'done' && rating && rating.status === 'submitted' && (
                 <div className={styles.detailSection}>
                   <div className={styles.ratingDone}>
-                    <div className="t">Você avaliou com {rating.score}/10 ⭐</div>
+                    <div className="t">
+                      Você avaliou: {'★'.repeat(rating.score)}
+                      <span style={{ opacity: 0.35 }}>{'★'.repeat(Math.max(0, 5 - rating.score))}</span> ({rating.score}/5)
+                    </div>
                     {rating.comment && <div className="c">&ldquo;{rating.comment}&rdquo;</div>}
                   </div>
                 </div>
