@@ -1,4 +1,4 @@
-// clickup-sync v5 — mapping PT-BR + assignees.
+// clickup-sync v6 — mapping PT-BR + assignees via demand_operators.
 // portal.demands (INSERT/UPDATE) → trigger pg_net (portal._sync_demand_to_clickup)
 // → esta função cria/atualiza a task no ClickUp e grava demands.clickup_task_id.
 //
@@ -43,15 +43,20 @@ async function getDemand(supabase: any, demand_id: string) {
   return data;
 }
 
+// Operadores atribuídos vivem em portal.demand_operators (NÃO demand_members,
+// que só tem role='client'). portal.operators já tem clickup_user_id.
+// (v6: corrige assignees vazios — antes lia demand_members.)
 async function getMembersInfo(supabase: any, demand_id: string) {
-  const { data: members } = await supabase.schema("portal")
-    .from("demand_members").select("user_id, role").eq("demand_id", demand_id);
-  if (!members?.length) return [];
-  const ids = members.map((m: any) => m.user_id);
-  const { data: users } = await supabase.schema("portal")
-    .from("users").select("id, name, email, role, clickup_user_id").in("id", ids);
-  const byId = Object.fromEntries((users || []).map((u: any) => [u.id, u]));
-  return members.map((m: any) => ({ ...m, user: byId[m.user_id] || {} }));
+  const { data: dops } = await supabase.schema("portal")
+    .from("demand_operators").select("operator_id").eq("demand_id", demand_id);
+  if (!dops?.length) return [];
+  const opIds = dops.map((d: any) => d.operator_id);
+  const { data: operators } = await supabase.schema("portal")
+    .from("operators").select("id, name, email, clickup_user_id").in("id", opIds);
+  return (operators || []).map((o: any) => ({
+    user_id: o.id, role: "operator",
+    user: { name: o.name, email: o.email, clickup_user_id: o.clickup_user_id },
+  }));
 }
 
 async function getRequesterEmail(supabase: any, created_by: string | null) {
