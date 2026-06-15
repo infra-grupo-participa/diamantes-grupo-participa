@@ -23,6 +23,9 @@ Mantenha este diretório em sincronia ao editar uma função.
   - **Lista por cliente:** a task vai pra **lista do cliente** (`clients.cu_list_id`)
     p/ organizar por aluno no operacional; sem `cu_list_id`, cai na lista global
     (`clickup_config.list_id`).
+  - **Prefixo de projeto:** o nome da task vira `[<Projeto>] <título>` quando a demanda
+    tem `project_id` (diferencia o projeto no ClickUp). O `clickup-webhook` remove esse
+    prefixo (`^\[...\]`) ao sincronizar o nome de volta — não polui `demands.title`.
   - **Single-assignee:** se o espaço do ClickUp não tem o ClickApp de múltiplos
     assignees (erro `ITEM_417`), a task é (re)criada com **1 responsável** (o 1º operador);
     a equipe completa fica no custom field "equipe".

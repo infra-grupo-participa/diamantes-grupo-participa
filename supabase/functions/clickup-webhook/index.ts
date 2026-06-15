@@ -191,7 +191,9 @@ Deno.serve(async (req: Request) => {
     const cuStatusName = task?.status?.status || "";
     const mapped = mapStatusReverse(cuStatusName);
     if (mapped && mapped !== demand.status) patch.status = mapped;
-    if (typeof task?.name === "string" && task.name.trim() && task.name !== demand.title) patch.title = task.name;
+    // Remove o prefixo "[Projeto] " que o clickup-sync adiciona, p/ não poluir o título.
+    const cuName = typeof task?.name === "string" ? task.name.replace(/^\s*\[[^\]]*\]\s*/, "").trim() : "";
+    if (cuName && cuName !== demand.title) patch.title = cuName;
     if (typeof task?.description === "string" && (task.description || "") !== (demand.description || "")) patch.description = task.description || "";
     if (task?.start_date) {
       const ds = new Date(Number(task.start_date)).toISOString().slice(0, 10);
