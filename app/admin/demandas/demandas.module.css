@@ -6,15 +6,15 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  --d-success: #16a34a;
+  --d-success: var(--success);
   --d-warning: #f59e0b;
-  --d-bg: #f7f8fa;
-  --d-surface: #ffffff;
-  --d-border: #eef0f4;
-  --d-border-strong: #e3e6ec;
-  --d-text: #0f172a;
-  --d-text-secondary: #475569;
-  --d-muted: #94a3b8;
+  --d-bg: var(--surface-sunken);
+  --d-surface: var(--surface);
+  --d-border: var(--border);
+  --d-border-strong: var(--border-strong);
+  --d-text: var(--text);
+  --d-text-secondary: var(--muted);
+  --d-muted: var(--muted);
 }
 
 /* ── Cabeçalho ──────────────────────────────────────────────── */
@@ -920,7 +920,7 @@
 .skel {
   position: relative;
   overflow: hidden;
-  background: #eef1f5;
+  background: var(--surface-sunken);
   border-radius: 8px;
 }
 .skel::after {
@@ -931,7 +931,7 @@
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0,
-    rgba(255, 255, 255, 0.55) 50%,
+    var(--skeleton-shimmer) 50%,
     rgba(255, 255, 255, 0) 100%
   );
   animation: dShimmer 1.2s infinite;

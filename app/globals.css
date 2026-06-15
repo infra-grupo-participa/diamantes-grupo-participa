@@ -65,6 +65,10 @@
   /* Superfícies brancas explícitas (inputs, chips, menus) — viram escuras no dark */
   --surface-input: #ffffff;
   --surface-raised: #ffffff;
+  /* Superfície "afundada"/inset (áreas levemente off-white sobre o card) */
+  --surface-sunken: #fafbfc;
+  /* Brilho do shimmer dos skeletons (claro forte; sutil no dark) */
+  --skeleton-shimmer: rgba(255, 255, 255, 0.55);
   /* Tinta do banner de plano (assinatura) */
   --plan-tint: linear-gradient(135deg, #fff7ea 0%, #fff 60%);
   /* Sombra colorida do avatar */
@@ -107,6 +111,8 @@
 
   --surface-input: #16132a;
   --surface-raised: #221e38;
+  --surface-sunken: #15122a;
+  --skeleton-shimmer: rgba(255, 255, 255, 0.06);
   --plan-tint: linear-gradient(135deg, #2a2238 0%, var(--surface) 60%);
   --avatar-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
 }
