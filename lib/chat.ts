@@ -51,66 +51,48 @@ export function fmtSize(bytes: number): string {
   return (bytes / 1024 / 1024).toFixed(1) + ' MB';
 }
 
-/** Lista mensagens da demanda (ordem crescente) com info do autor (join users). */
+/** Lista mensagens da demanda (ordem crescente) já com nome/role/avatar do autor.
+ *  Via RPC SECURITY DEFINER: o cliente não lê portal.users de outros (RLS), então
+ *  o nome do operador/admin precisa vir resolvido do servidor. */
 export async function listMessages(demandId: string): Promise<ChatMessage[]> {
   const supabase = createClient();
-  const { data: msgs, error } = await supabase
-    .from('demand_messages')
-    .select('id, user_id, content, attachments, origin, created_at')
-    .eq('demand_id', demandId)
-    .order('created_at', { ascending: true });
+  const { data, error } = await supabase.rpc('get_demand_messages', { p_demand_id: demandId });
   if (error) throw error;
-  if (!msgs || msgs.length === 0) return [];
-
-  const ids = [...new Set(msgs.map((m) => m.user_id).filter(Boolean))] as number[];
-  let usersById: Record<number, { name?: string; role?: string; metadata?: { avatar_url?: string } }> = {};
-  if (ids.length) {
-    const { data: users } = await supabase.from('users').select('id, name, role, metadata').in('id', ids);
-    usersById = Object.fromEntries((users || []).map((u) => [u.id, u]));
-  }
-
-  return msgs.map((m) => {
-    const u = usersById[m.user_id as number] || {};
-    return {
-      ...m,
-      attachments: Array.isArray(m.attachments) ? (m.attachments as Attachment[]) : [],
-      author_name: u.name || null,
-      author_role: u.role || null,
-      avatar_url: u.metadata?.avatar_url || null,
-    } as ChatMessage;
-  });
+  return ((data ?? []) as Array<Record<string, unknown>>).map((m) => ({
+    id: m.id,
+    user_id: m.user_id,
+    content: m.content,
+    attachments: Array.isArray(m.attachments) ? (m.attachments as Attachment[]) : [],
+    origin: m.origin,
+    created_at: m.created_at,
+    clickup_comment_id: m.clickup_comment_id,
+    author_name: (m.author_name as string) || null,
+    author_role: (m.author_role as string) || null,
+    avatar_url: (m.avatar_url as string) || null,
+  } as ChatMessage));
 }
 
 /** Busca UMA mensagem por id (com autor + anexos hidratados). Usada no append
  *  incremental do realtime, evitando re-hidratar signed URLs de todas. */
 export async function getMessage(messageId: string): Promise<ChatMessage | null> {
   const supabase = createClient();
-  const { data: m, error } = await supabase
-    .from('demand_messages')
-    .select('id, user_id, content, attachments, origin, created_at')
-    .eq('id', messageId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('get_demand_message', { p_message_id: messageId });
   if (error) throw error;
+  const m = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
   if (!m) return null;
-
-  let author: { name?: string; role?: string; metadata?: { avatar_url?: string } } = {};
-  if (m.user_id) {
-    const { data: u, error: uErr } = await supabase
-      .from('users')
-      .select('name, role, metadata')
-      .eq('id', m.user_id)
-      .maybeSingle();
-    if (uErr) console.error('getMessage: falha ao carregar autor', uErr);
-    author = u || {};
-  }
 
   const atts = Array.isArray(m.attachments) ? (m.attachments as Attachment[]) : [];
   return {
-    ...m,
+    id: m.id,
+    user_id: m.user_id,
+    content: m.content,
     attachments: atts.length ? await hydrateAttachments(atts) : [],
-    author_name: author.name || null,
-    author_role: author.role || null,
-    avatar_url: author.metadata?.avatar_url || null,
+    origin: m.origin,
+    created_at: m.created_at,
+    clickup_comment_id: m.clickup_comment_id,
+    author_name: (m.author_name as string) || null,
+    author_role: (m.author_role as string) || null,
+    avatar_url: (m.avatar_url as string) || null,
   } as ChatMessage;
 }
 
