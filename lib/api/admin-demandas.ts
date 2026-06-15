@@ -222,8 +222,8 @@ export async function getDemandFullDetails(demandId: string): Promise<{
       user_id: m.user_id as string,
       content: (m.content as string) ?? null,
       created_at: (m.created_at as string) ?? null,
-      author_name: (u.name as string) ?? null,
-      author_role: (u.role as string) ?? null,
+      author_name: (u.name as string) ?? (m.clickup_author as string) ?? null,
+      author_role: (u.role as string) ?? (m.clickup_author ? 'operator' : null),
       avatar_url: (meta?.avatar_url as string) ?? null,
     };
   });
