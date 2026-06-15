@@ -286,7 +286,7 @@ export default function BriefingForm(props: BriefingFormProps) {
           className={`${styles.fieldInput} ${hasErr ? styles.inputError : ''}`}
           type={t}
           value={cur != null ? String(cur) : ''}
-          placeholder={f.placeholder ?? ''}
+          placeholder={ro ? '—' : (f.placeholder ?? '')}
           readOnly={ro}
           tabIndex={ro ? -1 : undefined}
           onChange={ro ? undefined : (e) => handleSet(unit, f, e.target.value)}

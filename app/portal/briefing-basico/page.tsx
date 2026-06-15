@@ -218,7 +218,12 @@ export default function BriefingBasicoPage() {
       setTimeout(() => router.push('/portal'), 1500);
     } catch (err) {
       setSubmitting(false);
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : err && typeof err === 'object' && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : String(err);
       toast('Erro ao enviar: ' + msg, 'error');
     }
   }
