@@ -9,6 +9,7 @@ import {
   getStudentStats,
   getStudentTeam,
   getStudentServices,
+  getServicesBySlugs,
   getStudentContractedPositions,
   listOperators,
   assignTeamMember,
@@ -131,6 +132,13 @@ export default function AlunosClient() {
       const { data, count } = await listStudents({ search, billingStatus, limit: pageSize, offset });
       setStudents(data);
       setTotal(count);
+      // Busca os serviços da página inteira em lote para popular badge/contagem nas linhas.
+      try {
+        const bySlug = await getServicesBySlugs(data.map((r) => r.slug));
+        setServicesBySlug((prev) => ({ ...prev, ...bySlug }));
+      } catch (err) {
+        console.error('getServicesBySlugs', err);
+      }
     } catch (e) {
       setTableError((e as Error).message || String(e));
       console.error(e);
@@ -286,6 +294,10 @@ export default function AlunosClient() {
   const last = Math.min(page * pageSize, total);
 
   // ── Métricas do detalhe ──
+  // Tetos explícitos p/ normalizar as barras (referência visual, não limite de negócio).
+  const RATINGS_CAP = 20; // avaliações: barra cheia em 20+
+  const SERVICES_CAP = 8; // serviços ativos: barra cheia em 8+
+  const TEAM_CAP = 6; // integrantes: barra cheia em 6+
   const ratingAvg = parseFloat(String(current?.rating_avg)) || 0;
 
   return (
@@ -550,14 +562,22 @@ export default function AlunosClient() {
             <h4 className={s.sectionTitle}>Métricas</h4>
             <div className={s.metrics}>
               <Metric label="Avaliação média" value={fmtRating(current.rating_avg)} pct={(ratingAvg / 5) * 100} green />
-              <Metric label="Avaliações totais" value={current.ratings_count ?? 0} pct={0} />
+              <Metric
+                label="Avaliações totais"
+                value={current.ratings_count ?? 0}
+                pct={Math.min(100, ((current.ratings_count || 0) / RATINGS_CAP) * 100)}
+              />
               <Metric
                 label="Serviços ativos"
                 value={current.services_count ?? 0}
-                pct={Math.min(100, (current.services_count || 0) * 14)}
+                pct={Math.min(100, ((current.services_count || 0) / SERVICES_CAP) * 100)}
                 green
               />
-              <Metric label="Integrantes" value={current.team_count ?? 0} pct={Math.min(100, (current.team_count || 0) * 20)} />
+              <Metric
+                label="Integrantes"
+                value={current.team_count ?? 0}
+                pct={Math.min(100, ((current.team_count || 0) / TEAM_CAP) * 100)}
+              />
             </div>
           </div>
         </aside>

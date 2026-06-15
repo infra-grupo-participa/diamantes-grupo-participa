@@ -99,22 +99,26 @@ export async function listAllDemands(filter: DemandFilter = {}): Promise<Demand[
   return (data ?? []) as Demand[];
 }
 
-/** Carrega os membros (lite) de várias demandas em paralelo, indexados por demand_id. */
+/** Carrega os membros (lite) de várias demandas em UMA query (.in), indexados por demand_id. */
 export async function loadMembersByDemand(
   demandIds: string[],
 ): Promise<Record<string, DemandMemberLite[]>> {
-  const supabase = createClient();
   const out: Record<string, DemandMemberLite[]> = {};
-  await Promise.all(
-    demandIds.map(async (id) => {
-      const { data, error } = await supabase
-        .from('demand_members')
-        .select('user_id, role, approved_finish')
-        .eq('demand_id', id);
-      if (error) throw error;
-      out[id] = (data ?? []) as DemandMemberLite[];
-    }),
-  );
+  const ids = [...new Set((demandIds || []).filter(Boolean))];
+  if (ids.length === 0) return out;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('demand_members')
+    .select('demand_id, user_id, role, approved_finish')
+    .in('demand_id', ids);
+  if (error) throw error;
+  for (const row of (data ?? []) as Array<DemandMemberLite & { demand_id: string }>) {
+    (out[row.demand_id] ||= []).push({
+      user_id: row.user_id,
+      role: row.role,
+      approved_finish: row.approved_finish,
+    });
+  }
   return out;
 }
 
@@ -122,10 +126,11 @@ export async function loadMembersByDemand(
 export async function loadOperatorUsers(ids: string[]): Promise<Record<string, OperatorUser>> {
   if (!ids.length) return {};
   const supabase = createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('users')
     .select('id, name, metadata, clickup_user_id')
     .in('id', ids);
+  if (error) throw error;
   return Object.fromEntries(((data ?? []) as OperatorUser[]).map((u) => [u.id, u]));
 }
 
@@ -159,10 +164,11 @@ export async function getDemandFullDetails(demandId: string): Promise<{
 
   let usersById: Record<string, Record<string, unknown>> = {};
   if (userIds.length) {
-    const { data: users } = await supabase
+    const { data: users, error: usersErr } = await supabase
       .from('users')
       .select('id, name, email, role, position_id, metadata, clickup_user_id')
       .in('id', userIds);
+    if (usersErr) throw usersErr;
     usersById = Object.fromEntries(
       ((users ?? []) as Array<Record<string, unknown>>).map((u) => [u.id as string, u]),
     );
@@ -174,10 +180,11 @@ export async function getDemandFullDetails(demandId: string): Promise<{
       ),
     ];
     if (pids.length) {
-      const { data: positions } = await supabase
+      const { data: positions, error: positionsErr } = await supabase
         .from('positions')
         .select('id, name, color')
         .in('id', pids);
+      if (positionsErr) throw positionsErr;
       const positionsById = Object.fromEntries(
         ((positions ?? []) as Array<Record<string, unknown>>).map((p) => [p.id as number, p]),
       );

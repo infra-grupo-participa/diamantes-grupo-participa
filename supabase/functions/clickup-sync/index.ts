@@ -67,10 +67,20 @@ async function getRequesterEmail(supabase: any, created_by: string | null) {
 }
 
 async function clickupRequest(apiKey: string, path: string, init: RequestInit = {}) {
-  const r = await fetch(CLICKUP_API + path, {
+  const doFetch = () => fetch(CLICKUP_API + path, {
     ...init,
     headers: { ...(init.headers || {}), "Authorization": apiKey, "Content-Type": "application/json" },
   });
+
+  let r = await doFetch();
+  // Rate limit (429): aguarda o Retry-After (ou um curto delay) e tenta 1 vez.
+  if (r.status === 429) {
+    const ra = Number(r.headers.get("Retry-After"));
+    const delayMs = Number.isFinite(ra) && ra > 0 ? Math.min(ra * 1000, 10_000) : 1500;
+    await new Promise((res) => setTimeout(res, delayMs));
+    r = await doFetch();
+  }
+
   const txt = await r.text();
   let json: any = null; try { json = JSON.parse(txt); } catch (_) { json = txt; }
   if (!r.ok) throw new Error(`ClickUp ${r.status}: ${JSON.stringify(json)}`);
@@ -170,9 +180,11 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const provided = req.headers.get("x-internal-key") || "";
     const auth     = req.headers.get("Authorization") || "";
+    const bearer   = auth.replace(/^Bearer /i, "").trim();
     const internalKey = await getSecret(supabase, "clickup_sync_internal_key");
     const okInternal = internalKey && provided === internalKey;
-    const okService  = auth.includes(SERVICE_KEY) && SERVICE_KEY.length > 20;
+    // Comparação EXATA do Bearer (não substring) para evitar bypass por prefixo.
+    const okService  = SERVICE_KEY.length > 20 && bearer === SERVICE_KEY;
     if (!okInternal && !okService) {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
@@ -192,8 +204,11 @@ Deno.serve(async (req: Request) => {
       task = await updateTask(apiKey, cfg, demand.clickup_task_id, demand, members, requester);
     } else {
       task = await createTask(apiKey, cfg, demand, members, requester);
-      await supabase.schema("portal").from("demands")
+      // Persistir o vínculo é crítico: se falhar, a próxima execução cria task
+      // duplicada. Propaga o erro para o trigger pg_net poder reprocessar.
+      const { error: linkErr } = await supabase.schema("portal").from("demands")
         .update({ clickup_task_id: task.id }).eq("id", demand_id);
+      if (linkErr) throw new Error("persist clickup_task_id: " + linkErr.message);
     }
 
     return new Response(JSON.stringify({

@@ -206,9 +206,11 @@ Deno.serve(async (req: Request) => {
     // Auth: x-internal-key (mesmo segredo interno do ClickUp) ou service-role.
     const provided = req.headers.get("x-internal-key") || "";
     const auth     = req.headers.get("Authorization") || "";
+    const bearer   = auth.replace(/^Bearer /i, "").trim();
     const internalKey = await getSecret(supabase, "clickup_sync_internal_key");
     const okInternal = internalKey && provided === internalKey;
-    const okService  = auth.includes(SERVICE_KEY) && SERVICE_KEY.length > 20;
+    // Comparação EXATA do Bearer (não substring) para evitar bypass por prefixo.
+    const okService  = SERVICE_KEY.length > 20 && bearer === SERVICE_KEY;
     if (!okInternal && !okService) {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
     }

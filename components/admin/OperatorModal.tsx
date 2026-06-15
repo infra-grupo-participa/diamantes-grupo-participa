@@ -47,6 +47,16 @@ export default function OperatorModal({
     }
   }, [open, editing]);
 
+  // Esc fecha o modal (consistência com os demais modais admin).
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   async function submit(e: React.FormEvent) {

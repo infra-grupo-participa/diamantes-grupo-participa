@@ -1,5 +1,16 @@
 // Helpers de formatação/serviço portados do legado (dashboard.html, admin/*).
 
+import { getUserTimezone, getUserLocale, DEFAULT_TIMEZONE, DEFAULT_LOCALE } from '@/lib/theme';
+
+// Fuso/idioma efetivos: lê a preferência do usuário (localStorage, setada no
+// login/perfil via PrefsProvider). Default São Paulo / pt-BR — retrocompatível.
+function tz(override?: string): string {
+  return override || getUserTimezone() || DEFAULT_TIMEZONE;
+}
+function loc(override?: string): string {
+  return override || getUserLocale() || DEFAULT_LOCALE;
+}
+
 export function initials(name?: string | null): string {
   if (!name) return '–';
   return name
@@ -14,23 +25,29 @@ export function firstName(name?: string | null): string {
   return (name ?? '').trim().split(/\s+/)[0] ?? '';
 }
 
-export function fmtDate(value?: string | Date | null): string {
+export function fmtDate(value?: string | Date | null, timeZone?: string): string {
   if (!value) return '—';
   const d = new Date(value);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString(loc(), {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: tz(timeZone),
+  });
 }
 
-export function fmtDateTime(value?: string | Date | null): string {
+export function fmtDateTime(value?: string | Date | null, timeZone?: string): string {
   if (!value) return '—';
   const d = new Date(value);
   if (isNaN(d.getTime())) return '—';
-  return d.toLocaleString('pt-BR', {
+  return d.toLocaleString(loc(), {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: tz(timeZone),
   });
 }
 

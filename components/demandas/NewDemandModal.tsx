@@ -4,7 +4,7 @@
 // Port de buildNewDemandModal()/ndGoStep2()/ndForm de portal/demandas.html.
 // Gate-aware: o caller só abre se isBaseReady().
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   createDemand,
   listMyProjects,
@@ -30,7 +30,9 @@ export default function NewDemandModal({
   const [mode, setMode] = useState<Mode | null>(null);
   const [projectId, setProjectId] = useState<string>('');
   const [projects, setProjects] = useState<Project[] | null>(null);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const [operators, setOperators] = useState<Operator[] | null>(null);
   const [opsError, setOpsError] = useState<string | null>(null);
@@ -43,17 +45,33 @@ export default function NewDemandModal({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // a11y: fecha no Esc e foca o modal ao abrir.
+  useEffect(() => {
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   // Ao escolher modo "projeto", carrega projetos active/briefing.
   useEffect(() => {
     if (mode !== 'project' || projects !== null) return;
     let cancel = false;
     setLoadingProjects(true);
+    setProjectsError(null);
     listMyProjects()
       .then((all) => {
         if (cancel) return;
         setProjects(all.filter((p) => p.status === 'active' || p.status === 'briefing'));
       })
-      .catch(() => !cancel && setProjects([]))
+      .catch((e) => {
+        if (cancel) return;
+        // Diferencia falha (rede/permissão) de lista vazia: erro NÃO vira "nenhum projeto".
+        setProjectsError(e instanceof Error ? e.message : 'Não foi possível carregar os projetos.');
+        setProjects(null);
+      })
       .finally(() => !cancel && setLoadingProjects(false));
     return () => {
       cancel = true;
@@ -98,6 +116,21 @@ export default function NewDemandModal({
       setError('Selecione pelo menos um operador.');
       return;
     }
+    // Validação de datas (comparação por dia-calendário YYYY-MM-DD; inputs date já vêm nesse formato).
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    if (startsAt && startsAt < todayStr) {
+      setError('A data de início não pode estar no passado.');
+      return;
+    }
+    if (endsAt && endsAt < todayStr) {
+      setError('O prazo final não pode estar no passado.');
+      return;
+    }
+    if (startsAt && endsAt && endsAt < startsAt) {
+      setError('O prazo final deve ser igual ou posterior à data de início.');
+      return;
+    }
     setBusy(true);
     try {
       const created = await createDemand({
@@ -118,7 +151,7 @@ export default function NewDemandModal({
 
   return (
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={styles.dialog}>
+      <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Nova demanda" tabIndex={-1} ref={dialogRef}>
         <div className={styles.head}>
           <div>
             <h3>{step === 1 ? 'Nova demanda' : mode === 'project' ? '📁 Chamado de projeto' : '⚡ Chamado simples'}</h3>
@@ -167,10 +200,12 @@ export default function NewDemandModal({
                   className={styles.select}
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
-                  disabled={loadingProjects}
+                  disabled={loadingProjects || !!projectsError}
                 >
                   {loadingProjects ? (
                     <option value="">Carregando projetos…</option>
+                  ) : projectsError ? (
+                    <option value="">Erro ao carregar projetos</option>
                   ) : projects && projects.length > 0 ? (
                     <>
                       <option value="">— Selecione o projeto —</option>
@@ -184,6 +219,22 @@ export default function NewDemandModal({
                     <option value="">Nenhum projeto ativo — crie um em Projetos</option>
                   )}
                 </select>
+                {projectsError && (
+                  <div className={styles.error} style={{ marginTop: 8 }}>
+                    {projectsError}{' '}
+                    <button
+                      type="button"
+                      className={styles.btnSecondary}
+                      style={{ padding: '2px 8px', marginLeft: 4 }}
+                      onClick={() => {
+                        setProjectsError(null);
+                        setProjects(null);
+                      }}
+                    >
+                      Tentar de novo
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

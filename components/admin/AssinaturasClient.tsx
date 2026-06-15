@@ -6,6 +6,7 @@ import { initials, fmtBRL, fmtDate, canonicalSector } from '@/lib/format';
 import {
   listSubscriptions,
   getSubscriptionStats,
+  getSubscriptionMoneySummary,
   getMrrSparkline,
   getServicesByType,
   getPurchaseMonthlyStats,
@@ -124,16 +125,13 @@ export default function AssinaturasClient() {
       const st = await getSubscriptionStats();
       setStats(st);
 
-      const { data: all } = await listSubscriptions({ limit: 1000, offset: 0 });
-      const due = all.filter((x) => x.status === 'pending').reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
-      const late = all
-        .filter((x) => x.status === 'overdue' || x.status === 'late' || x.status === 'partial')
-        .reduce((acc, x) => acc + Number(x.monthly_value || 0), 0);
-      const active = all.filter((x) => x.status !== 'canceled');
-      const avg = active.length ? active.reduce((acc, x) => acc + Number(x.monthly_value || 0), 0) / active.length : 0;
-      setSummary({ due, late, avg });
-
-      const [sp, svc, mo] = await Promise.all([getMrrSparkline(), getServicesByType(), getPurchaseMonthlyStats()]);
+      const [money, sp, svc, mo] = await Promise.all([
+        getSubscriptionMoneySummary(),
+        getMrrSparkline(),
+        getServicesByType(),
+        getPurchaseMonthlyStats(),
+      ]);
+      setSummary(money);
       setSpark(sp);
       setServicesByType(svc);
       setMonthly(mo);
@@ -297,7 +295,7 @@ export default function AssinaturasClient() {
         <Kpi label="Assinantes ativos" value={stats?.active ?? '—'} bg="#f1ecff" color="#8b5cf6" icon="users" />
         <Kpi label="Inadimplentes" value={stats ? (stats.late || 0) + (stats.partial || 0) : '—'} bg="#fee2e2" color="#ef4444" icon="alert" />
         <Kpi label="Pendentes" value={stats?.pending ?? '—'} bg="#fff4d6" color="#eab308" icon="clock" />
-        <Kpi label="Taxa de retenção" value={stats ? stats.retention + '%' : '—'} bg="#e7f7ee" color="#16a34a" icon="trend" />
+        <Kpi label="Retenção (não cancelados)" value={stats ? stats.retention + '%' : '—'} bg="#e7f7ee" color="#16a34a" icon="trend" />
       </div>
 
       {/* Coluna 1: tabela */}

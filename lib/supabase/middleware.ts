@@ -5,7 +5,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config';
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
 /**
- * Renova a sessão Supabase a cada request e protege /portal e /admin.
+ * Renova a sessão Supabase a cada request e protege /portal, /admin e /operator.
  * (Enforcement fino de role fica nos layouts de cada área — fase 1.)
  */
 export async function updateSession(request: NextRequest) {
@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isProtected =
-    path.startsWith('/portal') || path.startsWith('/admin');
+    path.startsWith('/portal') || path.startsWith('/admin') || path.startsWith('/operator');
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

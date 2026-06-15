@@ -130,7 +130,11 @@ export async function getDemandMembers(demandId: string): Promise<DemandMember[]
 
   if (memberRows?.length) {
     const ids = memberRows.map((m) => m.user_id);
-    const { data: users } = await supabase.from('users').select('id, name, email, role, position_id, metadata').in('id', ids);
+    const { data: users, error: usersErr } = await supabase
+      .from('users')
+      .select('id, name, email, role, position_id, metadata')
+      .in('id', ids);
+    if (usersErr) console.error('getDemandMembers: falha ao carregar users', usersErr);
     const usersById = Object.fromEntries((users || []).map((u) => [u.id, u]));
     for (const m of memberRows) {
       const u = usersById[m.user_id] || {};
@@ -147,19 +151,25 @@ export async function getDemandMembers(demandId: string): Promise<DemandMember[]
   }
 
   // 2. Operadores via demand_operators → portal.operators (+ positions)
-  const { data: opRows } = await supabase
+  const { data: opRows, error: opRowsErr } = await supabase
     .from('demand_operators')
     .select('id, operator_id, role, added_at')
     .eq('demand_id', demandId);
+  if (opRowsErr) console.error('getDemandMembers: falha ao carregar demand_operators', opRowsErr);
 
   if (opRows?.length) {
     const opIds = opRows.map((r) => r.operator_id);
-    const { data: ops } = await supabase.from('operators').select('id, name, email, position_id, metadata').in('id', opIds);
+    const { data: ops, error: opsErr } = await supabase
+      .from('operators')
+      .select('id, name, email, position_id, metadata')
+      .in('id', opIds);
+    if (opsErr) console.error('getDemandMembers: falha ao carregar operators', opsErr);
     const opsById = Object.fromEntries((ops || []).map((o) => [o.id, o]));
     const posIds = [...new Set((ops || []).map((o) => o.position_id).filter(Boolean))];
     let posById: Record<number, { name?: string; color?: string }> = {};
     if (posIds.length) {
-      const { data: positions } = await supabase.from('positions').select('id, name, color').in('id', posIds);
+      const { data: positions, error: posErr } = await supabase.from('positions').select('id, name, color').in('id', posIds);
+      if (posErr) console.error('getDemandMembers: falha ao carregar positions', posErr);
       posById = Object.fromEntries((positions || []).map((p) => [p.id, p]));
     }
     for (const r of opRows) {
@@ -192,7 +202,8 @@ async function enrichOperators(
   const pids = [...new Set(rows.map((u) => u.position_id).filter(Boolean))] as number[];
   let positionsById: Record<number, { name?: string; color?: string }> = {};
   if (pids.length) {
-    const { data: positions } = await supabase.from('positions').select('id, name, color').in('id', pids);
+    const { data: positions, error: posErr } = await supabase.from('positions').select('id, name, color').in('id', pids);
+    if (posErr) console.error('enrichOperators: falha ao carregar positions', posErr);
     positionsById = Object.fromEntries((positions || []).map((p) => [p.id, p]));
   }
   return rows.map((u) => ({
@@ -221,15 +232,20 @@ export async function listOperatorsForClient(): Promise<Operator[]> {
 
   const opIds = (assignments || []).map((t) => t.operator_id).filter(Boolean);
   if (opIds.length === 0) {
-    const { data: all } = await supabase
+    const { data: all, error: allErr } = await supabase
       .from('operators')
       .select('id, name, email, position_id, metadata')
       .eq('status', 'active')
       .eq('contract_active', true)
       .order('name');
+    if (allErr) throw allErr;
     return enrichOperators(all || []);
   }
-  const { data: ops } = await supabase.from('operators').select('id, name, email, position_id, metadata').in('id', opIds);
+  const { data: ops, error: opsErr } = await supabase
+    .from('operators')
+    .select('id, name, email, position_id, metadata')
+    .in('id', opIds);
+  if (opsErr) throw opsErr;
   return enrichOperators(ops || []);
 }
 
@@ -278,7 +294,7 @@ export async function getMyDemandRating(demandId: string): Promise<Rating | null
   return (data as Rating) || null;
 }
 
-/** Avaliação do cliente (nota 1-10 + comentário) via RPC. */
+/** Avaliação do cliente (nota 1-5 estrelas + comentário) via RPC. */
 export async function submitClientRating(demandId: string, score: number, comment?: string): Promise<unknown> {
   const { data, error } = await db().rpc('submit_client_rating', {
     p_demand_id: demandId,

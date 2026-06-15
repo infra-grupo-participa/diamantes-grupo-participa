@@ -18,7 +18,7 @@ import {
   type Me,
   type Rating,
 } from '@/lib/api/demandas';
-import { hydrateAttachments, isImage, listMessages, postMessage, subscribe, type Attachment, type ChatMessage } from '@/lib/chat';
+import { getMessage, hydrateAttachments, isImage, listMessages, postMessage, subscribe, type Attachment, type ChatMessage } from '@/lib/chat';
 import { fmtDate, initials } from '@/lib/format';
 import { toast } from '@/lib/toast';
 import ChatComposer from '@/components/demandas/ChatComposer';
@@ -76,20 +76,33 @@ function fmtDayLabel(s?: string | null): string {
   if (d.toDateString() === y.toDateString()) return 'Ontem';
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' });
 }
+// Dias de diferença entre hoje e uma data de vencimento, comparando ambos como
+// dia-calendário (YYYY-MM-DD em UTC) — evita erro de ±1 dia perto da meia-noite.
+// Suporta `ends_at` como data pura ('YYYY-MM-DD') ou timestamp ISO.
+function daysUntilDue(ends_at: string): number | null {
+  const ymd = /^\d{4}-\d{2}-\d{2}/.exec(ends_at)?.[0];
+  if (!ymd) return null;
+  const [y, m, dd] = ymd.split('-').map(Number);
+  const dueUTC = Date.UTC(y, m - 1, dd);
+  const now = new Date();
+  const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((dueUTC - todayUTC) / 86400000);
+}
 function dueLabel(d: Demand): string {
   if (d.status === 'done') return 'Concluída em ' + fmtDate(d.finalized_at);
   if (d.status === 'canceled') return 'Cancelada';
   if (!d.ends_at) return 'Sem prazo';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.ceil((new Date(d.ends_at).getTime() - today.getTime()) / 86400000);
+  const diff = daysUntilDue(d.ends_at);
+  if (diff === null) return 'Sem prazo';
   if (diff < 0) return 'Atrasada — ' + fmtDate(d.ends_at);
   if (diff === 0) return 'Vence hoje';
   if (diff === 1) return 'Vence amanhã';
   return 'Vence em ' + diff + ' dias';
 }
 function categoryOf(members?: DemandMember[]): string {
-  const ops = (members || []).filter((m) => m.role === 'operator');
+  // members undefined ⇒ ainda não carregado (lazy): retorna vazio p/ não poluir a lista.
+  if (!members) return '';
+  const ops = members.filter((m) => m.role === 'operator');
   const positions = [...new Set(ops.map((m) => m.position_name).filter(Boolean))];
   if (positions.length === 0) return 'Sem categoria';
   if (positions.length === 1) return positions[0] as string;
@@ -125,32 +138,52 @@ export default function DemandasPage() {
   const currentIdRef = useRef<string | null>(null);
   currentIdRef.current = currentId;
 
-  // ── Carga inicial ──
+  // Caches LAZY (refs p/ não re-buscar nem re-subscrever): ids carregados + em voo.
+  const membersLoaded = useRef<Set<string>>(new Set());
+  const membersInflight = useRef<Set<string>>(new Set());
+  const ratingsLoaded = useRef<Set<string>>(new Set());
+  const ratingsInflight = useRef<Set<string>>(new Set());
+
+  // ── Carga inicial (LEVE: só a lista; membros/rating carregam sob demanda) ──
   const loadAll = useCallback(async () => {
     try {
       const list = await listMyDemands();
-      const mem: Record<string, DemandMember[]> = {};
-      const rat: Record<string, Rating | null> = {};
-      await Promise.all(
-        list.map(async (d) => {
-          mem[d.id] = await getDemandMembers(d.id);
-          if (d.status === 'done') {
-            try {
-              rat[d.id] = await getMyDemandRating(d.id);
-            } catch {
-              rat[d.id] = null;
-            }
-          }
-        }),
-      );
       setDemands(list);
-      setMembers(mem);
-      setRatings(rat);
       setCurrentId((prev) => prev ?? (list.length > 0 ? list[0].id : null));
       return list;
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
       return [];
+    }
+  }, []);
+
+  // Carrega membros de UMA demanda (cache por id; força refetch após realtime/finalize).
+  const ensureMembers = useCallback(async (demandId: string, force = false) => {
+    if (!force && (membersInflight.current.has(demandId) || membersLoaded.current.has(demandId))) return;
+    membersInflight.current.add(demandId);
+    try {
+      const mem = await getDemandMembers(demandId);
+      membersLoaded.current.add(demandId);
+      setMembers((prev) => ({ ...prev, [demandId]: mem }));
+    } catch (e) {
+      console.error('ensureMembers', e);
+    } finally {
+      membersInflight.current.delete(demandId);
+    }
+  }, []);
+
+  // Carrega rating de UMA demanda concluída (cache por id).
+  const ensureRating = useCallback(async (demandId: string) => {
+    if (ratingsInflight.current.has(demandId) || ratingsLoaded.current.has(demandId)) return;
+    ratingsInflight.current.add(demandId);
+    try {
+      const r = await getMyDemandRating(demandId);
+      ratingsLoaded.current.add(demandId);
+      setRatings((prev) => ({ ...prev, [demandId]: r }));
+    } catch {
+      setRatings((prev) => ({ ...prev, [demandId]: null }));
+    } finally {
+      ratingsInflight.current.delete(demandId);
     }
   }, []);
 
@@ -183,6 +216,21 @@ export default function DemandasPage() {
     }
   }, []);
 
+  // Append incremental de UMA mensagem nova (sem refetch/re-hidratar todas).
+  const appendMessage = useCallback(async (demandId: string, messageId: string) => {
+    try {
+      const msg = await getMessage(messageId);
+      if (!msg) return;
+      setMessages((prev) => {
+        const list = prev[demandId] || [];
+        if (list.some((m) => m.id === msg.id)) return prev; // dedup (eco do próprio envio)
+        return { ...prev, [demandId]: [...list, msg] };
+      });
+    } catch (e) {
+      console.error('appendMessage', e);
+    }
+  }, []);
+
   // ── Realtime para a demanda atual ──
   useEffect(() => {
     if (unsubRef.current) {
@@ -191,15 +239,20 @@ export default function DemandasPage() {
     }
     if (!currentId) return;
     void loadMessages(currentId);
+    // Lazy: carrega membros só da demanda aberta (rating tem efeito próprio abaixo).
+    void ensureMembers(currentId);
     unsubRef.current = subscribe(currentId, {
-      onMessage: () => {
-        if (currentIdRef.current) void loadMessages(currentIdRef.current);
+      onMessage: (raw) => {
+        const id = currentIdRef.current;
+        const msgId = raw?.id != null ? String(raw.id) : null;
+        if (!id) return;
+        if (msgId) void appendMessage(id, msgId);
+        else void loadMessages(id); // fallback: payload sem id
       },
       onDemandUpdate: async (raw) => {
         const id = String(raw.id);
         const fresh = await getDemand(id);
-        const mem = await getDemandMembers(id);
-        setMembers((prev) => ({ ...prev, [id]: mem }));
+        await ensureMembers(id, true);
         if (fresh) setDemands((prev) => prev.map((x) => (x.id === id ? fresh : x)));
       },
     });
@@ -209,7 +262,13 @@ export default function DemandasPage() {
         unsubRef.current = null;
       }
     };
-  }, [currentId, loadMessages]);
+  }, [currentId, loadMessages, appendMessage, ensureMembers]);
+
+  // Lazy: carrega o rating da demanda aberta assim que ela estiver concluída.
+  const currentStatus = currentId ? demands.find((d) => d.id === currentId)?.status : null;
+  useEffect(() => {
+    if (currentId && currentStatus === 'done') void ensureRating(currentId);
+  }, [currentId, currentStatus, ensureRating]);
 
   // Auto-scroll do chat ao receber/atualizar mensagens.
   useEffect(() => {
@@ -242,6 +301,9 @@ export default function DemandasPage() {
   const currentMsgs = currentId ? messages[currentId] || [] : [];
   const currentMembers = currentId ? members[currentId] || [] : [];
   const operators = currentMembers.filter((m) => m.role === 'operator');
+  // Membros CLIENTES (não operadores). Operadores entram com user_id sintético
+  // (operator_id) e user_role='operator' — não devem contar como cliente.
+  const clientMembers = currentMembers.filter((m) => m.role !== 'operator' && m.user_role !== 'operator');
 
   // ── Nova demanda (gate-aware) ──
   async function openNewDemand() {
@@ -269,18 +331,18 @@ export default function DemandasPage() {
     void loadMessages(created.id);
   }
 
-  // ── Finalizar minha parte (operador membro) ──
-  const isOperatorMember = !!me && operators.some((m) => m.user_id === me.id);
-  const alreadyApproved = !!me && operators.some((m) => m.user_id === me.id && m.approved_finish);
+  // ── Finalizar minha parte (apenas membro CLIENTE = o próprio logado) ──
+  // Operadores NÃO aprovam por aqui (têm user_id sintético + user_role='operator').
+  const isClientMember = !!me && clientMembers.some((m) => m.user_id === me.id);
+  const alreadyApproved = !!me && clientMembers.some((m) => m.user_id === me.id && m.approved_finish);
 
   async function doFinalize() {
     if (!currentId || !current) return;
     if (!window.confirm('Confirmar que sua parte está concluída?\n\nA demanda só é fechada quando todos os operadores aprovarem.')) return;
     try {
       const res = await finalizeMyPart(currentId);
-      const mem = await getDemandMembers(currentId);
+      await ensureMembers(currentId, true);
       const updated = await getDemand(currentId);
-      setMembers((prev) => ({ ...prev, [currentId]: mem }));
       if (updated) setDemands((prev) => prev.map((x) => (x.id === currentId ? updated : x)));
       if (res?.status === 'done') toast('Demanda concluída! Todos os operadores aprovaram.', 'success');
       else toast('Sua parte foi marcada como concluída.', 'success');
@@ -292,8 +354,11 @@ export default function DemandasPage() {
   // ── Etapas (timeline) ──
   function renderSteps() {
     if (!current) return null;
-    const approved = operators.filter((m) => m.approved_finish).length;
-    const total = operators.length;
+    const opCount = operators.length; // só p/ "Equipe trabalhando"
+    // Aprovação conta SOMENTE membros clientes — demand_operators não tem coluna
+    // de aprovação (operadores não aprovam). Não entram no denominador.
+    const approved = clientMembers.filter((m) => m.approved_finish).length;
+    const total = clientMembers.length;
     return (
       <div className={styles.steps}>
         <div className={`${styles.step} ${styles.done}`}>
@@ -310,7 +375,7 @@ export default function DemandasPage() {
           <span>
             <span className={styles.stepTitle}>Equipe trabalhando</span>
             <span className={styles.stepWhen}>
-              {total} operador{total === 1 ? '' : 'es'}
+              {opCount} operador{opCount === 1 ? '' : 'es'}
             </span>
           </span>
         </div>
@@ -321,7 +386,7 @@ export default function DemandasPage() {
               Aprovação {approved}/{total}
             </span>
             <span className={styles.stepWhen}>
-              {total === 0 ? 'Sem operadores' : approved === total ? 'Todos aprovaram' : 'Aguardando todos confirmarem'}
+              {total === 0 ? 'Aguardando equipe' : approved === total ? 'Todos aprovaram' : 'Aguardando todos confirmarem'}
             </span>
           </span>
         </div>
@@ -345,9 +410,11 @@ export default function DemandasPage() {
     if (!current) return '';
     if (current.status === 'done') return styles.onTime;
     if (current.ends_at) {
-      const diff = Math.ceil((new Date(current.ends_at).getTime() - Date.now()) / 86400000);
-      if (diff < 0) return styles.late;
-      if (diff <= 3) return styles.dueSoon;
+      const diff = daysUntilDue(current.ends_at);
+      if (diff !== null) {
+        if (diff < 0) return styles.late;
+        if (diff <= 3) return styles.dueSoon;
+      }
     }
     return '';
   }
@@ -465,8 +532,15 @@ export default function DemandasPage() {
                       {d.title || 'Sem título'}
                     </span>
                     <span className={styles.listMeta}>
-                      <span>{categoryOf(members[d.id])}</span>
-                      <span>•</span>
+                      {(() => {
+                        const cat = categoryOf(members[d.id]);
+                        return cat ? (
+                          <>
+                            <span>{cat}</span>
+                            <span>•</span>
+                          </>
+                        ) : null;
+                      })()}
                       <span>{dueLabel(d)}</span>
                     </span>
                   </span>
@@ -577,8 +651,12 @@ export default function DemandasPage() {
             disabled={!current}
             onSend={async ({ content, attachments }) => {
               if (!currentId || !me) return;
-              await postMessage(currentId, content, attachments, me.id, me.client_slug || '');
-              await loadMessages(currentId);
+              const inserted = (await postMessage(currentId, content, attachments, me.id, me.client_slug || '')) as
+                | { id?: string | number }
+                | null;
+              // Append incremental do próprio envio (dedup cobre o eco do realtime).
+              if (inserted?.id != null) await appendMessage(currentId, String(inserted.id));
+              else await loadMessages(currentId);
             }}
           />
         </section>
@@ -697,12 +775,12 @@ export default function DemandasPage() {
                 </div>
               </div>
 
-              {isOperatorMember && current.status !== 'done' && current.status !== 'canceled' && (
+              {isClientMember && current.status !== 'done' && current.status !== 'canceled' && (
                 <div className={styles.detailSection}>
                   <button type="button" className={styles.finalizeBtn} onClick={() => void doFinalize()} disabled={alreadyApproved}>
                     {alreadyApproved ? 'Você já aprovou. Aguardando outros…' : 'Finalizar minha parte'}
                   </button>
-                  <small className={styles.finalizeHint}>A demanda é concluída quando todos os operadores aprovam.</small>
+                  <small className={styles.finalizeHint}>A demanda é concluída quando todos aprovam.</small>
                 </div>
               )}
             </>
@@ -718,6 +796,7 @@ export default function DemandasPage() {
           onClose={() => setRatingFor(null)}
           onSubmitted={async () => {
             const r = await getMyDemandRating(ratingFor);
+            ratingsLoaded.current.add(ratingFor);
             setRatings((prev) => ({ ...prev, [ratingFor]: r }));
             setRatingFor(null);
           }}

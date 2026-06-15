@@ -139,6 +139,28 @@ export async function getStudentServices(slug: string): Promise<ServiceRow[]> {
   return (data ?? []) as ServiceRow[];
 }
 
+/**
+ * Busca serviços de vários alunos em UMA query (.in client_slug) e agrupa por slug.
+ * Usado pela listagem para popular badge de vencimento / contagem antes de abrir o detalhe.
+ */
+export async function getServicesBySlugs(slugs: string[]): Promise<Record<string, ServiceRow[]>> {
+  const out: Record<string, ServiceRow[]> = {};
+  const clean = [...new Set((slugs || []).filter(Boolean))];
+  if (clean.length === 0) return out;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('services')
+    .select('id, service_type, status, metadata, access_until, offer_code, canceled_at, created_at, client_slug')
+    .in('client_slug', clean)
+    .order('service_type', { ascending: true });
+  if (error) throw error;
+  for (const row of (data ?? []) as Array<ServiceRow & { client_slug: string }>) {
+    const slug = row.client_slug;
+    (out[slug] ||= []).push(row);
+  }
+  return out;
+}
+
 export async function getStudentStats(): Promise<StudentStats> {
   const supabase = createClient();
   const [total, paid, partial, overdue, withTeam] = await Promise.all([

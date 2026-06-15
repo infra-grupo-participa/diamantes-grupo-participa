@@ -27,26 +27,45 @@ export default function LoginForm() {
     }
 
     // resolve role p/ redirecionar (RLS permite ler o próprio registro)
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('role, status')
       .eq('auth_user_id', data.user.id)
       .maybeSingle();
 
-    if (profile?.status && profile.status !== 'approved') {
+    if (profileError) {
+      setErro('Não foi possível carregar seu perfil. Tente novamente.');
+      await supabase.auth.signOut();
+      setLoading(false);
+      return;
+    }
+
+    if (!profile) {
+      setErro('Não encontramos seu perfil. Fale com o suporte.');
+      await supabase.auth.signOut();
+      setLoading(false);
+      return;
+    }
+
+    if (profile.status !== 'approved') {
       setErro('Sua conta ainda não foi aprovada.');
       await supabase.auth.signOut();
       setLoading(false);
       return;
     }
 
-    router.replace(profile?.role === 'admin' ? '/admin' : '/portal');
+    router.replace(profile.role === 'admin' ? '/admin' : '/portal');
     router.refresh();
+    setLoading(false);
   }
 
   return (
     <form onSubmit={onSubmit}>
-      {erro && <div className="auth-error">{erro}</div>}
+      {erro && (
+        <div className="auth-error" role="alert" aria-live="assertive">
+          {erro}
+        </div>
+      )}
 
       <div className="field">
         <label htmlFor="email">E-mail</label>

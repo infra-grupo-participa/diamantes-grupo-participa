@@ -103,13 +103,17 @@ export async function POST(req: Request) {
   const amount = Number(pick(data, 'purchase', 'price', 'value') ?? 0) || 0;
   const paymentType = asString(pick(data, 'purchase', 'payment', 'type'));
   const installTotal = Number(pick(data, 'purchase', 'payment', 'installments_number') ?? 1) || 1;
-  const installNum = Number(pick(data, 'purchase', 'subscription', 'subscriber_code') ?? 0) || 0;
+  // Índice da recorrência da assinatura (1ª, 2ª cobrança…). A Hotmart envia em
+  // purchase.recurrence_number; fallback 1 quando ausente (compra avulsa / 1ª cobrança).
+  // NUNCA usar subscriber_code (string identificadora da assinatura) — ele já fica
+  // preservado integralmente em p_raw_payload.
+  const installNum = Number(pick(data, 'purchase', 'recurrence_number') ?? 1) || 1;
   const chargedAtRaw = asString(pick(data, 'purchase', 'approved_date'));
 
   // Hotmart envia datas em epoch ms.
   let chargedAt = 'now()';
   if (chargedAtRaw !== '' && /^\d+$/.test(chargedAtRaw) && Number(chargedAtRaw) > 0) {
-    chargedAt = new Date(Math.floor(Number(chargedAtRaw))).toISOString();
+    chargedAt = new Date(Number(chargedAtRaw)).toISOString();
   } else if (chargedAtRaw !== '') {
     chargedAt = chargedAtRaw;
   }

@@ -1,9 +1,9 @@
 'use client';
 
-// Modal de avaliação cliente → operadores (nota 1-10 + comentário).
+// Modal de avaliação cliente → operadores (nota 1-5 estrelas + comentário).
 // Port do openRatingModal() de portal/demandas.html — RPC submit_client_rating.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { submitClientRating } from '@/lib/api/demandas';
 import { toast } from '@/lib/toast';
 import styles from './Modal.module.css';
@@ -26,8 +26,19 @@ export default function RatingModal({
   const [hover, setHover] = useState(0);
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const shown = hover || score;
+
+  // a11y: fecha no Esc e foca o modal ao abrir.
+  useEffect(() => {
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose, busy]);
 
   async function submit() {
     if (score < 1) return;
@@ -44,7 +55,7 @@ export default function RatingModal({
 
   return (
     <div className={styles.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`${styles.dialog} ${styles.narrow}`}>
+      <div className={`${styles.dialog} ${styles.narrow}`} role="dialog" aria-modal="true" aria-label="Avalie essa entrega" tabIndex={-1} ref={dialogRef}>
         <div className={styles.head}>
           <div>
             <h3>Avalie essa entrega</h3>

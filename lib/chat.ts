@@ -81,6 +81,39 @@ export async function listMessages(demandId: string): Promise<ChatMessage[]> {
   });
 }
 
+/** Busca UMA mensagem por id (com autor + anexos hidratados). Usada no append
+ *  incremental do realtime, evitando re-hidratar signed URLs de todas. */
+export async function getMessage(messageId: string): Promise<ChatMessage | null> {
+  const supabase = createClient();
+  const { data: m, error } = await supabase
+    .from('demand_messages')
+    .select('id, user_id, content, attachments, origin, created_at')
+    .eq('id', messageId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!m) return null;
+
+  let author: { name?: string; role?: string; metadata?: { avatar_url?: string } } = {};
+  if (m.user_id) {
+    const { data: u, error: uErr } = await supabase
+      .from('users')
+      .select('name, role, metadata')
+      .eq('id', m.user_id)
+      .maybeSingle();
+    if (uErr) console.error('getMessage: falha ao carregar autor', uErr);
+    author = u || {};
+  }
+
+  const atts = Array.isArray(m.attachments) ? (m.attachments as Attachment[]) : [];
+  return {
+    ...m,
+    attachments: atts.length ? await hydrateAttachments(atts) : [],
+    author_name: author.name || null,
+    author_role: author.role || null,
+    avatar_url: author.metadata?.avatar_url || null,
+  } as ChatMessage;
+}
+
 /**
  * Insere mensagem em demand_messages. A sincronização do comentário para o
  * ClickUp é feita NO BANCO (trigger messages_clickup_sync → Edge Function
