@@ -52,6 +52,9 @@
   box-shadow: var(--bf-shadow-sm);
   color: var(--bf-text);
   font-size: 14px;
+  /* Painel de altura de viewport: a barra escura fica fixa e o conteúdo rola
+     por dentro (.main). Em telas curtas, encolhe pro conteúdo (não força altura). */
+  max-height: calc(100dvh - 120px);
 }
 
 .wrap button {
@@ -64,11 +67,20 @@
   background: var(--bf-sidebar-bg);
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 0;
-  align-self: start;
-  max-height: 100vh;
+  min-height: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+.sidebar::-webkit-scrollbar {
+  width: 8px;
+}
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+}
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
 }
 .sidebarHeader {
   padding: 20px 20px 18px;
@@ -202,6 +214,21 @@
   padding: 32px 40px 100px;
   background: var(--bf-bg);
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--bf-border-strong) transparent;
+}
+.main::-webkit-scrollbar {
+  width: 10px;
+}
+.main::-webkit-scrollbar-thumb {
+  background: var(--bf-border-strong);
+  border-radius: 8px;
+  border: 2px solid var(--bf-bg);
+}
+.main::-webkit-scrollbar-track {
+  background: transparent;
 }
 .pageHeader {
   margin-bottom: 26px;
@@ -809,6 +836,7 @@
 @media (max-width: 860px) {
   .wrap {
     grid-template-columns: 1fr;
+    max-height: none;
   }
   .sidebar {
     display: none;
@@ -820,6 +848,7 @@
   }
   .main {
     padding: 18px 16px 96px;
+    overflow: visible;
   }
   .pageHeader {
     margin-bottom: 20px;
