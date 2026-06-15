@@ -1,10 +1,12 @@
-// send-email v1 — e-mails transacionais do portal (Resend).
+// send-email v2 — e-mails transacionais do portal (Resend).
 // Disparada por triggers pg_net:
 //   • portal._notify_demanda_criada  → { type:'demanda_criada', demand_id }
-//   • portal._notify_nova_mensagem   → { type:'nova_mensagem',  message_id }
+//   • portal._notify_projeto_criado  → { type:'projeto_criado', project_id }
+// (Nova mensagem NÃO dispara e-mail: o ClickUp já notifica. Reset de senha é via
+//  SMTP do Supabase Auth.)
 //
 // Provider-agnóstico: a troca de provedor mexe só em sendViaProvider() + no
-// secret do Vault. Throttle/dedup vivem em portal.email_log.
+// secret do Vault. Dedup "uma vez só" via portal.email_log (dedup_key).
 //
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
@@ -17,8 +19,6 @@ const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 // Remetente — domínio a verificar no Resend (DNS SPF/DKIM).
 const FROM       = "Diamantes <nao-responder@diamantes.grupoparticipa.app.br>";
 const PORTAL_URL = "https://diamantes.grupoparticipa.app.br";
-// Cooldown do digest de chat: no máx. 1 e-mail por demanda/destinatário a cada N min.
-const CHAT_COOLDOWN_MIN = 30;
 
 // ── Branding (alinhado a app/globals.css) ───────────────────────────
 const C = {
@@ -59,15 +59,6 @@ function baseLayout(opts: { title: string; intro: string; bodyHtml: string; ctaL
   </table>
   <div style="max-width:560px;margin-top:16px;font-size:11px;color:${C.muted};font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">© Grupo Participa · Programa Diamantes</div>
 </td></tr></table></body></html>`;
-}
-
-function quoteBox(author: string, text: string): string {
-  const preview = text.length > 320 ? text.slice(0, 320) + "…" : text;
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
-    <tr><td style="background:${C.bg};border:1px solid ${C.border};border-left:3px solid ${C.accent};border-radius:10px;padding:14px 16px;">
-      <div style="font-size:13px;font-weight:700;color:${C.text};margin-bottom:4px;">${esc(author)}</div>
-      <div style="font-size:14px;line-height:1.55;color:${C.text};white-space:pre-wrap;">${esc(preview)}</div>
-    </td></tr></table>`;
 }
 
 // ── Secrets / provider ──────────────────────────────────────────────
@@ -146,51 +137,33 @@ async function handleDemandaCriada(supabase: any, apiKey: string, demand_id: str
   return res.ok ? { sent: to.email } : { failed: res.error };
 }
 
-async function handleNovaMensagem(supabase: any, apiKey: string, message_id: string) {
-  const { data: msg } = await supabase.schema("portal")
-    .from("demand_messages").select("id, demand_id, user_id, content, origin").eq("id", message_id).maybeSingle();
-  if (!msg) return { skipped: "unknown_message" };
+async function handleProjetoCriado(supabase: any, apiKey: string, project_id: string) {
+  const { data: project } = await supabase.schema("portal")
+    .from("projects").select("id, title, client_slug, created_by").eq("id", project_id).maybeSingle();
+  if (!project) return { skipped: "unknown_project" };
 
-  // Autor: se for o próprio cliente, não notificamos o cliente.
-  const { data: author } = await supabase.schema("portal")
-    .from("users").select("name, role").eq("id", msg.user_id).maybeSingle();
-  const authorIsClient = author?.role === "user";
-  if (authorIsClient && msg.origin !== "clickup") return { skipped: "author_is_client" };
+  const dedupKey = `projeto_criado:${project_id}`;
+  const { data: dup } = await supabase.schema("portal").from("email_log")
+    .select("id").eq("dedup_key", dedupKey).eq("status", "sent").limit(1).maybeSingle();
+  if (dup) return { skipped: "already_sent" };
 
-  const { data: demand } = await supabase.schema("portal")
-    .from("demands").select("id, title, client_slug, created_by").eq("id", msg.demand_id).maybeSingle();
-  if (!demand) return { skipped: "unknown_demand" };
-
-  const to = await resolveClientRecipient(supabase, demand);
+  const to = await resolveClientRecipient(supabase, project);
   if (!to) return { skipped: "no_recipient" };
 
-  // Throttle: cooldown por (demanda, destinatário).
-  const since = new Date(Date.now() - CHAT_COOLDOWN_MIN * 60_000).toISOString();
-  const { data: recent } = await supabase.schema("portal").from("email_log")
-    .select("id").eq("type", "nova_mensagem").eq("ref_id", msg.demand_id)
-    .eq("to_email", to.email).eq("status", "sent").gt("created_at", since).limit(1).maybeSingle();
-  if (recent) {
-    await logEmail(supabase, {
-      type: "nova_mensagem", to_email: to.email, subject: `Nova mensagem: ${demand.title}`,
-      ref_type: "demand", ref_id: msg.demand_id, status: "skipped", error: "cooldown",
-    });
-    return { skipped: "cooldown" };
-  }
-
-  const authorName = author?.name || "Equipe Diamantes";
-  const subject = `Nova mensagem na demanda: ${demand.title}`;
+  const title = project.title || "Novo projeto";
+  const subject = `Projeto criado: ${title}`;
   const html = baseLayout({
-    title: "Você tem uma nova mensagem 💬",
-    intro: `<strong>${esc(authorName)}</strong> respondeu na sua demanda <strong>${esc(demand.title)}</strong>:`,
-    bodyHtml: quoteBox(authorName, msg.content || ""),
-    ctaLabel: "Responder no portal",
-    ctaHref: `${PORTAL_URL}/portal/demandas`,
+    title: "Seu projeto foi criado 🎯",
+    intro: `Olá${to.name ? " " + esc(to.name.split(" ")[0]) : ""}, criamos o projeto <strong>${esc(title)}</strong>. O próximo passo é preencher o briefing para a equipe começar a trabalhar.`,
+    bodyHtml: "",
+    ctaLabel: "Preencher briefing",
+    ctaHref: `${PORTAL_URL}/portal/briefing/${project.id}`,
   });
 
   const res = await sendViaProvider(apiKey, to.email, subject, html);
   await logEmail(supabase, {
-    type: "nova_mensagem", to_email: to.email, subject,
-    ref_type: "demand", ref_id: msg.demand_id, dedup_key: null,
+    type: "projeto_criado", to_email: to.email, subject,
+    ref_type: "project", ref_id: project_id, dedup_key: res.ok ? dedupKey : null,
     status: res.ok ? "sent" : "failed", resend_id: res.id || null, error: res.error || null,
   });
   return res.ok ? { sent: to.email } : { failed: res.error };
@@ -198,7 +171,7 @@ async function handleNovaMensagem(supabase: any, apiKey: string, message_id: str
 
 Deno.serve(async (req: Request) => {
   let body: any = {}; try { body = await req.json(); } catch (_) { body = {}; }
-  const { type, demand_id, message_id, to, subject, html } = body;
+  const { type, demand_id, project_id, to, subject, html } = body;
 
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -224,9 +197,9 @@ Deno.serve(async (req: Request) => {
         if (!demand_id) return new Response(JSON.stringify({ error: "demand_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
         result = await handleDemandaCriada(supabase, apiKey, demand_id);
         break;
-      case "nova_mensagem":
-        if (!message_id) return new Response(JSON.stringify({ error: "message_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        result = await handleNovaMensagem(supabase, apiKey, message_id);
+      case "projeto_criado":
+        if (!project_id) return new Response(JSON.stringify({ error: "project_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        result = await handleProjetoCriado(supabase, apiKey, project_id);
         break;
       case "custom": {
         // Teste/manual: { type:'custom', to, subject, html }
