@@ -72,7 +72,7 @@
     height: 100%;
     z-index: 220;
     border-radius: 18px 0 0 18px;
-    box-shadow: -12px 0 40px rgba(26, 20, 48, 0.22);
+    box-shadow: var(--shadow-lg);
     animation: detailIn 0.2s ease;
     padding-top: 8px;
   }
@@ -162,7 +162,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 6px 20px rgba(26, 20, 48, 0.05);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 200px);
@@ -203,7 +203,7 @@
 .filterTabs button.active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: 0 2px 8px rgba(26, 20, 48, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 .filterTabs button.urgent.active {
   background: var(--accent-soft);
@@ -253,7 +253,7 @@
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
-  background: #fff;
+  background: var(--surface-input);
 }
 
 .listScroll {
@@ -533,7 +533,7 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: 0 1px 2px rgba(26, 20, 48, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 .msg.mine .msgBubble {
   background: var(--accent-soft);

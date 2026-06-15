@@ -10,7 +10,7 @@
   backdrop-filter: blur(3px);
 }
 .dialog {
-  background: #fff;
+  background: var(--surface-raised);
   border-radius: 18px;
   width: 100%;
   max-width: 560px;
@@ -83,7 +83,7 @@
   border-radius: 12px;
   font-size: 0.92rem;
   font-family: inherit;
-  background: #fff;
+  background: var(--surface-input);
   color: var(--text);
 }
 .input:focus,
@@ -134,7 +134,7 @@
   padding: 16px 14px;
   cursor: pointer;
   text-align: left;
-  background: #fff;
+  background: var(--surface-raised);
   transition: border-color 0.12s, background 0.12s;
 }
 .modeCard:hover {
@@ -169,7 +169,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   padding: 8px;
-  background: #fafbfc;
+  background: var(--surface-sunken);
 }
 .opRow {
   display: flex;
@@ -248,7 +248,7 @@
   height: 36px;
   border-radius: 10px;
   border: 1px solid var(--border-strong);
-  background: #fff;
+  background: var(--surface-input);
   font-weight: 700;
   cursor: pointer;
   font-size: 0.86rem;
@@ -282,7 +282,7 @@
   font-weight: 600;
   font-family: inherit;
   border: 1.5px solid var(--border-strong);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
 }
@@ -321,7 +321,7 @@
   .actions {
     position: sticky;
     bottom: 0;
-    background: #fff;
+    background: var(--surface-raised);
     margin: 0 -18px -18px;
     padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);

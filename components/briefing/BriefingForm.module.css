@@ -2,12 +2,27 @@
    Porte fiel de portal/assets/briefing.css, escopado em CSS Module.
    Renderiza dentro do <main> do shell do portal (não cria layout de página). */
 
+/* Dark: sobrescreve a paleta quente local (claro permanece idêntico) */
+:global([data-theme='dark']) .wrap {
+  --bf-accent-soft: rgba(242, 151, 37, 0.16);
+  --bf-bg: #15131f;
+  --bf-border: #2c2842;
+  --bf-border-strong: #3a3556;
+  --bf-text: #ece9f5;
+  --bf-text-2: #b8b2c8;
+  --bf-text-3: #8a8399;
+  --bf-red-soft: rgba(220, 38, 38, 0.16);
+  --bf-yellow-soft: rgba(217, 119, 6, 0.16);
+  --bf-green-soft: rgba(22, 163, 74, 0.16);
+  --bf-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
 .wrap {
   --bf-accent: #f29725;
   --bf-accent-soft: #fff7ec;
   --bf-accent-dark: #c97a10;
   --bf-bg: #f7f5f2;
-  --bf-surface: #ffffff;
+  --bf-surface: var(--surface-raised);
   --bf-border: #eae4db;
   --bf-border-strong: #ded6ca;
   --bf-text: #1a1410;
@@ -685,7 +700,7 @@
 /* ── Skeleton de carregamento ────────────────────────────── */
 .skel {
   --bf-bg: #f7f5f2;
-  --bf-surface: #ffffff;
+  --bf-surface: var(--surface-raised);
   --bf-border: #eae4db;
   --bf-sidebar-bg: #18181b;
   --bf-radius-md: 10px;

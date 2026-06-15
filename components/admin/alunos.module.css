@@ -102,7 +102,7 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(26, 20, 48, 0.04);
+  box-shadow: var(--shadow-sm);
 }
 .tableHead {
   padding: 20px 24px 14px;
@@ -711,7 +711,7 @@
   padding: 20px;
 }
 .modalCard {
-  background: #fff;
+  background: var(--surface-raised);
   border-radius: 16px;
   width: 100%;
   max-width: 480px;
@@ -810,7 +810,7 @@
 }
 .credCopy {
   border: 1.5px solid var(--border-strong);
-  background: #fff;
+  background: var(--surface-raised);
   border-radius: 8px;
   padding: 0 12px;
   cursor: pointer;

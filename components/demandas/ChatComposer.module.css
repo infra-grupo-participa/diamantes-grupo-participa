@@ -26,7 +26,7 @@
   width: 30px;
   height: 30px;
   border-radius: 6px;
-  background: #fff center/cover no-repeat;
+  background: var(--surface-input) center/cover no-repeat;
   display: grid;
   place-items: center;
   color: var(--muted);
@@ -65,7 +65,7 @@
   border-radius: 4px;
 }
 .removeBtn:hover {
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--danger);
 }
 .removeBtn svg {
@@ -96,7 +96,7 @@
 .wrap:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
-  background: #fff;
+  background: var(--surface-input);
 }
 .dragover {
   outline: 2px dashed var(--accent);
