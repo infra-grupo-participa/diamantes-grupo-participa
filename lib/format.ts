@@ -1,6 +1,6 @@
 // Helpers de formatação/serviço portados do legado (dashboard.html, admin/*).
 
-import { getUserTimezone, getUserLocale, DEFAULT_TIMEZONE, DEFAULT_LOCALE } from '@/lib/theme';
+import { getUserTimezone, getUserLocale, DEFAULT_TIMEZONE, DEFAULT_LOCALE } from '@/lib/prefs';
 
 // Fuso/idioma efetivos: lê a preferência do usuário (localStorage, setada no
 // login/perfil via PrefsProvider). Default São Paulo / pt-BR — retrocompatível.

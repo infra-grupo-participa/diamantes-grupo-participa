@@ -17,90 +17,32 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import {
+  THEME_KEY,
+  DEFAULT_TIMEZONE,
+  DEFAULT_LOCALE,
+  getUserTimezone,
+  getUserLocale,
+  persistTimezone,
+  persistLocale,
+  resolveTheme,
+  applyTheme,
+  readStoredTheme,
+  type ThemePref,
+  type ResolvedTheme,
+} from '@/lib/prefs';
 
-export type ThemePref = 'light' | 'dark' | 'auto';
-export type ResolvedTheme = 'light' | 'dark';
-
-export const THEME_KEY = 'diamantes.theme';
-export const TZ_KEY = 'diamantes.timezone';
-export const LOCALE_KEY = 'diamantes.locale';
-
-export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
-export const DEFAULT_LOCALE = 'pt-BR';
-
-// ─────────────────────────────────────────────────────────────
-// Helpers globais (legíveis fora do React — ex.: lib/format.ts)
-// Mantêm um espelho em memória + localStorage. SSR-safe.
-// ─────────────────────────────────────────────────────────────
-
-let memTimezone = DEFAULT_TIMEZONE;
-let memLocale = DEFAULT_LOCALE;
-
-export function getUserTimezone(): string {
-  if (typeof window === 'undefined') return memTimezone;
-  try {
-    return window.localStorage.getItem(TZ_KEY) || memTimezone;
-  } catch {
-    return memTimezone;
-  }
-}
-
-export function getUserLocale(): string {
-  if (typeof window === 'undefined') return memLocale;
-  try {
-    return window.localStorage.getItem(LOCALE_KEY) || memLocale;
-  } catch {
-    return memLocale;
-  }
-}
-
-function persistTimezone(tz: string) {
-  memTimezone = tz || DEFAULT_TIMEZONE;
-  try {
-    window.localStorage.setItem(TZ_KEY, memTimezone);
-  } catch {
-    /* ignore */
-  }
-}
-
-function persistLocale(locale: string) {
-  memLocale = locale || DEFAULT_LOCALE;
-  try {
-    window.localStorage.setItem(LOCALE_KEY, memLocale);
-  } catch {
-    /* ignore */
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Resolução de tema
-// ─────────────────────────────────────────────────────────────
-
-function systemPrefersDark(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
-function resolveTheme(pref: ThemePref): ResolvedTheme {
-  if (pref === 'auto') return systemPrefersDark() ? 'dark' : 'light';
-  return pref;
-}
-
-function applyTheme(resolved: ResolvedTheme) {
-  if (typeof document === 'undefined') return;
-  document.documentElement.setAttribute('data-theme', resolved);
-}
-
-function readStoredTheme(): ThemePref {
-  if (typeof window === 'undefined') return 'light';
-  try {
-    const v = window.localStorage.getItem(THEME_KEY);
-    if (v === 'light' || v === 'dark' || v === 'auto') return v;
-  } catch {
-    /* ignore */
-  }
-  return 'light';
-}
+// Re-exporta os helpers/constantes (compat com importadores antigos de '@/lib/theme').
+export {
+  THEME_KEY,
+  TZ_KEY,
+  LOCALE_KEY,
+  DEFAULT_TIMEZONE,
+  DEFAULT_LOCALE,
+  getUserTimezone,
+  getUserLocale,
+} from '@/lib/prefs';
+export type { ThemePref, ResolvedTheme } from '@/lib/prefs';
 
 // ─────────────────────────────────────────────────────────────
 // Contexto
@@ -134,8 +76,8 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
 
     const tz = getUserTimezone();
     const loc = getUserLocale();
-    memTimezone = tz;
-    memLocale = loc;
+    persistTimezone(tz);
+    persistLocale(loc);
     setTimezoneState(tz);
     setLocaleState(loc);
   }, []);
