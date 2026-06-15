@@ -43,7 +43,7 @@ const STATUS_LABELS: Record<string, { label: string; cls: string }> = {
 
 // Progresso do evento: campos red do bloco geral + seções "project" red dos serviços.
 function calcProgress(project: ProjectRow): number {
-  const services = project.services ?? [];
+  const services = Array.isArray(project.services) ? project.services : [];
   const briefing = project.briefing ?? {};
   let total = getGeneralFields().filter((f) => f.priority === 'red').length;
   services.forEach((svc) => {
