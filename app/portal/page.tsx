@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getDashboard, isBaseReady, type DashboardData } from '@/lib/api/portal';
+import { getDashboard, isBaseReady, getPendingProjectBriefing, type DashboardData } from '@/lib/api/portal';
 import { firstName, fmtRelative, initials, serviceMeta } from '@/lib/format';
 
 export const metadata = { title: 'Início — Portal Diamantes' };
@@ -44,6 +44,7 @@ export default async function Dashboard() {
   }
 
   const baseReady = await isBaseReady();
+  const pending = baseReady ? await getPendingProjectBriefing().catch(() => null) : null;
   const name = data.user?.name ?? '';
   const team = data.team ?? [];
   const services = data.services ?? [];
@@ -61,6 +62,30 @@ export default async function Dashboard() {
           </div>
           <Link className="btn-primary" href="/portal/briefing-basico">
             Preencher agora →
+          </Link>
+        </div>
+      )}
+
+      {pending && (
+        <div className="resume-banner">
+          <div className="resume-banner-main">
+            <span className="resume-eyebrow">⏳ Briefing em andamento</span>
+            <strong>Continue de onde parou: {pending.title}</strong>
+            <span className="resume-sub">
+              {pending.progress}% preenchido — termine o briefing para a equipe começar a trabalhar.
+            </span>
+            <div
+              className="resume-progress"
+              role="progressbar"
+              aria-valuenow={pending.progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div className="resume-progress-fill" style={{ width: `${pending.progress}%` }} />
+            </div>
+          </div>
+          <Link className="btn-primary" href={`/portal/briefing/${pending.id}`}>
+            Continuar briefing →
           </Link>
         </div>
       )}
