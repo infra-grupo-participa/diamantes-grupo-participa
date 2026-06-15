@@ -69,6 +69,13 @@
   --surface-sunken: #fafbfc;
   /* Brilho do shimmer dos skeletons (claro forte; sutil no dark) */
   --skeleton-shimmer: rgba(255, 255, 255, 0.55);
+
+  /* Status "soft" (fundo de badge/chip/linha) + "strong" (texto/ícone do status) */
+  --success-soft: #e7f7ee;  --success-strong: #15803d;
+  --warning-soft: #fff4d6;  --warning-strong: #b45309;
+  --danger-soft:  #fee2e2;  --danger-strong:  #dc2626;
+  --info-soft:    #dbeafe;  --info-strong:    #2563eb;
+  --neutral-soft: #f1f5f9;  --neutral-strong: #64748b;
   /* Tinta do banner de plano (assinatura) */
   --plan-tint: linear-gradient(135deg, #fff7ea 0%, #fff 60%);
   /* Sombra colorida do avatar */
@@ -113,6 +120,12 @@
   --surface-raised: #221e38;
   --surface-sunken: #15122a;
   --skeleton-shimmer: rgba(255, 255, 255, 0.06);
+
+  --success-soft: rgba(52, 211, 153, 0.15);  --success-strong: #4ade80;
+  --warning-soft: rgba(251, 191, 36, 0.15);  --warning-strong: #fcd34d;
+  --danger-soft:  rgba(248, 113, 113, 0.15); --danger-strong:  #fca5a5;
+  --info-soft:    rgba(96, 165, 250, 0.15);  --info-strong:    #93c5fd;
+  --neutral-soft: rgba(255, 255, 255, 0.08); --neutral-strong: #a39db8;
   --plan-tint: linear-gradient(135deg, #2a2238 0%, var(--surface) 60%);
   --avatar-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
 }

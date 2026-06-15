@@ -150,19 +150,19 @@
   border-color: rgba(242, 151, 37, 0.22);
 }
 .badgeActive {
-  background: rgba(22, 163, 74, 0.1);
-  color: #15803d;
-  border-color: rgba(22, 163, 74, 0.18);
+  background: var(--success-soft);
+  color: var(--success-strong);
+  border-color: var(--success-soft);
 }
 .badgeCompleted {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-  border-color: rgba(59, 130, 246, 0.18);
+  background: var(--info-soft);
+  color: var(--info-strong);
+  border-color: var(--info-soft);
 }
 .badgeCancelled {
-  background: #f1f5f9;
-  color: #64748b;
-  border-color: #e2e8f0;
+  background: var(--neutral-soft);
+  color: var(--neutral-strong);
+  border-color: var(--neutral-soft);
 }
 
 .right {
@@ -207,12 +207,12 @@
   white-space: nowrap;
 }
 .pillDraft {
-  background: #fff3e0;
-  color: #bf360c;
+  background: var(--warning-soft);
+  color: var(--warning-strong);
 }
 .pillSubmitted {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--success-soft);
+  color: var(--success-strong);
 }
 
 .empty {

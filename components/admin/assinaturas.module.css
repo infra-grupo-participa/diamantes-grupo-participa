@@ -202,10 +202,10 @@
   background: var(--table-row-hover);
 }
 .rowOverdue {
-  background: #fff5f5;
+  background: var(--danger-soft);
 }
 .rowOverdue:hover {
-  background: #fee2e2;
+  background: var(--danger-soft);
 }
 .rowOverdue td:first-child {
   border-left: 3px solid var(--danger);
@@ -305,10 +305,10 @@
   background: currentColor;
   flex-shrink: 0;
 }
-.badgeGreen { background: rgba(22, 163, 74, 0.1); color: #15803d; border-color: rgba(22, 163, 74, 0.18); }
+.badgeGreen { background: var(--success-soft); color: var(--success-strong); border-color: var(--success-soft); }
 .badgeYellow { background: rgba(242, 151, 37, 0.12); color: var(--accent-strong); border-color: rgba(242, 151, 37, 0.22); }
-.badgeRed { background: rgba(239, 68, 68, 0.1); color: #dc2626; border-color: rgba(239, 68, 68, 0.18); }
-.badgeGray { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+.badgeRed { background: var(--danger-soft); color: var(--danger-strong); border-color: var(--danger-soft); }
+.badgeGray { background: var(--neutral-soft); color: var(--neutral-strong); border-color: var(--neutral-soft); }
 
 .rowActions {
   justify-content: flex-end;
@@ -505,10 +505,10 @@
   border-radius: 999px;
 }
 .serviceBarFill.purple { background: #8b5cf6; }
-.serviceBarFill.blue { background: #3b82f6; }
-.serviceBarFill.green { background: #16a34a; }
+.serviceBarFill.blue { background: var(--info); }
+.serviceBarFill.green { background: var(--success); }
 .serviceBarFill.pink { background: #ec4899; }
-.serviceBarFill.yellow { background: #eab308; }
+.serviceBarFill.yellow { background: var(--warning); }
 .serviceBarFill.orange { background: var(--accent); }
 
 .scrollBox {

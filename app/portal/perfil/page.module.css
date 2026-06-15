@@ -134,11 +134,11 @@
   cursor: not-allowed;
 }
 .btnGhostDanger {
-  color: var(--danger);
-  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--danger-strong);
+  border-color: var(--danger-soft);
 }
 .btnGhostDanger:hover {
-  background: rgba(239, 68, 68, 0.06);
+  background: var(--danger-soft);
 }
 
 /* ── Forms ── */
@@ -253,8 +253,8 @@
   place-items: center;
 }
 .icoDanger {
-  background: rgba(239, 68, 68, 0.14);
-  color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger-strong);
 }
 .ico svg {
   width: 18px;
