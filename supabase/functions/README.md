@@ -49,6 +49,31 @@ uma task de briefing com upload de arquivo. Candidata a virar Edge Function no f
 Enquanto isso, **`CLICKUP_TOKEN` precisa estar setado no Node App da Hostinger** só por
 causa dessa rota.
 
+## E-mails transacionais (Resend) — `send-email`
+Mesmo padrão (trigger → pg_net → Edge Function → API externa), agora para **e-mail**.
+
+- **`send-email`** — recebe `{ type, ... }`, monta o HTML estilizado (cores da marca,
+  `app/globals.css`) e envia via **Resend**. É **provider-agnóstico**: trocar de provedor
+  mexe só em `sendViaProvider()` + no secret. `verify_jwt=false` (auth por `x-internal-key`).
+  - `type:'demanda_criada'` (`demand_id`) → confirmação ao cliente. Dedup *uma vez só* por
+    `dedup_key = demanda_criada:<id>`.
+  - `type:'nova_mensagem'` (`message_id`) → avisa o cliente quando operador/admin/ClickUp
+    responde. Pula se o autor é o próprio cliente. **Throttle/digest:** no máx. 1 e-mail por
+    (demanda, destinatário) a cada `CHAT_COOLDOWN_MIN` (30 min) — controla a cota.
+  - `type:'custom'` (`to,subject,html`) → envio manual/teste.
+- **Triggers:** `demands_email_notify` em `portal.demands` (`_notify_demanda_criada`) e
+  `messages_email_notify` em `portal.demand_messages` (`_notify_nova_mensagem`).
+- **Auditoria/dedup:** tabela `portal.email_log` (status `sent|failed|skipped`, `resend_id`,
+  `dedup_key`, `ref_type/ref_id`). RLS: SELECT só admin.
+- **Secret:** `resend_api_key` no Vault (whitelist em `portal.get_internal_secret`).
+- **Remetente:** `nao-responder@diamantes.grupoparticipa.app.br` (domínio verificado no Resend).
+
+### Reset de senha seguro (Supabase Auth)
+O reset agora usa **link por e-mail** (`auth.resetPasswordForEmail` → `/auth/callback`
+troca o `code` por sessão → `/reset-password/update`). A rota insegura `app/api/reset-password`
+foi removida. **Requer SMTP custom (Resend) no Supabase Auth** para o envio do link —
+ver instruções no painel (Authentication → SMTP) e o redirect `…/auth/callback` na allowlist.
+
 ## Outras Edge Functions ativas (não versionadas aqui)
 `digisac-webhook`, `admin-digisac-lookup` (integração Digisac/WhatsApp),
 `cron-expirar-sessoes`, `cron-expirar-avaliacoes` (crons). Exportar quando for mexer.
