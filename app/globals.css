@@ -207,8 +207,10 @@ a {
 }
 
 .auth-hero h1 {
-  font-size: 2rem;
-  line-height: 1.15;
+  font-size: 2.15rem;
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
   margin: 18px 0 12px;
 }
 
@@ -239,7 +241,9 @@ a {
 
 .auth-panel h2 {
   margin: 0 0 4px;
-  font-size: 1.5rem;
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .auth-panel .sub {
@@ -304,13 +308,158 @@ a {
 }
 
 .auth-error {
-  background: rgba(239, 68, 68, 0.08);
-  color: var(--danger);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  border-radius: 10px;
-  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, transparent);
+  border-radius: 12px;
+  padding: 11px 14px;
   font-size: 0.85rem;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+}
+.auth-error svg {
+  flex-shrink: 0;
+}
+
+/* Marca no topo do painel direito */
+.auth-panel-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  margin-bottom: 16px;
+}
+
+/* Inputs com ícone à esquerda + toggle de senha à direita */
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.input-wrap .input-ico {
+  position: absolute;
+  left: 14px;
+  display: inline-flex;
+  color: var(--muted);
+  pointer-events: none;
+}
+.input-wrap input {
+  width: 100%;
+  padding-left: 42px;
+}
+.input-wrap input.has-toggle {
+  padding-right: 46px;
+}
+.input-toggle {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.input-toggle:hover {
+  color: var(--text);
+  background: var(--hero-tint);
+}
+.input-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Botão do painel de auth: largura cheia + ícone centralizado */
+.auth-panel .btn-primary {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: var(--shadow-cta);
+}
+
+/* Divisor "ou" */
+.auth-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 12px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.auth-or::before,
+.auth-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.auth-forgot {
+  text-align: center;
+  font-size: 0.88rem;
+  margin: 0;
+}
+.auth-forgot a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-forgot a:hover {
+  text-decoration: underline;
+}
+
+/* Hero — decorações (diamantes/sparkle) e rodapé */
+.auth-hero-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.auth-hero > :not(.auth-hero-deco) {
+  position: relative;
+  z-index: 1;
+}
+.auth-hero-mid {
+  margin: 6px 0;
+}
+.auth-hero-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-hero-rule {
+  width: 44px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.auth-hero-tag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  opacity: 0.96;
+  max-width: 32ch;
+}
+.auth-hero-tag svg {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+.auth-hero-copy {
+  font-size: 0.78rem;
+  opacity: 0.72;
 }
 
 /* ── Brand ──────────────────────────────────────────────────── */
