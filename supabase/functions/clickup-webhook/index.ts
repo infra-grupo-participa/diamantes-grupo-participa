@@ -104,13 +104,16 @@ async function handleCommentEvent(supabase: any, apiKey: string, payload: any, d
   for (const c of comments) {
     const cid = String(c.id);
     if (existing.has(cid)) continue;
-    const author = await findUserForClickUpUser(supabase, c.user || userMeta);
-    if (!author) continue; // ignora comentários de usuários sem vínculo no portal
     const text = stripBotPrefix(c.comment_text || c.comment || "");
     if (!text.trim()) continue;
+    const cuUser = c.user || userMeta || {};
+    const author = await findUserForClickUpUser(supabase, cuUser);
+    // Autores sem vínculo de operador (pessoas de fora da equipe respondendo na task)
+    // entram com user_id null + o nome de exibição vindo do ClickUp (clickup_author).
     toInsert.push({
       demand_id: demand.id,
-      user_id: author.id,
+      user_id: author?.id ?? null,
+      clickup_author: author ? null : (cuUser.username || cuUser.email || "Equipe"),
       content: text.trim(),
       origin: "clickup",
       clickup_comment_id: cid,
