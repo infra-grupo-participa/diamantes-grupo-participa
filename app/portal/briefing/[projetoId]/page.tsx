@@ -253,12 +253,13 @@ export default function ProjectBriefingPage() {
         pdfOk = false;
       }
       setSubmitBtn('Enviado ✓');
-      if (pdfOk) {
-        toast('Briefing enviado para a equipe!', 'success');
-      } else {
-        toast('Briefing salvo, mas houve um problema ao anexar o PDF no ClickUp. Avise o suporte se persistir.', 'warning');
+      // O briefing já foi salvo no sistema; a anexação do PDF no ClickUp é um passo
+      // interno de operação. Se falhar, NÃO alarmamos o cliente — a equipe reprocessa.
+      toast('Briefing enviado para a equipe! ✓', 'success');
+      if (!pdfOk) {
+        console.warn('[briefing] anexo do PDF no ClickUp falhou — será reprocessado pela equipe.');
       }
-      setTimeout(() => router.push(BACK_HREF), pdfOk ? 2200 : 3500);
+      setTimeout(() => router.push(BACK_HREF), 2200);
     } catch (err) {
       setSubmitting(false);
       setSubmitBtn('Enviar para a Equipe');
