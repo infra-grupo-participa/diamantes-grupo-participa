@@ -363,21 +363,33 @@ export default function DemandasPage() {
   }, [messages, currentId]);
 
   // ── Derivados ──
+  // Não-lida = última mensagem é da EQUIPE e mais nova que a última vez que o cliente viu.
+  const isUnread = useCallback(
+    (d: Demand) =>
+      d.id !== currentId &&
+      d.last_message_from === 'team' &&
+      !!d.last_message_at &&
+      (!readMap[d.id] || (d.last_message_at as string) > readMap[d.id]),
+    [currentId, readMap],
+  );
+  // "Precisam de você" = mensagem nova não-lida OU aguardando sua aprovação (review).
+  const needsYou = useCallback((d: Demand) => isUnread(d) || d.status === 'review', [isUnread]);
+
   const counts = useMemo(
     () => ({
       all: demands.length,
       in_progress: demands.filter((d) => d.status === 'open' || d.status === 'in_progress' || d.status === 'review').length,
-      awaiting: demands.filter((d) => d.status === 'review').length,
+      awaiting: demands.filter((d) => needsYou(d)).length,
       done: demands.filter((d) => d.status === 'done').length,
     }),
-    [demands],
+    [demands, needsYou],
   );
 
   const filtered = useMemo(() => {
     let items = demands;
     if (projectFilter) items = items.filter((d) => d.project_id === projectFilter);
     if (filter === 'in_progress') items = items.filter((d) => d.status === 'open' || d.status === 'in_progress' || d.status === 'review');
-    else if (filter === 'awaiting') items = items.filter((d) => d.status === 'review');
+    else if (filter === 'awaiting') items = items.filter((d) => needsYou(d));
     else if (filter === 'done') items = items.filter((d) => d.status === 'done');
     const q = search.trim().toLowerCase();
     if (q) {
@@ -386,7 +398,7 @@ export default function DemandasPage() {
       );
     }
     return items;
-  }, [demands, filter, search, projectFilter]);
+  }, [demands, filter, search, projectFilter, needsYou]);
 
   // Nome do projeto filtrado (de qualquer demanda dele) p/ o banner.
   const projectFilterName = useMemo(
@@ -605,7 +617,7 @@ export default function DemandasPage() {
                 className={`${styles.urgent} ${filter === 'awaiting' ? styles.active : ''}`}
                 onClick={() => setFilter('awaiting')}
               >
-                Aguardando você <span className={styles.cnt}>{counts.awaiting}</span>
+                Precisam de você <span className={styles.cnt}>{counts.awaiting}</span>
               </button>
               <button className={filter === 'done' ? styles.active : ''} onClick={() => setFilter('done')}>
                 Concluídas <span className={styles.cnt}>{counts.done}</span>
@@ -671,10 +683,7 @@ export default function DemandasPage() {
             ) : (
               filtered.map((d) => {
                 const urg = dueUrgency(d);
-                const unread =
-                  d.id !== currentId &&
-                  !!d.last_message_at &&
-                  (!readMap[d.id] || (d.last_message_at as string) > readMap[d.id]);
+                const unread = isUnread(d);
                 return (
                   <button
                     key={d.id}
@@ -711,6 +720,17 @@ export default function DemandasPage() {
                           {dueLabel(d)}
                         </span>
                       </span>
+                      {d.last_message_preview ? (
+                        <span
+                          className={styles.listMeta}
+                          style={{ display: 'block', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: unread ? 1 : 0.9 }}
+                        >
+                          <span style={{ fontWeight: unread ? 600 : 500 }}>
+                            {d.last_message_from === 'client' ? 'Você: ' : 'Equipe: '}
+                          </span>
+                          {(d.last_message_preview as string).replace(/\s+/g, ' ').slice(0, 80)}
+                        </span>
+                      ) : null}
                     </span>
                     {unread ? (
                       <span

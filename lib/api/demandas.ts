@@ -20,6 +20,8 @@ export type Demand = {
   project_id?: string | null;
   project_title?: string | null;
   last_message_at?: string | null;
+  last_message_preview?: string | null;
+  last_message_from?: 'team' | 'client' | null;
   messages_count?: number | null;
   [k: string]: unknown;
 };
