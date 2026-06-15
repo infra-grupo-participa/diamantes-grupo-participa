@@ -501,16 +501,11 @@
   border-color: var(--bf-red);
 }
 .fieldInput[readonly] {
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--bf-bg),
-    var(--bf-bg) 9px,
-    #f2efe9 9px,
-    #f2efe9 18px
-  );
+  background: var(--bf-bg);
   color: var(--bf-text-2);
   border-color: var(--bf-border);
-  border-style: dashed;
+  border-style: solid;
+  font-weight: 500;
   cursor: default;
 }
 .fieldInput[readonly]:focus {
