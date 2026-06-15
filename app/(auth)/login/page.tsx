@@ -22,16 +22,32 @@ export default function LoginPage() {
 
           <div className="auth-hero-mid">
             <h1>Bem-vindo ao seu portal.</h1>
-            <p>
-              Acompanhe sua equipe, briefings e demandas em um só lugar — com a agilidade
-              que o Grupo Participa entrega.
-            </p>
+            <p>Tudo do seu trabalho com o Grupo Participa, organizado em um só lugar.</p>
+            <ul className="auth-feats">
+              <li>
+                <span className="auth-feat-ico" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
+                Abra demandas e converse com sua equipe
+              </li>
+              <li>
+                <span className="auth-feat-ico" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
+                Briefings e projetos centralizados
+              </li>
+              <li>
+                <span className="auth-feat-ico" aria-hidden>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                </span>
+                Acompanhe cada entrega em tempo real
+              </li>
+            </ul>
           </div>
 
           <div className="auth-hero-foot">
-            <span className="auth-hero-rule" />
             <div className="auth-hero-tag">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                 <circle cx="9" cy="7" r="4" />
                 <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
