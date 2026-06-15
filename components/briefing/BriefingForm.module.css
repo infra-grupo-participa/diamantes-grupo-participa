@@ -48,13 +48,9 @@
   background: var(--bf-surface);
   border: 1px solid var(--bf-border);
   border-radius: var(--bf-radius-lg);
-  overflow: hidden;
   box-shadow: var(--bf-shadow-sm);
   color: var(--bf-text);
   font-size: 14px;
-  /* Painel de altura de viewport: a barra escura fica fixa e o conteúdo rola
-     por dentro (.main). Em telas curtas, encolhe pro conteúdo (não força altura). */
-  max-height: calc(100dvh - 120px);
 }
 
 .wrap button {
@@ -67,8 +63,13 @@
   background: var(--bf-sidebar-bg);
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 76px;
+  align-self: start;
+  max-height: calc(100dvh - 96px);
   min-height: 0;
   overflow-y: auto;
+  border-radius: var(--bf-radius-lg) 0 0 var(--bf-radius-lg);
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
 }
@@ -214,21 +215,7 @@
   padding: 32px 40px 100px;
   background: var(--bf-bg);
   min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--bf-border-strong) transparent;
-}
-.main::-webkit-scrollbar {
-  width: 10px;
-}
-.main::-webkit-scrollbar-thumb {
-  background: var(--bf-border-strong);
-  border-radius: 8px;
-  border: 2px solid var(--bf-bg);
-}
-.main::-webkit-scrollbar-track {
-  background: transparent;
+  border-radius: 0 var(--bf-radius-lg) var(--bf-radius-lg) 0;
 }
 .pageHeader {
   margin-bottom: 26px;
@@ -360,7 +347,7 @@
   padding: 24px 28px;
   margin-bottom: 16px;
   box-shadow: var(--bf-shadow-sm);
-  scroll-margin-top: 16px;
+  scroll-margin-top: 92px;
 }
 .sectionPanelAccess {
   background: #fcfbf9;

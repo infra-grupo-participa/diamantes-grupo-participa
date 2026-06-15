@@ -72,7 +72,9 @@ export default async function Dashboard() {
             <span className="resume-eyebrow">⏳ Briefing em andamento</span>
             <strong>Continue de onde parou: {pending.title}</strong>
             <span className="resume-sub">
-              {pending.progress}% preenchido — termine o briefing para a equipe começar a trabalhar.
+              {pending.progress >= 100
+                ? 'Está tudo preenchido — falta só enviar para a equipe começar.'
+                : `${pending.progress}% preenchido — termine o briefing para a equipe começar a trabalhar.`}
             </span>
             <div
               className="resume-progress"

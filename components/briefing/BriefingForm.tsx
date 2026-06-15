@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { BriefingField, CardValue } from '@/lib/briefing-templates';
 import styles from './BriefingForm.module.css';
 
@@ -131,6 +131,24 @@ export default function BriefingForm(props: BriefingFormProps) {
     setActive(i);
     panelRefs.current[i]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // Scrollspy: marca a seção atual na barra conforme o conteúdo rola (janela).
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .map((e) => panelRefs.current.indexOf(e.target as HTMLDivElement))
+          .filter((i) => i >= 0);
+        if (visible.length) setActive(Math.min(...visible));
+      },
+      // "ativa" o painel que está no topo da área visível (abaixo do topbar).
+      { rootMargin: '-92px 0px -55% 0px', threshold: 0 },
+    );
+    panelRefs.current.forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [navUnits.length]);
 
   function isVisible(unit: BriefingUnit, f: BriefingField): boolean {
     if (!f.dependsOn) return true;
