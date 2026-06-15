@@ -343,6 +343,29 @@ export default function DemandasPage() {
   // (operator_id) e user_role='operator' — não devem contar como cliente.
   const clientMembers = currentMembers.filter((m) => m.role !== 'operator' && m.user_role !== 'operator');
 
+  // Pessoas envolvidas = operadores ATRIBUÍDOS + quem da equipe/externo já RESPONDEU
+  // no chat (autores não-cliente). Dedup por nome.
+  const involvedPeople = useMemo(() => {
+    const map = new Map<string, { key: string; name: string; role: string; color?: string | null; approved?: boolean }>();
+    operators.forEach((o) => {
+      const name = o.user_name || o.user_email || 'Operador';
+      map.set(name.toLowerCase(), {
+        key: 'op:' + String(o.id),
+        name,
+        role: o.position_name || 'Operador',
+        color: o.position_color,
+        approved: !!o.approved_finish,
+      });
+    });
+    currentMsgs.forEach((m) => {
+      if (m.author_role && m.author_role !== 'user' && m.author_name) {
+        const k = m.author_name.toLowerCase();
+        if (!map.has(k)) map.set(k, { key: 'msg:' + m.author_name, name: m.author_name, role: 'Equipe' });
+      }
+    });
+    return [...map.values()];
+  }, [operators, currentMsgs]);
+
   // ── Nova demanda (gate-aware) ──
   async function openNewDemand() {
     try {
@@ -777,32 +800,32 @@ export default function DemandasPage() {
                 <h3>
                   Pessoas envolvidas{' '}
                   <span className="small">
-                    {operators.length} pessoa{operators.length === 1 ? '' : 's'}
+                    {involvedPeople.length} pessoa{involvedPeople.length === 1 ? '' : 's'}
                   </span>
                 </h3>
                 <div className={styles.teamMini}>
-                  {operators.length === 0 ? (
+                  {involvedPeople.length === 0 ? (
                     <div className="muted" style={{ fontSize: '0.84rem' }}>
-                      Sem operadores.
+                      Ninguém da equipe ainda — assim que alguém for atribuído ou responder, aparece aqui.
                     </div>
                   ) : (
-                    operators.map((m) => (
-                      <div key={String(m.id)} className={styles.teamItem}>
+                    involvedPeople.map((m) => (
+                      <div key={m.key} className={styles.teamItem}>
                         <span
                           className={styles.teamAvatar}
                           style={
-                            m.position_color
-                              ? { background: `linear-gradient(135deg, ${m.position_color}33, ${m.position_color})` }
+                            m.color
+                              ? { background: `linear-gradient(135deg, ${m.color}33, ${m.color})` }
                               : undefined
                           }
                         >
-                          {initials(m.user_name)}
+                          {initials(m.name)}
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ fontWeight: 600, display: 'block' }}>{m.user_name || '—'}</span>
-                          <span className={styles.teamRole}>{m.position_name || '—'}</span>
+                          <span style={{ fontWeight: 600, display: 'block' }}>{m.name || '—'}</span>
+                          <span className={styles.teamRole}>{m.role || '—'}</span>
                         </span>
-                        {m.approved_finish && (
+                        {m.approved && (
                           <span className={styles.approvedTick} title="Aprovou finalização">
                             ✓
                           </span>
