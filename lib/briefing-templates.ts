@@ -1493,11 +1493,12 @@ export function validateProjectBriefing(
   briefing: ProjectBriefing | null | undefined,
 ): ProjectBriefingValidationResult {
   const missing: ProjectMissingEntry[] = []; // [{ scope:'general'|svc, field }]
+  const svcList = Array.isArray(services) ? services : [];
   const general = (briefing && briefing.general) || {};
   getGeneralFields().forEach((f) => {
     if (f.priority === 'red' && fieldIsEmpty(f, general)) missing.push({ scope: 'general', field: f.id });
   });
-  (services || []).forEach((svc) => {
+  svcList.forEach((svc) => {
     const ans = ((briefing && briefing.services) || {})[svc] || {};
     getProjectSections(svc).forEach((sec) =>
       sec.fields.forEach((f) => {
