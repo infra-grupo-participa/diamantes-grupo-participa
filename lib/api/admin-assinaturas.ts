@@ -32,8 +32,13 @@ export type SubscriptionStats = {
   late: number;
   pending: number;
   canceled: number;
+  /**
+   * Retenção lifetime = (total − cancelados) / total. Mede quantos assinantes
+   * já contratados seguem sem cancelar — não mistura inadimplência (atraso/parcial)
+   * com churn. Nota: portal.subscriptions não tem timestamp de cancelamento
+   * (canceled_at), então não dá para recortar por período; é uma taxa acumulada.
+   */
   retention: number;
-  dueSoon: SubscriptionRow[];
 };
 
 export type SparkPoint = { label: string; value: number };
@@ -92,22 +97,18 @@ export async function listSubscriptions({
 
 export async function getSubscriptionStats(): Promise<SubscriptionStats> {
   const supabase = createClient();
-  const [paid, partial, overdue, pending, canceled, sumActive, dueSoon] = await Promise.all([
+  const [paid, partial, overdue, pending, canceled, all, sumActive] = await Promise.all([
     supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'paid'),
     supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'partial'),
     supabase.from('subscriptions').select('id', { count: 'exact', head: true }).in('status', ['overdue', 'late']),
     supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'canceled'),
+    supabase.from('subscriptions').select('id', { count: 'exact', head: true }),
     supabase.from('subscriptions').select('monthly_value').neq('status', 'canceled'),
-    supabase
-      .from('v_subscriptions')
-      .select('*')
-      .gte('next_billing_date', new Date().toISOString().slice(0, 10))
-      .lte('next_billing_date', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
-      .neq('status', 'canceled')
-      .order('next_billing_date', { ascending: true })
-      .limit(8),
   ]);
+  for (const r of [paid, partial, overdue, pending, canceled, all, sumActive]) {
+    if (r.error) throw r.error;
+  }
 
   const mrr = ((sumActive.data ?? []) as Array<{ monthly_value: number }>).reduce(
     (s, r) => s + Number(r.monthly_value || 0),
@@ -117,8 +118,11 @@ export async function getSubscriptionStats(): Promise<SubscriptionStats> {
   const partialCount = partial.count ?? 0;
   const overdueCount = overdue.count ?? 0;
   const pendingCount = pending.count ?? 0;
+  const canceledCount = canceled.count ?? 0;
+  const totalCount = all.count ?? 0;
   const active = paidCount + partialCount + pendingCount + overdueCount;
-  const retention = active === 0 ? 0 : Math.round((paidCount / active) * 100);
+  // Retenção lifetime: dos assinantes já contratados, quantos não cancelaram.
+  const retention = totalCount === 0 ? 0 : Math.round(((totalCount - canceledCount) / totalCount) * 100);
 
   return {
     mrr,
@@ -127,10 +131,35 @@ export async function getSubscriptionStats(): Promise<SubscriptionStats> {
     partial: partialCount,
     late: overdueCount,
     pending: pendingCount,
-    canceled: canceled.count ?? 0,
+    canceled: canceledCount,
     retention,
-    dueSoon: (dueSoon.data ?? []) as SubscriptionRow[],
   };
+}
+
+/**
+ * Somatórios financeiros (a receber / inadimplência / ticket médio) derivados
+ * apenas das colunas status + monthly_value — sem baixar as 1000 linhas completas
+ * que a tabela paginada já carrega. Uma query enxuta cobre todos os agregados.
+ */
+export async function getSubscriptionMoneySummary(): Promise<{ due: number; late: number; avg: number }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from('subscriptions').select('status, monthly_value');
+  if (error) throw error;
+  const rows = (data ?? []) as Array<{ status: string; monthly_value: number }>;
+  let due = 0;
+  let late = 0;
+  let activeSum = 0;
+  let activeCount = 0;
+  for (const r of rows) {
+    const v = Number(r.monthly_value || 0);
+    if (r.status === 'pending') due += v;
+    if (r.status === 'overdue' || r.status === 'late' || r.status === 'partial') late += v;
+    if (r.status !== 'canceled') {
+      activeSum += v;
+      activeCount++;
+    }
+  }
+  return { due, late, avg: activeCount ? activeSum / activeCount : 0 };
 }
 
 export async function getMrrSparkline(): Promise<SparkPoint[]> {

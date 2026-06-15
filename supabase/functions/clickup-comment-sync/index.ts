@@ -32,7 +32,9 @@ Deno.serve(async (req: Request) => {
     const internalKey = await getSecret(supabase, "clickup_sync_internal_key");
     const okInternal = internalKey && provided === internalKey;
     const auth = req.headers.get("Authorization") || "";
-    const okService  = auth.includes(SERVICE_KEY) && SERVICE_KEY.length > 20;
+    const bearer = auth.replace(/^Bearer /i, "").trim();
+    // Comparação EXATA do Bearer (não substring) para evitar bypass por prefixo.
+    const okService  = SERVICE_KEY.length > 20 && bearer === SERVICE_KEY;
     if (!okInternal && !okService) {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
@@ -86,8 +88,11 @@ Deno.serve(async (req: Request) => {
 
     const commentId = respJson?.id ? String(respJson.id) : null;
     if (commentId) {
-      await supabase.schema("portal")
+      // Persistir o clickup_comment_id é crítico: sem ele a sync reversa pode
+      // re-importar o mesmo comentário (duplicidade). Loga se falhar.
+      const { error: upErr } = await supabase.schema("portal")
         .from("demand_messages").update({ clickup_comment_id: commentId }).eq("id", msg.id);
+      if (upErr) console.error("persist clickup_comment_id err", upErr.message);
     }
 
     return new Response(JSON.stringify({ ok: true, message_id: msg.id, clickup_comment_id: commentId }), { status: 200, headers: { "Content-Type": "application/json" } });

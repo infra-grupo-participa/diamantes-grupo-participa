@@ -61,6 +61,61 @@
   /* Avatar de conteúdo (squircle, gradiente da marca) */
   --avatar-radius: 11px;
   --avatar-gradient: linear-gradient(135deg, #fcd9a5, var(--accent));
+
+  /* Superfícies brancas explícitas (inputs, chips, menus) — viram escuras no dark */
+  --surface-input: #ffffff;
+  --surface-raised: #ffffff;
+  /* Tinta do banner de plano (assinatura) */
+  --plan-tint: linear-gradient(135deg, #fff7ea 0%, #fff 60%);
+  /* Sombra colorida do avatar */
+  --avatar-shadow: 0 8px 20px rgba(242, 151, 37, 0.24);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DARK MODE — overrides de todos os tokens de cor sob [data-theme="dark"].
+   Paleta: fundo escuro lavanda/neutro, texto claro, mantendo o laranja.
+   ════════════════════════════════════════════════════════════════ */
+[data-theme='dark'] {
+  --bg: #131120;
+  --surface: #1c1930;
+  --text: #ece9f5;
+  --muted: #a39db8;
+  --border: #2c2842;
+  --border-strong: #3a3556cc;
+  --accent: #f29725;
+  --accent-strong: #f7ad4d;
+  --accent-soft: rgba(242, 151, 37, 0.16);
+  --hero-tint: #241f3a;
+  --hero-tint-strong: #2c2745;
+  --danger: #f87171;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --info: #60a5fa;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 18px 48px rgba(0, 0, 0, 0.55);
+  --shadow-cta: 0 4px 12px rgba(242, 151, 37, 0.32);
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+
+  --table-head-bg: rgba(44, 39, 69, 0.6);
+  --table-row-hover: rgba(44, 39, 69, 0.45);
+
+  --avatar-gradient: linear-gradient(135deg, #d98f3a, var(--accent));
+
+  --surface-input: #16132a;
+  --surface-raised: #221e38;
+  --plan-tint: linear-gradient(135deg, #2a2238 0%, var(--surface) 60%);
+  --avatar-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme='dark'] body {
+  background:
+    radial-gradient(circle at 15% 10%, var(--hero-tint-strong), transparent 55%),
+    radial-gradient(circle at 90% 90%, rgba(242, 151, 37, 0.07), transparent 55%),
+    var(--bg);
 }
 
 * {
@@ -193,7 +248,8 @@ a {
   border-radius: 12px;
   font-size: 0.95rem;
   font-family: inherit;
-  background: #fff;
+  color: var(--text);
+  background: var(--surface-input);
   transition: border-color 0.15s;
 }
 
@@ -277,7 +333,7 @@ a {
   align-items: center;
   gap: 20px;
   padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.86);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
@@ -303,9 +359,9 @@ a {
   color: var(--text);
 }
 .topnav-item.active {
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--accent-strong);
-  box-shadow: 0 2px 8px rgba(26, 20, 48, 0.08);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ── Admin / operator sidebar ───────────────────────────────── */
@@ -413,7 +469,8 @@ a {
   padding: 6px 10px 6px 6px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fff;
+  background: var(--surface-raised);
+  color: var(--text);
   cursor: pointer;
   font-family: inherit;
 }
@@ -445,7 +502,7 @@ a {
   right: 0;
   top: calc(100% + 8px);
   min-width: 220px;
-  background: #fff;
+  background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow);
@@ -537,7 +594,7 @@ a {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px;
-  box-shadow: 0 6px 20px rgba(26, 20, 48, 0.05);
+  box-shadow: var(--shadow-md);
 }
 .badge {
   display: inline-flex;
@@ -567,7 +624,7 @@ a {
   font-weight: 600;
   font-family: inherit;
   border: 1.5px solid var(--border-strong);
-  background: #fff;
+  background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
 }
@@ -763,7 +820,7 @@ button:active {
   transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
 .card:hover {
-  box-shadow: 0 10px 28px rgba(26, 20, 48, 0.08);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Spinner / loading de rota */

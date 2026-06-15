@@ -19,6 +19,16 @@ type Pending = {
 
 const MAX_FILES = 5;
 
+// Tipos aceitos (espelha o accept do <input>): imagens, PDF, docs, planilhas, txt, zip.
+const ACCEPTED_MIME = /^(image\/|application\/pdf$|application\/msword$|application\/vnd\.openxmlformats|application\/vnd\.ms-excel$|text\/csv$|text\/plain$|application\/zip$|application\/x-zip-compressed$)/;
+const ACCEPTED_EXT = /\.(png|jpe?g|gif|webp|svg|pdf|docx?|xlsx?|csv|txt|zip)$/i;
+
+function isAcceptedFile(file: File): boolean {
+  if (file.type && ACCEPTED_MIME.test(file.type)) return true;
+  // Alguns navegadores não preenchem o mime: cai pra extensão.
+  return ACCEPTED_EXT.test(file.name || '');
+}
+
 const IconFile = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -75,8 +85,24 @@ export default function ChatComposer({
         toast('Selecione uma demanda antes de anexar arquivos.', 'warning');
         return;
       }
-      const limit = MAX_FILES - pendingRef.current.length;
-      const arr = Array.from(files).slice(0, Math.max(0, limit));
+      const incoming = Array.from(files);
+      // Valida extensão/mime: avisa e descarta os não suportados.
+      const valid = incoming.filter(isAcceptedFile);
+      const rejectedType = incoming.length - valid.length;
+      if (rejectedType > 0) {
+        toast(
+          rejectedType === 1
+            ? 'Um arquivo foi ignorado: tipo não suportado.'
+            : `${rejectedType} arquivos foram ignorados: tipo não suportado.`,
+          'warning',
+        );
+      }
+      const limit = Math.max(0, MAX_FILES - pendingRef.current.length);
+      const arr = valid.slice(0, limit);
+      // Avisa quando estourar o limite de anexos (antes descartava em silêncio).
+      if (valid.length > limit) {
+        toast(`Máximo de ${MAX_FILES} anexos por mensagem. ${valid.length - limit} não foram adicionados.`, 'warning');
+      }
       for (const file of arr) {
         const id = Math.random().toString(36).slice(2);
         const item: Pending = {

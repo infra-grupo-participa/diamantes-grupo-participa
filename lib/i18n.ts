@@ -1,3 +1,37 @@
+// i18n do portal.
+//
+// IMPORTANTE — estado honesto: o conteúdo do portal é 100% PT-BR. Não existe
+// catálogo de tradução para outro idioma; oferecer en-US/es de verdade exigiria
+// traduzir todas as telas, o que não está feito. Por isso pt-BR é o ÚNICO locale
+// real aqui, e a tela de perfil marca os demais como "em breve" (desabilitados),
+// sem fingir tradução.
+//
+// A estrutura abaixo deixa o terreno pronto para adicionar locales no futuro:
+// basta registrar um novo objeto em LOCALES e popular as chaves.
+
+export type LocaleCode = 'pt-BR';
+
+export const DEFAULT_LOCALE: LocaleCode = 'pt-BR';
+
+export interface LocaleMeta {
+  code: string;
+  label: string;
+  /** true = locale com tradução completa e selecionável. */
+  ready: boolean;
+}
+
+/** Catálogo de locais oferecidos na UI. Só `ready: true` é realmente aplicável. */
+export const LOCALES: LocaleMeta[] = [
+  { code: 'pt-BR', label: 'Português (BR)', ready: true },
+  { code: 'en-US', label: 'English (US)', ready: false },
+  { code: 'es', label: 'Español', ready: false },
+];
+
+/** Locais com tradução pronta (hoje, só pt-BR). */
+export function readyLocales(): LocaleMeta[] {
+  return LOCALES.filter((l) => l.ready);
+}
+
 // Tradução de erros de auth do Supabase → PT-BR (porta de assets/js/supabase-i18n.js).
 // Nunca vaza inglês: tenta código exato → substring → regex → fallback genérico.
 

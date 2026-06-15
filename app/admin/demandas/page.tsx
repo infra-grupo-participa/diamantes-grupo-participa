@@ -62,6 +62,8 @@ export default function AdminDemandasPage() {
   const filterRef = useRef<DemandFilter>({ search: '', clientSlug: 'all' });
   filterRef.current = { search, clientSlug };
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Coalesce de reloads vindos do realtime (vários eventos → 1 recarga).
+  const realtimeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadAll = useCallback(async () => {
     try {
@@ -92,6 +94,12 @@ export default function AdminDemandasPage() {
     }
   }, []);
 
+  // Reload coalescido: agenda uma única recarga ~400ms após o último evento.
+  const scheduleReload = useCallback(() => {
+    if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
+    realtimeTimer.current = setTimeout(() => loadAll(), 400);
+  }, [loadAll]);
+
   // Restaura preferência de visão + carga inicial + clientes.
   useEffect(() => {
     try {
@@ -111,21 +119,22 @@ export default function AdminDemandasPage() {
     const supabase = createClient();
     const ch = supabase
       .channel('admin-demands')
-      .on('postgres_changes', { event: '*', schema: 'portal', table: 'demands' }, () => loadAll())
+      .on('postgres_changes', { event: '*', schema: 'portal', table: 'demands' }, () => scheduleReload())
       .on(
         'postgres_changes',
         { event: '*', schema: 'portal', table: 'demand_members' },
-        () => loadAll(),
+        () => scheduleReload(),
       )
       .subscribe();
     return () => {
+      if (realtimeTimer.current) clearTimeout(realtimeTimer.current);
       try {
         supabase.removeChannel(ch);
       } catch {
         /* noop */
       }
     };
-  }, [loadAll]);
+  }, [scheduleReload]);
 
   function onSearchChange(value: string) {
     setSearch(value);
@@ -135,8 +144,9 @@ export default function AdminDemandasPage() {
 
   function onClientChange(value: string) {
     setClientSlug(value);
-    // filterRef é atualizado a cada render; lemos o novo valor já aqui.
-    filterRef.current = { search, clientSlug: value };
+    // Atualiza só o campo novo no ref (preserva o `search` já vigente, sem
+    // depender do valor capturado no closure deste render).
+    filterRef.current = { ...filterRef.current, clientSlug: value };
     loadAll();
   }
 
@@ -327,22 +337,22 @@ export default function AdminDemandasPage() {
         {loading
           ? Array.from({ length: 5 }).map((_, i) => (
               <div className={styles.skelKpi} key={i}>
-                <div className={`${styles.skel} ${styles.skelIcon}`} />
-                <div style={{ flex: 1 }}>
-                  <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '60%', marginBottom: 6 }} />
-                  <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '36%', height: 18 }} />
+                <div className={styles.kpiHead}>
+                  <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '60%' }} />
+                  <div className={`${styles.skel} ${styles.skelIcon}`} />
                 </div>
+                <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '40%', height: 26 }} />
               </div>
             ))
           : kpis.map((k) => (
               <div className={styles.kpiCard} key={k.key}>
-                <div className={styles.kpiIcon} style={{ background: k.bg, color: k.color }}>
-                  {k.icon}
+                <div className={styles.kpiHead}>
+                  <span className={styles.kpiLabel}>{k.label}</span>
+                  <span className={styles.kpiIcon} style={{ background: k.bg, color: k.color }}>
+                    {k.icon}
+                  </span>
                 </div>
-                <div>
-                  <div className={styles.kpiLabel}>{k.label}</div>
-                  <div className={styles.kpiValue}>{stats[k.key]}</div>
-                </div>
+                <div className={styles.kpiValue}>{stats[k.key]}</div>
               </div>
             ))}
       </div>

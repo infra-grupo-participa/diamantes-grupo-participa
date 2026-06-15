@@ -3,7 +3,7 @@
 // Modal de avaliação de PROJETO (CSAT 5 estrelas + comentário + NPS opcional).
 // RPC submit_project_rating (migration 036).
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { submitProjectRating } from '@/lib/api/projects';
 import { toast } from '@/lib/toast';
 import s from './projetoRating.module.css';
@@ -27,8 +27,19 @@ export default function ProjectRatingModal({
   const [comment, setComment] = useState('');
   const [nps, setNps] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const shown = hover || stars;
+
+  // a11y: fecha no Esc e foca o modal ao abrir.
+  useEffect(() => {
+    dialogRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !busy) onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose, busy]);
 
   async function submit() {
     if (stars < 1) return;
@@ -45,7 +56,7 @@ export default function ProjectRatingModal({
 
   return (
     <div className={s.overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={s.dialog} role="dialog" aria-modal="true">
+      <div className={s.dialog} role="dialog" aria-modal="true" aria-label="Como foi o projeto?" tabIndex={-1} ref={dialogRef}>
         <div className={s.head}>
           <h3>Como foi o projeto?</h3>
           <div className={s.headSub}>{projectTitle}</div>

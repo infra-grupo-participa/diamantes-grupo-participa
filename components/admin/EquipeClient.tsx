@@ -275,7 +275,7 @@ export default function EquipeClient() {
         <Kpi icon={<IconGem />} bg="#f1ecff" color="#8b5cf6" label="Alunos diamantes" value={stats ? String(stats.students) : '—'} />
         <Kpi icon={<IconChat />} bg="#e7f7ee" color="#16a34a" label="Avaliações recebidas" value={stats ? stats.ratings.toLocaleString('pt-BR') : '—'} />
         <Kpi icon={<IconStar />} bg="#fff4d6" color="#eab308" label="Média geral" value={stats ? stats.ratingAvg.toFixed(2).replace('.', ',') : '—'} />
-        <Kpi icon={<IconClock />} bg="#ffe9ee" color="#ec4899" label="Ativos hoje" value={stats ? String(stats.activeToday) : '—'} />
+        <Kpi icon={<IconClock />} bg="#ffe9ee" color="#ec4899" label="Admins ativos hoje" value={stats ? String(stats.activeToday) : '—'} />
       </div>
 
       {/* ── Tabs ── */}

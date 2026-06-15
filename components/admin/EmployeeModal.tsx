@@ -42,6 +42,16 @@ export default function EmployeeModal({
     }
   }, [open, editing]);
 
+  // Esc fecha o modal (consistência com os demais modais admin).
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   async function submit(e: React.FormEvent) {
@@ -88,7 +98,7 @@ export default function EmployeeModal({
             {!editing && (
               <div>
                 <label className={s.label}>Senha (mín. 8 caracteres)</label>
-                <input className={s.searchInput} style={{ paddingLeft: 12 }} type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+                <input className={s.searchInput} style={{ paddingLeft: 12 }} type="password" minLength={8} required value={password} onChange={(e) => setPassword(e.target.value)} />
                 <small className={s.hintSmall}>
                   A senha não pode ser alterada por aqui depois — peça para o usuário usar &quot;esqueci a senha&quot;.
                 </small>

@@ -36,6 +36,8 @@ export default function ResetForm() {
       <div>
         <div
           className="auth-error"
+          role="status"
+          aria-live="polite"
           style={{ background: 'rgba(22,163,74,0.08)', color: 'var(--success)', borderColor: 'rgba(22,163,74,0.25)' }}
         >
           Se houver uma conta com esse e-mail, enviamos um link para redefinir a senha. Verifique sua caixa de entrada (e o spam).
@@ -50,7 +52,9 @@ export default function ResetForm() {
   return (
     <form onSubmit={onSubmit}>
       {linkErro && (
-        <div className="auth-error">O link expirou ou já foi usado. Solicite um novo abaixo.</div>
+        <div className="auth-error" role="alert" aria-live="assertive">
+          O link expirou ou já foi usado. Solicite um novo abaixo.
+        </div>
       )}
 
       <div className="field">

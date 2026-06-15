@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { translateAuthError } from '@/lib/i18n';
 
 /**
  * Define a nova senha usando a sessão de recuperação estabelecida pelo link
@@ -19,7 +20,29 @@ export default function UpdateForm() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => setHasSession(!!data.session));
+    let settled = false;
+
+    // O evento de recuperação pode chegar logo após o redirect do callback —
+    // escutamos onAuthStateChange (PASSWORD_RECOVERY/SIGNED_IN) para não marcar
+    // "link inválido" prematuramente. Só concluímos false depois do getSession.
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || session) {
+        settled = true;
+        setHasSession(true);
+      }
+    });
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (settled) return; // um evento de recovery já confirmou a sessão
+      if (data.session) {
+        settled = true;
+        setHasSession(true);
+      } else {
+        setHasSession(false);
+      }
+    });
+
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -36,7 +59,7 @@ export default function UpdateForm() {
         setErro(
           /session|jwt|missing/i.test(error.message)
             ? 'Sua sessão de redefinição expirou. Solicite um novo link.'
-            : error.message,
+            : translateAuthError(error),
         );
         setLoading(false);
         return;
@@ -53,6 +76,8 @@ export default function UpdateForm() {
       <div>
         <div
           className="auth-error"
+          role="status"
+          aria-live="polite"
           style={{ background: 'rgba(22,163,74,0.08)', color: 'var(--success)', borderColor: 'rgba(22,163,74,0.25)' }}
         >
           Senha redefinida com sucesso.
@@ -67,7 +92,7 @@ export default function UpdateForm() {
   if (hasSession === false) {
     return (
       <div>
-        <div className="auth-error">
+        <div className="auth-error" role="alert" aria-live="assertive">
           Link inválido ou expirado. Abra o link mais recente do seu e-mail ou solicite um novo.
         </div>
         <Link className="btn-primary" href="/reset-password" style={{ display: 'inline-block', textAlign: 'center' }}>
@@ -79,7 +104,11 @@ export default function UpdateForm() {
 
   return (
     <form onSubmit={onSubmit}>
-      {erro && <div className="auth-error">{erro}</div>}
+      {erro && (
+        <div className="auth-error" role="alert" aria-live="assertive">
+          {erro}
+        </div>
+      )}
 
       <div className="field">
         <label htmlFor="password">Nova senha</label>

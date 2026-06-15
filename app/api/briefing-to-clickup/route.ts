@@ -70,7 +70,8 @@ async function cuCreateTask(
   }
 
   const respText = await upstream.text();
-  if (upstream.status !== 200) {
+  // ClickUp responde 201 ao criar a task — aceita qualquer 2xx, não só 200.
+  if (!upstream.ok) {
     const detail = respText || 'sem detalhe';
     return {
       errorResponse: jsonOut(
@@ -238,8 +239,18 @@ export async function POST(req: Request) {
     taskId = created.taskId as string;
     taskCreated = true;
 
-    // Salva task ID na entidade para reutilização futura.
-    await admin.from(entityTable).update({ clickup_task_id: taskId }).eq('id', entityId);
+    // Salva task ID na entidade para reutilização futura. Se a gravação falhar,
+    // aborta: sem o vínculo persistido, uma reabertura criaria task duplicada.
+    const { error: linkErr } = await admin
+      .from(entityTable)
+      .update({ clickup_task_id: taskId })
+      .eq('id', entityId);
+    if (linkErr) {
+      return jsonOut(
+        { ok: false, error: 'Task criada mas falhou ao salvar o vínculo: ' + linkErr.message },
+        500,
+      );
+    }
   }
 
   // ── Anexa PDF à task ───────────────────────────────────────────────────────
@@ -253,7 +264,7 @@ export async function POST(req: Request) {
     fileName,
   );
 
-  let attachStatus = 0;
+  let attachOk = false;
   let attachText = '';
   let attachErr = '';
   try {
@@ -266,13 +277,13 @@ export async function POST(req: Request) {
         body: attachForm,
       },
     );
-    attachStatus = upstream.status;
+    attachOk = upstream.ok; // aceita qualquer 2xx (ClickUp pode retornar 200/201)
     attachText = await upstream.text();
   } catch (e) {
     attachErr = e instanceof Error ? e.message : String(e);
   }
 
-  if (attachStatus !== 200) {
+  if (!attachOk) {
     const detail = attachErr || attachText || 'sem detalhe';
     return jsonOut({ ok: false, error: 'Erro ao anexar PDF na task: ' + detail }, 502);
   }

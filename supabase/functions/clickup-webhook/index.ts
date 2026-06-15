@@ -134,12 +134,16 @@ Deno.serve(async (req: Request) => {
     const sig = req.headers.get("x-signature") || req.headers.get("X-Signature") || "";
     let webhookSecret = "";
     try { webhookSecret = await getSecret(supabase, "clickup_webhook_secret"); } catch (_) {}
-    if (webhookSecret) {
-      const valid = await verifyHmac(rawBody, sig, webhookSecret);
-      if (!valid) {
-        console.warn("HMAC inválido. sig=", sig.slice(0, 16));
-        return new Response(JSON.stringify({ error: "invalid signature" }), { status: 401, headers: { "Content-Type": "application/json" } });
-      }
+    // Falha FECHADA: sem secret configurado/legível, não há como verificar a
+    // origem do payload — recusa em vez de aceitar qualquer requisição.
+    if (!webhookSecret) {
+      console.error("clickup_webhook_secret ausente — recusando (fail-closed)");
+      return new Response(JSON.stringify({ error: "webhook secret not configured" }), { status: 401, headers: { "Content-Type": "application/json" } });
+    }
+    const valid = await verifyHmac(rawBody, sig, webhookSecret);
+    if (!valid) {
+      console.warn("HMAC inválido. sig=", sig.slice(0, 16));
+      return new Response(JSON.stringify({ error: "invalid signature" }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
 
     let payload: any = {};

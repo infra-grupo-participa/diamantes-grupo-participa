@@ -28,7 +28,9 @@ export default function Pagination({
 
   return (
     <div className={s.pagination}>
-      <span className={s.pgInfo} dangerouslySetInnerHTML={{ __html: `Mostrando <strong>${first}–${last}</strong> de <strong>${total}</strong> ${noun}` }} />
+      <span className={s.pgInfo}>
+        Mostrando <strong>{first}–{last}</strong> de <strong>{total}</strong> {noun}
+      </span>
       <div className={s.pageSizeWrap}>
         <span>Itens por página</span>
         <select value={pageSize} onChange={(e) => onPageSize(parseInt(e.target.value, 10) || 25)}>

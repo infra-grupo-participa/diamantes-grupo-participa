@@ -15,7 +15,8 @@ import {
 } from '@/lib/api/perfil';
 import { initials } from '@/lib/format';
 import { toast } from '@/lib/toast';
-import { translateAuthError } from '@/lib/i18n';
+import { translateAuthError, LOCALES } from '@/lib/i18n';
+import { usePrefs, syncPrefsFromServer, type ThemePref } from '@/lib/theme';
 import styles from './page.module.css';
 
 interface FormState {
@@ -48,22 +49,19 @@ const NOTIFY_FIELDS: {
   { key: 'notify_news', title: 'Novidades do Diamantes', desc: 'Recursos novos, dicas e eventos.' },
 ];
 
-const LANGUAGES = [
-  { value: 'pt-BR', label: 'Português (BR)' },
-  { value: 'en-US', label: 'English (US)' },
-  { value: 'es', label: 'Español' },
-];
 const TIMEZONES = [
   { value: 'America/Sao_Paulo', label: 'São Paulo (GMT-3)' },
   { value: 'America/Manaus', label: 'Manaus (GMT-4)' },
   { value: 'Europe/Lisbon', label: 'Lisboa (GMT+0)' },
 ];
-const THEMES = [
+const THEMES: { value: ThemePref; label: string }[] = [
   { value: 'light', label: 'Claro' },
+  { value: 'dark', label: 'Escuro' },
   { value: 'auto', label: 'Automático' },
 ];
 
 export default function PerfilPage() {
+  const { setTheme, setTimezone, setLocale } = usePrefs();
   const [me, setMe] = useState<MeProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -71,9 +69,11 @@ export default function PerfilPage() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [snapshot, setSnapshot] = useState<FormState>(EMPTY_FORM);
   const [prefs, setPrefs] = useState<UserPreferences>(DEFAULT_PREFS);
+  const [pwOpen, setPwOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const avatarUrl = me?.metadata?.avatar_url ?? null;
+  const isDirty = (Object.keys(form) as (keyof FormState)[]).some((k) => form[k] !== snapshot[k]);
 
   function hydrate(profile: MeProfile) {
     const meta = profile.metadata ?? {};
@@ -97,6 +97,8 @@ export default function PerfilPage() {
         if (profile) hydrate(profile);
         const p = await getPreferences();
         setPrefs(p);
+        // Alinha o app (tema/fuso/idioma aplicados) com o que está salvo no banco.
+        syncPrefsFromServer({ theme: p.theme, timezone: p.timezone, language: p.language });
       } catch (err) {
         toast(translateAuthError(err as { message?: string }) || 'Erro ao carregar perfil.', 'error');
       } finally {
@@ -182,31 +184,18 @@ export default function PerfilPage() {
     }
   }
 
-  async function onChangePassword() {
-    const novo = prompt('Digite a nova senha (mín. 8 caracteres):');
-    if (!novo) return;
-    try {
-      await changePassword(novo);
-      toast('Senha alterada');
-    } catch (err) {
-      toast((err as Error).message || 'Não foi possível alterar a senha.', 'error');
-    }
+  // Aplica a preferência na hora (provider) e salva no banco.
+  function onPickTheme(value: string) {
+    setTheme(value as ThemePref);
+    persistPref({ theme: value });
   }
-
-  function pendingAction(kind: 'sessions' | 'close') {
-    if (kind === 'sessions') {
-      alert(
-        'Por enquanto, gerencie suas sessões fazendo logout no menu do usuário. Em breve esta opção mostrará todos os dispositivos conectados.',
-      );
-    } else {
-      if (
-        confirm(
-          'Tem certeza que deseja solicitar o encerramento da sua conta?\n\nNossa equipe entrará em contato para confirmar.',
-        )
-      ) {
-        alert('Solicitação registrada. Em breve nossa equipe entrará em contato pelo seu e-mail.');
-      }
-    }
+  function onPickTimezone(value: string) {
+    setTimezone(value);
+    persistPref({ timezone: value });
+  }
+  function onPickLanguage(value: string) {
+    setLocale(value);
+    persistPref({ language: value });
   }
 
   const avatarStyle = avatarUrl
@@ -324,7 +313,7 @@ export default function PerfilPage() {
                 <input
                   ref={fileRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/gif,.jpg,.jpeg,.png,.gif"
                   hidden
                   onChange={onPickAvatar}
                 />
@@ -400,10 +389,15 @@ export default function PerfilPage() {
                 </div>
               </div>
               <div className={styles.saveRow}>
-                <button type="button" className={styles.btnGhost} onClick={onDiscard} disabled={saving}>
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  onClick={onDiscard}
+                  disabled={saving || !isDirty}
+                >
                   Descartar
                 </button>
-                <button type="submit" className="btn-primary" disabled={saving}>
+                <button type="submit" className="btn-primary" disabled={saving || !isDirty}>
                   {saving ? 'Salvando…' : 'Salvar alterações'}
                 </button>
               </div>
@@ -430,7 +424,7 @@ export default function PerfilPage() {
                 <div className={styles.rowTitle}>Senha</div>
                 <div className={styles.rowDesc}>Defina uma nova senha de acesso.</div>
               </div>
-              <button type="button" className={styles.rowAction} onClick={onChangePassword}>
+              <button type="button" className={styles.rowAction} onClick={() => setPwOpen(true)}>
                 Alterar senha
               </button>
             </div>
@@ -443,11 +437,11 @@ export default function PerfilPage() {
               </div>
               <div>
                 <div className={styles.rowTitle}>Sessões ativas</div>
-                <div className={styles.rowDesc}>Gerencie os dispositivos conectados.</div>
+                <div className={styles.rowDesc}>
+                  Por enquanto, saia da conta pelo menu do usuário. A lista de dispositivos chega em breve.
+                </div>
               </div>
-              <button type="button" className={styles.rowAction} onClick={() => pendingAction('sessions')}>
-                Gerenciar sessões
-              </button>
+              <span className={styles.soon}>Em breve</span>
             </div>
 
             <div className={styles.listRow}>
@@ -459,15 +453,11 @@ export default function PerfilPage() {
               </div>
               <div>
                 <div className={styles.rowTitle}>Encerrar conta</div>
-                <div className={styles.rowDesc}>Você perderá acesso ao portal e ao histórico.</div>
+                <div className={styles.rowDesc}>
+                  Para encerrar sua conta, fale com seu contato no Diamantes. O autoatendimento chega em breve.
+                </div>
               </div>
-              <button
-                type="button"
-                className={`${styles.rowAction} ${styles.rowActionDanger}`}
-                onClick={() => pendingAction('close')}
-              >
-                Solicitar encerramento
-              </button>
+              <span className={styles.soon}>Em breve</span>
             </div>
           </section>
 
@@ -491,13 +481,7 @@ export default function PerfilPage() {
                   {me?.client_slug ? 'Cliente do portal' : '—'}
                 </div>
               </div>
-              <button
-                type="button"
-                className={styles.planLink}
-                onClick={() => alert('A página de detalhes do plano estará disponível em breve.')}
-              >
-                Ver detalhes →
-              </button>
+              <span className={styles.soon}>Em breve</span>
             </div>
           </section>
         </div>
@@ -553,15 +537,16 @@ export default function PerfilPage() {
             <div className={styles.prefRow}>
               <div>
                 <div className={styles.prefTitle}>Idioma</div>
-                <div className={styles.prefDesc}>Idioma de exibição do portal.</div>
+                <div className={styles.prefDesc}>
+                  Hoje o portal está só em português.{' '}
+                  <span className={styles.prefSoon}>Outros idiomas em breve.</span>
+                </div>
               </div>
-              <select
-                value={prefs.language}
-                onChange={(e) => persistPref({ language: e.target.value })}
-              >
-                {LANGUAGES.map((o) => (
-                  <option key={o.value} value={o.value}>
+              <select value={prefs.language} onChange={(e) => onPickLanguage(e.target.value)}>
+                {LOCALES.map((o) => (
+                  <option key={o.code} value={o.code} disabled={!o.ready}>
                     {o.label}
+                    {o.ready ? '' : ' (em breve)'}
                   </option>
                 ))}
               </select>
@@ -572,10 +557,7 @@ export default function PerfilPage() {
                 <div className={styles.prefTitle}>Fuso horário</div>
                 <div className={styles.prefDesc}>Datas e horários no portal.</div>
               </div>
-              <select
-                value={prefs.timezone}
-                onChange={(e) => persistPref({ timezone: e.target.value })}
-              >
+              <select value={prefs.timezone} onChange={(e) => onPickTimezone(e.target.value)}>
                 {TIMEZONES.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
@@ -587,21 +569,107 @@ export default function PerfilPage() {
             <div className={styles.prefRow}>
               <div>
                 <div className={styles.prefTitle}>Tema</div>
-                <div className={styles.prefDesc}>Aparência padrão.</div>
+                <div className={styles.prefDesc}>Claro, escuro ou seguir o sistema.</div>
               </div>
-              <select value={prefs.theme} onChange={(e) => persistPref({ theme: e.target.value })}>
+              <select value={prefs.theme} onChange={(e) => onPickTheme(e.target.value)}>
                 {THEMES.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
                 ))}
-                <option value="dark" disabled>
-                  Escuro (em breve)
-                </option>
               </select>
             </div>
           </section>
         </div>
+      </div>
+
+      {pwOpen && <PasswordModal onClose={() => setPwOpen(false)} />}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Modal de troca de senha (type=password + confirmação)
+// ─────────────────────────────────────────────────────────────
+
+function PasswordModal({ onClose }: { onClose: () => void }) {
+  const [pw, setPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (pw.length < 8) {
+      setError('A senha precisa ter no mínimo 8 caracteres.');
+      return;
+    }
+    if (pw !== confirmPw) {
+      setError('As senhas não conferem.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await changePassword(pw);
+      toast('Senha alterada');
+      onClose();
+    } catch (err) {
+      setError(translateAuthError(err as { message?: string }) || 'Não foi possível alterar a senha.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className={styles.overlay}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className={styles.dialog}>
+        <div className={styles.dialogHead}>
+          <div>
+            <h3>Alterar senha</h3>
+            <div className={styles.dialogSub}>Escolha uma nova senha de acesso.</div>
+          </div>
+          <button type="button" className={styles.dialogClose} onClick={onClose} aria-label="Fechar">
+            ×
+          </button>
+        </div>
+        <form className={styles.dialogBody} onSubmit={submit}>
+          <div className={styles.field}>
+            <label htmlFor="pwNew">Nova senha</label>
+            <input
+              id="pwNew"
+              type="password"
+              autoComplete="new-password"
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="Mín. 8 caracteres"
+            />
+          </div>
+          <div className={styles.field}>
+            <label htmlFor="pwConfirm">Confirmar nova senha</label>
+            <input
+              id="pwConfirm"
+              type="password"
+              autoComplete="new-password"
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              placeholder="Repita a senha"
+            />
+          </div>
+          {error && <p className={styles.formError}>{error}</p>}
+          <div className={styles.dialogActions}>
+            <button type="button" className={styles.btnGhost} onClick={onClose} disabled={busy}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy ? 'Salvando…' : 'Salvar senha'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
