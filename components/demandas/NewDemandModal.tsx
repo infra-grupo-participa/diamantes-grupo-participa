@@ -87,6 +87,9 @@ export default function NewDemandModal({
       try {
         const ops = await listOperatorsForClient();
         setOperators(ops);
+        // A equipe pré-definida do cliente já vem TODA selecionada (notifica todo
+        // mundo no ClickUp); o cliente pode desmarcar quem não deve participar.
+        setSelectedOps(new Set(ops.map((o) => String(o.id))));
       } catch (e) {
         setOpsError(e instanceof Error ? e.message : String(e));
         setOperators([]);
@@ -316,7 +319,7 @@ export default function NewDemandModal({
                   })
                 )}
               </div>
-              <small className={styles.hint}>Selecione a equipe que vai trabalhar nessa demanda.</small>
+              <small className={styles.hint}>Sua equipe já vem selecionada e será notificada no ClickUp — desmarque quem não deve participar desta demanda.</small>
             </div>
             <div className={styles.grid2}>
               <div>

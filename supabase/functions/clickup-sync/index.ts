@@ -43,6 +43,13 @@ async function getDemand(supabase: any, demand_id: string) {
   return data;
 }
 
+async function getProjectTitle(supabase: any, project_id: string | null): Promise<string> {
+  if (!project_id) return "";
+  const { data } = await supabase.schema("portal")
+    .from("projects").select("title").eq("id", project_id).maybeSingle();
+  return data?.title || "";
+}
+
 // Operadores atribuídos vivem em portal.demand_operators (NÃO demand_members,
 // que só tem role='client'). portal.operators já tem clickup_user_id.
 // (v6: corrige assignees vazios — antes lia demand_members.)
@@ -106,9 +113,17 @@ function assigneesFor(members: any[]): number[] {
     .filter(n => !isNaN(n));
 }
 
+// Nome da task com prefixo do projeto p/ diferenciar no ClickUp: "[Projeto] título".
+// O webhook reverso remove esse prefixo ao ler o nome (não polui demands.title).
+function taskName(demand: any): string {
+  const t = demand.title || "Demanda";
+  const proj = (demand._project_title || "").trim();
+  return proj ? `[${proj}] ${t}` : t;
+}
+
 function buildCreatePayload(demand: any, assignees: number[]) {
   const p: any = {
-    name: demand.title,
+    name: taskName(demand),
     description: demand.description || "",
     status: mapStatus(demand.status),
     assignees,
@@ -127,7 +142,7 @@ async function fetchCurrentAssignees(apiKey: string, task_id: string): Promise<n
 
 function buildUpdatePayload(demand: any, addAssignees: number[], remAssignees: number[]) {
   const p: any = {
-    name: demand.title,
+    name: taskName(demand),
     description: demand.description || "",
     status: mapStatus(demand.status),
   };
@@ -235,10 +250,12 @@ Deno.serve(async (req: Request) => {
     const [cfg, demand] = await Promise.all([getConfig(supabase), getDemand(supabase, demand_id)]);
     if (!demand) return new Response(JSON.stringify({ error: "demand não encontrada" }), { status: 404, headers: { "Content-Type": "application/json" } });
 
-    const [members, requester] = await Promise.all([
+    const [members, requester, projectTitle] = await Promise.all([
       getMembersInfo(supabase, demand_id),
       getRequesterEmail(supabase, demand.created_by),
+      getProjectTitle(supabase, demand.project_id),
     ]);
+    demand._project_title = projectTitle; // usado em taskName() p/ prefixar "[Projeto]"
 
     let task;
     if (demand.clickup_task_id) {
