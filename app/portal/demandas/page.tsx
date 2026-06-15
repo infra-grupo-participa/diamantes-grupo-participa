@@ -137,6 +137,8 @@ export default function DemandasPage() {
   const unsubRef = useRef<(() => void) | null>(null);
   const currentIdRef = useRef<string | null>(null);
   currentIdRef.current = currentId;
+  const messagesRef = useRef<Record<string, ChatMessage[]>>({});
+  messagesRef.current = messages;
 
   // Caches LAZY (refs p/ não re-buscar nem re-subscrever): ids carregados + em voo.
   const membersLoaded = useRef<Set<string>>(new Set());
@@ -231,6 +233,30 @@ export default function DemandasPage() {
     }
   }, []);
 
+  // Rede de segurança contra eventos de realtime perdidos (blip de conexão / aba
+  // em background): busca a lista e ANEXA só o que faltou (dedup por id).
+  const syncMessages = useCallback(async (demandId: string) => {
+    try {
+      const fresh = await listMessages(demandId);
+      const existingIds = new Set((messagesRef.current[demandId] || []).map((m) => m.id));
+      const novos = fresh.filter((m) => !existingIds.has(m.id));
+      if (!novos.length) return;
+      for (const m of novos) {
+        if (Array.isArray(m.attachments) && m.attachments.length) {
+          m.attachments = await hydrateAttachments(m.attachments);
+        }
+      }
+      setMessages((prev) => {
+        const ex = prev[demandId] || [];
+        const exIds = new Set(ex.map((x) => x.id));
+        const add = novos.filter((m) => !exIds.has(m.id));
+        return add.length ? { ...prev, [demandId]: [...ex, ...add] } : prev;
+      });
+    } catch (e) {
+      console.error('syncMessages', e);
+    }
+  }, []);
+
   // ── Realtime para a demanda atual ──
   useEffect(() => {
     if (unsubRef.current) {
@@ -256,13 +282,25 @@ export default function DemandasPage() {
         if (fresh) setDemands((prev) => prev.map((x) => (x.id === id ? fresh : x)));
       },
     });
+
+    // Rede de segurança: poll leve + re-sync ao voltar o foco/visibilidade da aba.
+    const poll = setInterval(() => void syncMessages(currentId), 7000);
+    const onActive = () => {
+      if (document.visibilityState === 'visible') void syncMessages(currentId);
+    };
+    document.addEventListener('visibilitychange', onActive);
+    window.addEventListener('focus', onActive);
+
     return () => {
+      clearInterval(poll);
+      document.removeEventListener('visibilitychange', onActive);
+      window.removeEventListener('focus', onActive);
       if (unsubRef.current) {
         unsubRef.current();
         unsubRef.current = null;
       }
     };
-  }, [currentId, loadMessages, appendMessage, ensureMembers]);
+  }, [currentId, loadMessages, appendMessage, ensureMembers, syncMessages]);
 
   // Lazy: carrega o rating da demanda aberta assim que ela estiver concluída.
   const currentStatus = currentId ? demands.find((d) => d.id === currentId)?.status : null;
