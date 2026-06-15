@@ -238,10 +238,10 @@
   margin-top: 2px;
 }
 .dueWarn.late {
-  color: #b91c1c;
+  color: var(--danger-strong);
 }
 .dueWarn.soon {
-  color: #b45309;
+  color: var(--warning-strong);
 }
 .dueWarn.future {
   color: var(--muted);
@@ -280,11 +280,11 @@
   background: currentColor;
   flex-shrink: 0;
 }
-.badgeGreen { background: rgba(22, 163, 74, 0.1); color: #15803d; border-color: rgba(22, 163, 74, 0.18); }
+.badgeGreen { background: var(--success-soft); color: var(--success-strong); border-color: var(--success-soft); }
 .badgeYellow { background: rgba(242, 151, 37, 0.12); color: var(--accent-strong); border-color: rgba(242, 151, 37, 0.22); }
-.badgeRed { background: rgba(239, 68, 68, 0.1); color: #dc2626; border-color: rgba(239, 68, 68, 0.18); }
-.badgeBlue { background: rgba(59, 130, 246, 0.1); color: #2563eb; border-color: rgba(59, 130, 246, 0.18); }
-.badgeGray { background: #f3f4f6; color: #6b7280; border-color: #e5e7eb; }
+.badgeRed { background: var(--danger-soft); color: var(--danger-strong); border-color: var(--danger-soft); }
+.badgeBlue { background: var(--info-soft); color: var(--info-strong); border-color: var(--info-soft); }
+.badgeGray { background: var(--neutral-soft); color: var(--neutral-strong); border-color: var(--neutral-soft); }
 
 .rowActions {
   justify-content: flex-end;
@@ -594,12 +594,12 @@
 .serviceChip.estrategia { background: var(--accent-soft); color: var(--accent-strong); }
 .serviceChip.estrategia .dot { background: var(--accent); }
 .serviceChip.delinquent {
-  background: #fff1f2;
-  color: #be123c;
-  border: 1.5px dashed #fca5a5;
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+  border: 1.5px dashed var(--danger-soft);
 }
 .serviceChip.delinquent .dot {
-  background: #f43f5e;
+  background: var(--danger);
 }
 .serviceLabel {
   font-size: 0.72rem;
@@ -611,7 +611,7 @@
   grid-column: 1 / -1;
 }
 .serviceLabel.late {
-  color: #be123c;
+  color: var(--danger-strong);
 }
 .dueTag {
   margin-left: 4px;
@@ -620,8 +620,8 @@
   padding: 1px 5px;
   font-weight: 700;
 }
-.dueTag.late { background: #fee2e2; color: #b91c1c; }
-.dueTag.soon { background: #fef3c7; color: #92400e; }
+.dueTag.late { background: var(--danger-soft); color: var(--danger-strong); }
+.dueTag.soon { background: var(--warning-soft); color: var(--warning-strong); }
 .dueTag.future { color: var(--muted); font-weight: 500; }
 
 .metrics {
@@ -827,9 +827,9 @@
 }
 .credWarn {
   font-size: 0.78rem;
-  color: #9a3412;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  color: var(--warning-strong);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-soft);
   border-radius: 8px;
   padding: 10px 12px;
   line-height: 1.5;

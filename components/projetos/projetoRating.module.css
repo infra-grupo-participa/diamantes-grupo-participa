@@ -151,7 +151,7 @@
   transform: scale(1.12);
 }
 .star.on {
-  color: #f59e0b;
+  color: var(--warning);
 }
 .starHint {
   text-align: center;

@@ -7,7 +7,7 @@
   flex-direction: column;
   gap: 18px;
   --d-success: var(--success);
-  --d-warning: #f59e0b;
+  --d-warning: var(--warning);
   --d-bg: var(--surface-sunken);
   --d-surface: var(--surface);
   --d-border: var(--border);
@@ -271,16 +271,16 @@
   border-radius: 50%;
 }
 .dotOpen {
-  background: #3b82f6;
+  background: var(--info);
 }
 .dotProg {
-  background: #eab308;
+  background: var(--warning);
 }
 .dotReview {
   background: #ec4899;
 }
 .dotDone {
-  background: #16a34a;
+  background: var(--success);
 }
 .kcolCount {
   background: var(--d-surface);
@@ -527,12 +527,12 @@
   color: #be185d;
 }
 .studentCounter.cProg {
-  background: #fff4d6;
-  color: #b45309;
+  background: var(--warning-soft);
+  color: var(--warning-strong);
 }
 .studentCounter.cDone {
-  background: #e7f7ee;
-  color: #15803d;
+  background: var(--success-soft);
+  color: var(--success-strong);
 }
 .studentCaret {
   width: 24px;
@@ -579,24 +579,24 @@
   margin-bottom: 6px;
 }
 .badgeMini.open {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--info-soft);
+  color: var(--info-strong);
 }
 .badgeMini.prog {
-  background: #fff4d6;
-  color: #b45309;
+  background: var(--warning-soft);
+  color: var(--warning-strong);
 }
 .badgeMini.review {
   background: #ffe9ee;
   color: #be185d;
 }
 .badgeMini.done {
-  background: #e7f7ee;
-  color: #15803d;
+  background: var(--success-soft);
+  color: var(--success-strong);
 }
 .badgeMini.cancel {
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--neutral-soft);
+  color: var(--neutral-strong);
 }
 .studentsEmpty {
   padding: 40px;
@@ -726,24 +726,24 @@
   flex-shrink: 0;
 }
 .bOpen {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: var(--info-soft);
+  color: var(--info-strong);
 }
 .bProg {
-  background: #fff4d6;
-  color: #b45309;
+  background: var(--warning-soft);
+  color: var(--warning-strong);
 }
 .bReview {
   background: #ffe9ee;
   color: #be185d;
 }
 .bDone {
-  background: #e7f7ee;
-  color: #15803d;
+  background: var(--success-soft);
+  color: var(--success-strong);
 }
 .bCancel {
-  background: #e2e8f0;
-  color: #475569;
+  background: var(--neutral-soft);
+  color: var(--neutral-strong);
 }
 
 /* ações de status */
@@ -776,7 +776,7 @@
   color: var(--danger);
 }
 .statusBtn.statusDanger:hover:not(:disabled) {
-  background: #fee2e2;
+  background: var(--danger-soft);
 }
 .statusBtn:disabled {
   cursor: default;

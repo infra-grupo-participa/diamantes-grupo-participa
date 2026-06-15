@@ -368,9 +368,9 @@
   flex-shrink: 0;
 }
 .rolePillAdmin {
-  background: linear-gradient(135deg, #fef3c7, #fff4d6);
-  color: #b45309;
-  border: 1px solid #fde68a;
+  background: var(--warning-soft);
+  color: var(--warning-strong);
+  border: 1px solid var(--warning-soft);
 }
 .rolePillAdmin .dot {
   background: var(--accent-strong);
@@ -383,7 +383,7 @@
 .stars {
   display: inline-flex;
   gap: 1px;
-  color: #f59e0b;
+  color: var(--warning);
   align-items: center;
 }
 .stars svg {
@@ -450,9 +450,9 @@
   flex-shrink: 0;
 }
 .stApproved {
-  background: rgba(22, 163, 74, 0.1);
-  color: #15803d;
-  border-color: rgba(22, 163, 74, 0.18);
+  background: var(--success-soft);
+  color: var(--success-strong);
+  border-color: var(--success-soft);
 }
 .stApproved .dot {
   background: var(--success);
@@ -466,20 +466,20 @@
   background: var(--accent);
 }
 .stRejected {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
-  border-color: rgba(239, 68, 68, 0.18);
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+  border-color: var(--danger-soft);
 }
 .stRejected .dot {
   background: var(--danger);
 }
 .stPending {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-  border-color: rgba(59, 130, 246, 0.18);
+  background: var(--info-soft);
+  color: var(--info-strong);
+  border-color: var(--info-soft);
 }
 .stPending .dot {
-  background: #3b82f6;
+  background: var(--info);
 }
 
 /* Row actions */
@@ -511,17 +511,17 @@
   border-color: rgba(242, 151, 37, 0.3);
 }
 .iconBtn.danger:hover {
-  background: #fee2e2;
-  color: var(--danger);
-  border-color: #fecaca;
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+  border-color: var(--danger-soft);
 }
 .iconBtn.success {
   color: var(--success);
 }
 .iconBtn.success:hover {
-  background: #dcfce7;
-  color: var(--success);
-  border-color: #bbf7d0;
+  background: var(--success-soft);
+  color: var(--success-strong);
+  border-color: var(--success-soft);
 }
 .iconBtn svg {
   width: 15px;
@@ -792,28 +792,28 @@
   white-space: nowrap;
 }
 .bDraft {
-  background: #fff3e0;
-  color: #bf360c;
+  background: var(--warning-soft);
+  color: var(--warning-strong);
 }
 .bSubmitted {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--success-soft);
+  color: var(--success-strong);
 }
 .bBriefing {
-  background: #fff8e1;
-  color: #e65100;
+  background: var(--warning-soft);
+  color: var(--warning-strong);
 }
 .bActive {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--success-soft);
+  color: var(--success-strong);
 }
 .bCompleted {
-  background: #e3f2fd;
-  color: #1565c0;
+  background: var(--info-soft);
+  color: var(--info-strong);
 }
 .bCancelled {
-  background: #f5f5f5;
-  color: #777;
+  background: var(--neutral-soft);
+  color: var(--neutral-strong);
 }
 
 /* Briefing modal */

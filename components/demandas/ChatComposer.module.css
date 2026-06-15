@@ -101,7 +101,7 @@
 .dragover {
   outline: 2px dashed var(--accent);
   outline-offset: -3px;
-  background: #fff7ea;
+  background: var(--warning-soft);
 }
 .textarea {
   flex: 1;
