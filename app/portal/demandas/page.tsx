@@ -99,6 +99,16 @@ function dueLabel(d: Demand): string {
   if (diff === 1) return 'Vence amanhã';
   return 'Vence em ' + diff + ' dias';
 }
+// Urgência do prazo p/ colorir na lista: vermelho (atrasada) / âmbar (vence hoje/amanhã).
+function dueUrgency(d: Demand): 'late' | 'soon' | '' {
+  if (d.status === 'done' || d.status === 'canceled' || !d.ends_at) return '';
+  const diff = daysUntilDue(d.ends_at);
+  if (diff === null) return '';
+  if (diff < 0) return 'late';
+  if (diff <= 1) return 'soon';
+  return '';
+}
+const DEMAND_READ_KEY = 'diamantes.demandRead';
 function categoryOf(members?: DemandMember[]): string {
   // members undefined ⇒ ainda não carregado (lazy): retorna vazio p/ não poluir a lista.
   if (!members) return '';
@@ -120,6 +130,25 @@ export default function DemandasPage() {
   const [ratings, setRatings] = useState<Record<string, Rating | null>>({});
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [me, setMe] = useState<Me | null>(null);
+  // Filtro por projeto (via ?projeto=<id>, vindo do card de Projetos).
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  useEffect(() => {
+    try { setProjectFilter(new URLSearchParams(window.location.search).get('projeto')); } catch { /* */ }
+  }, []);
+  function clearProjectFilter() {
+    setProjectFilter(null);
+    try { window.history.replaceState(null, '', '/portal/demandas'); } catch { /* */ }
+  }
+
+  // Não-lidas: timestamp da última vez que o cliente viu cada demanda (localStorage).
+  const [readMap, setReadMap] = useState<Record<string, string>>({});
+  const markRead = useCallback((id: string, ts?: string | null) => {
+    setReadMap((prev) => {
+      const next = { ...prev, [id]: ts || new Date().toISOString() };
+      try { localStorage.setItem(DEMAND_READ_KEY, JSON.stringify(next)); } catch { /* */ }
+      return next;
+    });
+  }, []);
 
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
@@ -191,6 +220,7 @@ export default function DemandasPage() {
 
   useEffect(() => {
     let cancel = false;
+    try { setReadMap(JSON.parse(localStorage.getItem(DEMAND_READ_KEY) || '{}')); } catch { /* */ }
     (async () => {
       const [profile] = await Promise.all([getMe()]);
       if (cancel) return;
@@ -200,6 +230,24 @@ export default function DemandasPage() {
     })();
     return () => {
       cancel = true;
+    };
+  }, [loadAll]);
+
+  // Marca a demanda ABERTA como lida (com o timestamp da última mensagem conhecida).
+  useEffect(() => {
+    if (!currentId) return;
+    const d = demands.find((x) => x.id === currentId);
+    markRead(currentId, (d?.last_message_at as string) || new Date().toISOString());
+  }, [currentId, demands, markRead]);
+
+  // Atualiza a lista (não-lidas + ordem por atividade) ao voltar o foco/visibilidade.
+  useEffect(() => {
+    const onActive = () => { if (document.visibilityState === 'visible') void loadAll(); };
+    window.addEventListener('focus', onActive);
+    document.addEventListener('visibilitychange', onActive);
+    return () => {
+      window.removeEventListener('focus', onActive);
+      document.removeEventListener('visibilitychange', onActive);
     };
   }, [loadAll]);
 
@@ -327,13 +375,24 @@ export default function DemandasPage() {
 
   const filtered = useMemo(() => {
     let items = demands;
+    if (projectFilter) items = items.filter((d) => d.project_id === projectFilter);
     if (filter === 'in_progress') items = items.filter((d) => d.status === 'open' || d.status === 'in_progress' || d.status === 'review');
     else if (filter === 'awaiting') items = items.filter((d) => d.status === 'review');
     else if (filter === 'done') items = items.filter((d) => d.status === 'done');
     const q = search.trim().toLowerCase();
-    if (q) items = items.filter((d) => (d.title || '').toLowerCase().includes(q));
+    if (q) {
+      items = items.filter((d) =>
+        `${d.title || ''} ${d.description || ''} ${d.project_title || ''}`.toLowerCase().includes(q),
+      );
+    }
     return items;
-  }, [demands, filter, search]);
+  }, [demands, filter, search, projectFilter]);
+
+  // Nome do projeto filtrado (de qualquer demanda dele) p/ o banner.
+  const projectFilterName = useMemo(
+    () => (projectFilter ? (demands.find((d) => d.project_id === projectFilter)?.project_title as string) || 'projeto' : null),
+    [projectFilter, demands],
+  );
 
   const current = useMemo(() => demands.find((d) => d.id === currentId) || null, [demands, currentId]);
   const currentMsgs = currentId ? messages[currentId] || [] : [];
@@ -560,6 +619,18 @@ export default function DemandasPage() {
               <input type="text" placeholder="Buscar demanda…" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
+          {projectFilter && (
+            <div
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 12px', margin: '0 0 6px', background: 'var(--accent-soft)', borderRadius: 10, fontSize: '0.8rem' }}
+            >
+              <span style={{ color: 'var(--accent-strong)', fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                📁 {projectFilterName}
+              </span>
+              <button type="button" onClick={clearProjectFilter} style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontWeight: 600, flexShrink: 0 }}>
+                Ver todas
+              </button>
+            </div>
+          )}
           <div className={styles.listScroll}>
             {loadError ? (
               <div className={styles.loadError}>Erro: {loadError}</div>
@@ -576,38 +647,83 @@ export default function DemandasPage() {
                 ))}
               </>
             ) : filtered.length === 0 ? (
-              <div className={styles.empty}>Nenhuma demanda nessa categoria.</div>
+              <div className={styles.empty}>
+                {filter === 'all' && !search && demands.length === 0 ? (
+                  <>
+                    <p style={{ marginBottom: 12 }}>Você ainda não abriu nenhuma demanda.</p>
+                    <button type="button" className="btn-primary" onClick={() => void openNewDemand()}>
+                      + Abrir primeira demanda
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ marginBottom: 10 }}>Nenhuma demanda neste filtro.</p>
+                    <button
+                      type="button"
+                      onClick={() => { setFilter('all'); setSearch(''); }}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent)', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Ver todas as demandas
+                    </button>
+                  </>
+                )}
+              </div>
             ) : (
-              filtered.map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  className={`${styles.listItem} ${d.id === currentId ? styles.active : ''} ${d.status === 'review' ? styles.awaiting : ''}`}
-                  onClick={() => setCurrentId(d.id)}
-                >
-                  <span className={`${styles.listIcon} ${styles[iconKeyFor(d)]}`}>
-                    <PenIcon />
-                  </span>
-                  <span className={styles.listBody}>
-                    <span className={styles.listTitle} style={{ display: 'block' }}>
-                      {d.title || 'Sem título'}
+              filtered.map((d) => {
+                const urg = dueUrgency(d);
+                const unread =
+                  d.id !== currentId &&
+                  !!d.last_message_at &&
+                  (!readMap[d.id] || (d.last_message_at as string) > readMap[d.id]);
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    className={`${styles.listItem} ${d.id === currentId ? styles.active : ''} ${d.status === 'review' ? styles.awaiting : ''}`}
+                    onClick={() => setCurrentId(d.id)}
+                  >
+                    <span className={`${styles.listIcon} ${styles[iconKeyFor(d)]}`}>
+                      <PenIcon />
                     </span>
-                    <span className={styles.listMeta}>
-                      {(() => {
-                        const cat = categoryOf(members[d.id]);
-                        return cat ? (
-                          <>
-                            <span>{cat}</span>
-                            <span>•</span>
-                          </>
-                        ) : null;
-                      })()}
-                      <span>{dueLabel(d)}</span>
+                    <span className={styles.listBody}>
+                      <span className={styles.listTitle} style={{ display: 'block', fontWeight: unread ? 700 : undefined }}>
+                        {d.title || 'Sem título'}
+                      </span>
+                      <span className={styles.listMeta}>
+                        {(() => {
+                          const cat = categoryOf(members[d.id]);
+                          return cat ? (
+                            <>
+                              <span>{cat}</span>
+                              <span>•</span>
+                            </>
+                          ) : null;
+                        })()}
+                        <span
+                          style={
+                            urg === 'late'
+                              ? { color: 'var(--danger-strong)', fontWeight: 600 }
+                              : urg === 'soon'
+                                ? { color: 'var(--warning-strong)', fontWeight: 600 }
+                                : undefined
+                          }
+                        >
+                          {dueLabel(d)}
+                        </span>
+                      </span>
                     </span>
-                  </span>
-                  <span />
-                </button>
-              ))
+                    {unread ? (
+                      <span
+                        aria-label="Mensagens novas"
+                        title="Mensagens novas"
+                        style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, alignSelf: 'center' }}
+                      />
+                    ) : (
+                      <span />
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
         </aside>
@@ -636,7 +752,15 @@ export default function DemandasPage() {
                     <span className={`${styles.statusBadge} ${styles[STATUS_TAG[current.status]]}`}>
                       {STATUS_LABEL[current.status] || current.status}
                     </span>
-                    <span>{current.starts_at ? `Início ${fmtDate(current.starts_at)}` : ''}</span>
+                    {current.project_title ? (
+                      <span
+                        title="Projeto"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 9px', borderRadius: 999, background: 'var(--accent-soft)', color: 'var(--accent-strong)', fontSize: '0.72rem', fontWeight: 600 }}
+                      >
+                        📁 {current.project_title}
+                      </span>
+                    ) : null}
+                    {current.starts_at ? <span>Início {fmtDate(current.starts_at)}</span> : null}
                   </div>
                 )}
               </div>
@@ -718,6 +842,7 @@ export default function DemandasPage() {
               // Append incremental do próprio envio (dedup cobre o eco do realtime).
               if (inserted?.id != null) await appendMessage(currentId, String(inserted.id));
               else await loadMessages(currentId);
+              markRead(currentId, new Date().toISOString());
             }}
           />
         </section>
