@@ -452,6 +452,19 @@ a {
   padding: 6px;
   z-index: 40;
 }
+/* No sidebar (admin/operator) o chip fica no rodapé — abre o menu PRA CIMA,
+   senão ele cai fora da tela (abaixo do rodapé da sidebar). */
+.sidebar-foot .user-menu {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+/* No mobile a sidebar vira barra horizontal no topo: volta a abrir pra baixo. */
+@media (max-width: 900px) {
+  .sidebar-foot .user-menu {
+    top: calc(100% + 8px);
+    bottom: auto;
+  }
+}
 .user-menu-head {
   display: flex;
   flex-direction: column;
