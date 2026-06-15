@@ -20,6 +20,12 @@ Mantenha este diretório em sincronia ao editar uma função.
   custom fields cliente/solicitante/equipe, status PT-BR) e grava `demands.clickup_task_id`.
   - Disparada por: trigger `demands_clickup_insert` / `demands_clickup_update` em
     `portal.demands` → `portal._sync_demand_to_clickup` (pg_net).
+  - **Lista por cliente:** a task vai pra **lista do cliente** (`clients.cu_list_id`)
+    p/ organizar por aluno no operacional; sem `cu_list_id`, cai na lista global
+    (`clickup_config.list_id`).
+  - **Single-assignee:** se o espaço do ClickUp não tem o ClickApp de múltiplos
+    assignees (erro `ITEM_417`), a task é (re)criada com **1 responsável** (o 1º operador);
+    a equipe completa fica no custom field "equipe".
 - `clickup-comment-sync` — publica a **mensagem** do chat como comentário na task.
   - Disparada por: trigger `messages_clickup_sync` em `portal.demand_messages` →
     `portal._sync_message_to_clickup` (pg_net). Ignora mensagens com `origin='clickup'`

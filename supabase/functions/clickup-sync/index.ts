@@ -147,12 +147,40 @@ async function setCustomFields(apiKey: string, task_id: string, cfg: any, demand
   }
 }
 
-async function createTask(apiKey: string, cfg: any, demand: any, members: any[], requester: string) {
+// Lista de destino da demanda: a LISTA do cliente (clients.cu_list_id) p/ organizar
+// por aluno; se não tiver configurada, cai na lista global (clickup_config.list_id).
+async function getClientListId(supabase: any, client_slug: string, cfg: any): Promise<string> {
+  if (!client_slug) return cfg.list_id;
+  const { data } = await supabase.schema("portal")
+    .from("clients").select("cu_list_id").eq("slug", client_slug).maybeSingle();
+  const listId = String(data?.cu_list_id || "").trim();
+  if (!listId) {
+    console.warn(`cliente ${client_slug} sem cu_list_id — usando lista global`);
+    return cfg.list_id;
+  }
+  return listId;
+}
+
+async function createTask(apiKey: string, listId: string, cfg: any, demand: any, members: any[], requester: string) {
   const assignees = assigneesFor(members);
-  const task = await clickupRequest(apiKey, `/list/${cfg.list_id}/task`, {
-    method: "POST",
-    body: JSON.stringify(buildCreatePayload(demand, assignees)),
-  });
+  let task;
+  try {
+    task = await clickupRequest(apiKey, `/list/${listId}/task`, {
+      method: "POST",
+      body: JSON.stringify(buildCreatePayload(demand, assignees)),
+    });
+  } catch (e) {
+    // Espaço sem o ClickApp de múltiplos assignees (ITEM_417): recria com 1 só.
+    if (assignees.length > 1 && String((e as any)?.message || e).includes("ITEM_417")) {
+      console.warn("espaço single-assignee — recriando com 1 responsável");
+      task = await clickupRequest(apiKey, `/list/${listId}/task`, {
+        method: "POST",
+        body: JSON.stringify(buildCreatePayload(demand, assignees.slice(0, 1))),
+      });
+    } else {
+      throw e;
+    }
+  }
   await setCustomFields(apiKey, task.id, cfg, demand, members, requester);
   return task;
 }
@@ -162,10 +190,23 @@ async function updateTask(apiKey: string, cfg: any, task_id: string, demand: any
   const current  = new Set(await fetchCurrentAssignees(apiKey, task_id));
   const add = [...desired].filter(id => !current.has(id));
   const rem = [...current].filter(id => !desired.has(id));
-  const task = await clickupRequest(apiKey, `/task/${task_id}`, {
-    method: "PUT",
-    body: JSON.stringify(buildUpdatePayload(demand, add, rem)),
-  });
+  let task;
+  try {
+    task = await clickupRequest(apiKey, `/task/${task_id}`, {
+      method: "PUT",
+      body: JSON.stringify(buildUpdatePayload(demand, add, rem)),
+    });
+  } catch (e) {
+    // Espaço single-assignee (ITEM_417): adiciona só 1 responsável.
+    if (add.length > 1 && String((e as any)?.message || e).includes("ITEM_417")) {
+      task = await clickupRequest(apiKey, `/task/${task_id}`, {
+        method: "PUT",
+        body: JSON.stringify(buildUpdatePayload(demand, add.slice(0, 1), rem)),
+      });
+    } else {
+      throw e;
+    }
+  }
   await setCustomFields(apiKey, task_id, cfg, demand, members, requester);
   return task;
 }
@@ -203,7 +244,8 @@ Deno.serve(async (req: Request) => {
     if (demand.clickup_task_id) {
       task = await updateTask(apiKey, cfg, demand.clickup_task_id, demand, members, requester);
     } else {
-      task = await createTask(apiKey, cfg, demand, members, requester);
+      const listId = await getClientListId(supabase, demand.client_slug, cfg);
+      task = await createTask(apiKey, listId, cfg, demand, members, requester);
       // Persistir o vínculo é crítico: se falhar, a próxima execução cria task
       // duplicada. Propaga o erro para o trigger pg_net poder reprocessar.
       const { error: linkErr } = await supabase.schema("portal").from("demands")
