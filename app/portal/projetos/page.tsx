@@ -68,6 +68,21 @@ export default async function ProjetosPage() {
 
   const projects = (data ?? []) as ProjectRow[];
 
+  // Contagem de demandas por projeto (RLS já restringe ao cliente).
+  const { data: demandRows } = await supabase.from('demands').select('project_id').not('project_id', 'is', null);
+  const demandCount = new Map<string, number>();
+  (demandRows ?? []).forEach((r) => {
+    const pid = (r as { project_id?: string }).project_id;
+    if (pid) demandCount.set(pid, (demandCount.get(pid) ?? 0) + 1);
+  });
+
+  // Data do evento (campo geral do briefing), se preenchida.
+  const eventDateOf = (p: ProjectRow): string | null => {
+    const g = (p.briefing?.general ?? p.briefing ?? {}) as Record<string, unknown>;
+    const raw = (g.event_date ?? g.eventDate) as string | undefined;
+    return raw ? fmtDate(raw) : null;
+  };
+
   return (
     <div className={styles.wrap}>
       <div className={styles.header}>
@@ -104,9 +119,13 @@ export default async function ProjetosPage() {
             };
             const submitted = p.briefing_status === 'submitted';
             const pct = calcProgress(p);
+            const count = demandCount.get(p.id) ?? 0;
+            const evDate = eventDateOf(p);
+            // Rascunho → leva ao briefing (preencher); enviado → leva às demandas do evento.
+            const href = submitted ? `/portal/demandas?projeto=${p.id}` : `/portal/briefing/${p.id}`;
 
             return (
-              <Link key={p.id} href={`/portal/briefing/${p.id}`} className={styles.card}>
+              <Link key={p.id} href={href} className={styles.card}>
                 <div className={styles.tags}>
                   {services.length === 0 ? (
                     <span className={styles.tag} style={{ borderColor: '#6b6584', color: '#6b6584' }}>
@@ -130,7 +149,10 @@ export default async function ProjetosPage() {
                 </div>
 
                 <div className={styles.title}>{p.title}</div>
-                <div className={styles.meta}>Criado em {fmtDate(p.created_at)}</div>
+                <div className={styles.meta}>
+                  {evDate ? `Evento em ${evDate}` : `Criado em ${fmtDate(p.created_at)}`}
+                  {count > 0 ? ` · ${count} demanda${count === 1 ? '' : 's'}` : ''}
+                </div>
 
                 <div className={styles.footer}>
                   <span className={`${styles.statusBadge} ${status.cls}`}>{status.label}</span>
@@ -146,7 +168,7 @@ export default async function ProjetosPage() {
                     <span
                       className={`${styles.pill} ${submitted ? styles.pillSubmitted : styles.pillDraft}`}
                     >
-                      {submitted ? '✓ Briefing enviado' : '✏️ Rascunho'}
+                      {submitted ? 'Ver demandas →' : '✏️ Preencher briefing'}
                     </span>
                   </div>
                 </div>

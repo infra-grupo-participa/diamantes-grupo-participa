@@ -18,6 +18,9 @@ export type Demand = {
   created_at: string;
   finalized_at: string | null;
   project_id?: string | null;
+  project_title?: string | null;
+  last_message_at?: string | null;
+  messages_count?: number | null;
   [k: string]: unknown;
 };
 
@@ -100,13 +103,17 @@ export async function getMe(): Promise<Me | null> {
   return data as Me | null;
 }
 
-/** Demandas do cliente (view v_demands), mais recentes primeiro. */
+/** Demandas do cliente (view v_demands), ordenadas por ATIVIDADE recente
+ *  (última mensagem ou, na falta, data de criação) — conversas ativas sobem. */
 export async function listMyDemands(status: string = 'all'): Promise<Demand[]> {
-  let q = db().from('v_demands').select('*').order('created_at', { ascending: false });
+  let q = db().from('v_demands').select('*');
   if (status && status !== 'all') q = q.eq('status', status);
   const { data, error } = await q;
   if (error) throw error;
-  return (data || []) as Demand[];
+  const rows = (data || []) as Demand[];
+  const at = (d: Demand) => (d.last_message_at as string) || d.created_at || '';
+  rows.sort((a, b) => (at(a) < at(b) ? 1 : at(a) > at(b) ? -1 : 0));
+  return rows;
 }
 
 export async function getDemand(id: string): Promise<Demand | null> {
