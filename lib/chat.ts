@@ -82,16 +82,17 @@ export async function listMessages(demandId: string): Promise<ChatMessage[]> {
 }
 
 /**
- * Insere mensagem em demand_messages e dispara sync best-effort pro ClickUp.
- * `userId` (portal.users.id) é resolvido pelo caller. Falha do ClickUp não
- * bloqueia o cliente.
+ * Insere mensagem em demand_messages. A sincronização do comentário para o
+ * ClickUp é feita NO BANCO (trigger messages_clickup_sync → Edge Function
+ * clickup-comment-sync), NÃO aqui — postar daqui também duplicaria o comentário.
+ * `userId` (portal.users.id) é resolvido pelo caller.
  */
 export async function postMessage(
   demandId: string,
   content: string,
   attachments: Attachment[],
   userId: number,
-  clientSlug?: string,
+  _clientSlug?: string,
 ): Promise<unknown> {
   const text = (content || '').trim();
   const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
@@ -110,27 +111,8 @@ export async function postMessage(
     .select()
     .single();
   if (error) throw error;
-
-  // Sync ClickUp em background — best-effort.
-  try {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      const body = { demand_id: demandId, client_slug: clientSlug || '', content: text, attachments: attachments || [] };
-      void fetch('/api/clickup-comment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + session.access_token,
-        },
-        body: JSON.stringify(body),
-      }).catch(() => {});
-    }
-  } catch {
-    /* ignora */
-  }
-
+  // Sem fetch pro ClickUp aqui: a trigger messages_clickup_sync no banco já
+  // publica o comentário via Edge Function. Postar daqui causaria duplicidade.
   return data;
 }
 
