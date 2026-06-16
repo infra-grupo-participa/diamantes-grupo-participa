@@ -48,6 +48,87 @@ export async function isBaseReady(): Promise<boolean> {
   }
 }
 
+export type DashAttentionItem = {
+  id: string;
+  title: string | null;
+  status: string | null;
+  ends_at: string | null;
+  project_title?: string | null;
+  reason: 'review' | 'reply' | 'deadline';
+};
+
+export type DashboardExtras = {
+  demands: { total: number; open: number; in_progress: number; review: number; done: number };
+  projects: { total: number; active: number; completed: number };
+  pendingRatings: number;
+  attention: DashAttentionItem[];
+};
+
+/**
+ * Resumo prático para a tela inicial: contadores de demandas/projetos, avaliações
+ * pendentes e a lista "precisam de você" (em revisão, resposta da equipe ou prazo perto).
+ * Tudo no servidor (RLS restringe ao cliente logado). Tolerante a falhas parciais.
+ */
+export async function getDashboardExtras(): Promise<DashboardExtras> {
+  const supabase = createClient();
+  const empty: DashboardExtras = {
+    demands: { total: 0, open: 0, in_progress: 0, review: 0, done: 0 },
+    projects: { total: 0, active: 0, completed: 0 },
+    pendingRatings: 0,
+    attention: [],
+  };
+
+  const [demRes, projRes, ratRes] = await Promise.all([
+    supabase.from('v_demands').select('id, title, status, ends_at, project_title, last_message_from'),
+    supabase.from('projects').select('id, status'),
+    supabase.rpc('get_my_pending_project_ratings'),
+  ]);
+
+  const demands = (demRes.data ?? []) as Array<{
+    id: string; title: string | null; status: string | null; ends_at: string | null;
+    project_title?: string | null; last_message_from?: string | null;
+  }>;
+  const projects = (projRes.data ?? []) as Array<{ status: string | null }>;
+
+  for (const d of demands) {
+    empty.demands.total++;
+    if (d.status === 'open') empty.demands.open++;
+    else if (d.status === 'in_progress') empty.demands.in_progress++;
+    else if (d.status === 'review') empty.demands.review++;
+    else if (d.status === 'done') empty.demands.done++;
+  }
+  for (const p of projects) {
+    empty.projects.total++;
+    if (p.status === 'completed') empty.projects.completed++;
+    else if (p.status !== 'cancelled' && p.status !== 'canceled') empty.projects.active++;
+  }
+  empty.pendingRatings = Array.isArray(ratRes.data) ? ratRes.data.length : 0;
+
+  const now = Date.now();
+  const SOON = 3 * 24 * 60 * 60 * 1000; // 3 dias
+  const open = (s: string | null) => s !== 'done' && s !== 'canceled';
+  empty.attention = demands
+    .filter((d) => open(d.status))
+    .map((d): DashAttentionItem | null => {
+      const due = d.ends_at ? new Date(d.ends_at).getTime() : null;
+      if (d.status === 'review') return { ...d, reason: 'review' };
+      if (d.last_message_from === 'team') return { ...d, reason: 'reply' };
+      if (due !== null && due - now <= SOON) return { ...d, reason: 'deadline' };
+      return null;
+    })
+    .filter((x): x is DashAttentionItem => x !== null)
+    .sort((a, b) => {
+      const order = { review: 0, reply: 1, deadline: 2 } as const;
+      if (order[a.reason] !== order[b.reason]) return order[a.reason] - order[b.reason];
+      const ad = a.ends_at ? new Date(a.ends_at).getTime() : Infinity;
+      const bd = b.ends_at ? new Date(b.ends_at).getTime() : Infinity;
+      return ad - bd;
+    })
+    .slice(0, 4);
+
+  return empty;
+}
+
 export type PendingBriefing = { id: string; title: string; progress: number };
 
 /**
