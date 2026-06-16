@@ -28,7 +28,7 @@ export type Demand = {
 
 export type DemandMember = {
   id: string | number;
-  user_id: number;
+  user_id: number | string; // operadores usam operator_id (uuid) como user_id sintético
   role: string;
   approved_finish: boolean;
   approved_at: string | null;
@@ -159,46 +159,26 @@ export async function getDemandMembers(demandId: string): Promise<DemandMember[]
     }
   }
 
-  // 2. Operadores via demand_operators → portal.operators (+ positions)
-  const { data: opRows, error: opRowsErr } = await supabase
-    .from('demand_operators')
-    .select('id, operator_id, role, added_at')
-    .eq('demand_id', demandId);
-  if (opRowsErr) console.error('getDemandMembers: falha ao carregar demand_operators', opRowsErr);
-
-  if (opRows?.length) {
-    const opIds = opRows.map((r) => r.operator_id);
-    const { data: ops, error: opsErr } = await supabase
-      .from('operators')
-      .select('id, name, email, position_id, metadata')
-      .in('id', opIds);
-    if (opsErr) console.error('getDemandMembers: falha ao carregar operators', opsErr);
-    const opsById = Object.fromEntries((ops || []).map((o) => [o.id, o]));
-    const posIds = [...new Set((ops || []).map((o) => o.position_id).filter(Boolean))];
-    let posById: Record<number, { name?: string; color?: string }> = {};
-    if (posIds.length) {
-      const { data: positions, error: posErr } = await supabase.from('positions').select('id, name, color').in('id', posIds);
-      if (posErr) console.error('getDemandMembers: falha ao carregar positions', posErr);
-      posById = Object.fromEntries((positions || []).map((p) => [p.id, p]));
-    }
-    for (const r of opRows) {
-      const o = opsById[r.operator_id] || {};
-      const p = (o.position_id != null ? posById[o.position_id] : null) || null;
-      result.push({
-        id: r.id,
-        user_id: r.operator_id, // sintético: operator_id como user_id para display
-        role: 'operator',
-        approved_finish: false,
-        approved_at: null,
-        added_at: r.added_at,
-        user_name: o.name ?? null,
-        user_email: o.email ?? null,
-        user_role: 'operator',
-        avatar_url: o.metadata?.avatar_url || null,
-        position_name: p?.name || null,
-        position_color: p?.color || null,
-      });
-    }
+  // 2. Operadores via RPC SECURITY DEFINER get_demand_team: o cliente NÃO lê
+  //    demand_operators direto (RLS) → 0 linhas. A RPC resolve nome/setor com
+  //    checagem de acesso (dono da demanda ou admin).
+  const { data: opRows, error: opRowsErr } = await supabase.rpc('get_demand_team', { p_demand_id: demandId });
+  if (opRowsErr) console.error('getDemandMembers: falha em get_demand_team', opRowsErr);
+  for (const r of (opRows ?? []) as Array<Record<string, unknown>>) {
+    result.push({
+      id: r.operator_id as string,
+      user_id: r.operator_id as string, // sintético: operator_id como user_id p/ display
+      role: 'operator',
+      approved_finish: false,
+      approved_at: null,
+      added_at: (r.added_at as string) ?? null,
+      user_name: (r.name as string) ?? null,
+      user_email: (r.email as string) ?? null,
+      user_role: 'operator',
+      avatar_url: null,
+      position_name: (r.position_name as string) ?? null,
+      position_color: (r.position_color as string) ?? null,
+    } as DemandMember);
   }
 
   return result;
