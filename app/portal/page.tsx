@@ -1,5 +1,11 @@
 import Link from 'next/link';
-import { getDashboard, isBaseReady, getPendingProjectBriefing, type DashboardData } from '@/lib/api/portal';
+import {
+  getDashboard,
+  isBaseReady,
+  getPendingProjectBriefing,
+  getDashboardExtras,
+  type DashboardData,
+} from '@/lib/api/portal';
 import { firstName, fmtRelative, initials, serviceMeta } from '@/lib/format';
 
 export const metadata = { title: 'Início — Portal Diamantes' };
@@ -22,6 +28,20 @@ function formatEvent(ev?: string): string {
   return EVENT_LABELS[ev] ?? ev.replace(/[._]/g, ' ');
 }
 
+/** Prazo legível olhando para o futuro (ao contrário de fmtRelative). */
+function formatDue(iso: string | null): string {
+  if (!iso) return 'sem prazo definido';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 'sem prazo definido';
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(d) - startOfDay(new Date())) / 86400000);
+  if (days < 0) return `atrasada há ${Math.abs(days)} ${Math.abs(days) === 1 ? 'dia' : 'dias'}`;
+  if (days === 0) return 'vence hoje';
+  if (days === 1) return 'vence amanhã';
+  if (days <= 14) return `vence em ${days} dias`;
+  return `vence em ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`;
+}
+
 function contractStart(d: DashboardData): string | null {
   const p = d.profile ?? {};
   const raw = (p.contractStartedAt ?? p.contract_started_at) as string | undefined;
@@ -41,7 +61,13 @@ const SVC_ICON: Record<string, string> = {
   'Copywriter': '✍️',
 };
 
-// Ícones (inline, traço fino) — cabeçalhos e stats.
+const ATTENTION_META: Record<string, { label: string; cls: string }> = {
+  review: { label: 'Aguarda sua aprovação', cls: 'att-review' },
+  reply: { label: 'A equipe respondeu', cls: 'att-reply' },
+  deadline: { label: 'Prazo próximo', cls: 'att-deadline' },
+};
+
+// Ícones (inline, traço fino).
 const IcoUsers = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
 );
@@ -56,6 +82,18 @@ const IcoClock = (
 );
 const IcoChat = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z" /></svg>
+);
+const IcoBolt = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>
+);
+const IcoPlus = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+);
+const IcoUser = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+);
+const IcoStar = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
 );
 
 export default async function Dashboard() {
@@ -72,13 +110,25 @@ export default async function Dashboard() {
   }
 
   const baseReady = await isBaseReady();
-  const pending = baseReady ? await getPendingProjectBriefing().catch(() => null) : null;
+  const [pending, extras] = await Promise.all([
+    baseReady ? getPendingProjectBriefing().catch(() => null) : Promise.resolve(null),
+    getDashboardExtras().catch(() => null),
+  ]);
+
   const name = data.user?.name ?? '';
   const team = data.team ?? [];
   const services = data.services ?? [];
   const activity = data.activity ?? [];
   const activeServices = services.filter((s) => s.status === 'active');
   const since = contractStart(data);
+
+  const openDemands = extras ? extras.demands.open + extras.demands.in_progress + extras.demands.review : 0;
+  const activeProjects = extras?.projects.active ?? 0;
+  const attention = extras?.attention ?? [];
+  const pendingRatings = extras?.pendingRatings ?? 0;
+
+  const demandsHref = baseReady ? '/portal/demandas' : '/portal/briefing-basico';
+  const projectHref = baseReady ? '/portal/novo-projeto' : '/portal/briefing-basico';
 
   return (
     <div className="dash">
@@ -114,6 +164,21 @@ export default async function Dashboard() {
         </div>
       )}
 
+      {pendingRatings > 0 && (
+        <Link className="rating-banner" href="/portal/projetos">
+          <span className="rating-banner-ico">{IcoStar}</span>
+          <div>
+            <strong>
+              {pendingRatings === 1
+                ? 'Você tem 1 projeto aguardando avaliação'
+                : `Você tem ${pendingRatings} projetos aguardando avaliação`}
+            </strong>
+            <span>Sua opinião ajuda a equipe a melhorar — leva menos de 1 minuto.</span>
+          </div>
+          <span className="rating-banner-go" aria-hidden>Avaliar →</span>
+        </Link>
+      )}
+
       {/* ── HERO ── */}
       <header className="dash-hero">
         <span className="dash-hero-deco" aria-hidden>
@@ -142,7 +207,21 @@ export default async function Dashboard() {
             <span className="dash-stat-ico ico-violet">{IcoUsers}</span>
             <div>
               <strong>{team.length}</strong>
-              <span>{team.length === 1 ? 'Integrante' : 'Integrantes'} na sua equipe</span>
+              <span>{team.length === 1 ? 'Integrante' : 'Integrantes'}</span>
+            </div>
+          </div>
+          <div className="dash-stat">
+            <span className="dash-stat-ico ico-accent">{IcoChat}</span>
+            <div>
+              <strong>{openDemands}</strong>
+              <span>{openDemands === 1 ? 'Demanda em aberto' : 'Demandas em aberto'}</span>
+            </div>
+          </div>
+          <div className="dash-stat">
+            <span className="dash-stat-ico ico-violet">{IcoLayers}</span>
+            <div>
+              <strong>{activeProjects}</strong>
+              <span>{activeProjects === 1 ? 'Projeto ativo' : 'Projetos ativos'}</span>
             </div>
           </div>
           <div className="dash-stat">
@@ -155,22 +234,105 @@ export default async function Dashboard() {
         </div>
       </header>
 
-      {/* ── BENTO ── */}
-      <div className="dash-bento">
+      {/* ── AÇÕES RÁPIDAS ── */}
+      <nav className="dash-actions" aria-label="Atalhos">
+        <Link className="dash-action" href={demandsHref}>
+          <span className="dash-action-ico ico-accent">{IcoPlus}</span>
+          <span className="dash-action-txt"><strong>Nova demanda</strong><span>Abra um chamado</span></span>
+        </Link>
+        <Link className="dash-action" href={projectHref}>
+          <span className="dash-action-ico ico-violet">{IcoRocket}</span>
+          <span className="dash-action-txt"><strong>Novo projeto</strong><span>Comece um briefing</span></span>
+        </Link>
+        <Link className="dash-action" href="/portal/projetos">
+          <span className="dash-action-ico ico-accent">{IcoLayers}</span>
+          <span className="dash-action-txt"><strong>Meus projetos</strong><span>Acompanhe entregas</span></span>
+        </Link>
+        <Link className="dash-action" href="/portal/perfil">
+          <span className="dash-action-ico ico-violet">{IcoUser}</span>
+          <span className="dash-action-txt"><strong>Meu perfil</strong><span>Dados e preferências</span></span>
+        </Link>
+      </nav>
+
+      {/* ── BENTO (3 colunas) ── */}
+      <div className="dash-bento3">
+        {/* Coluna 1 — Demandas */}
         <div className="dash-col">
-          {/* CTA principal: demandas */}
           <section className="card dash-demands">
             <span className="dash-demands-ico" aria-hidden>{IcoChat}</span>
             <div className="dash-demands-body">
               <h2>Suas demandas</h2>
-              <p>Abra chamados, acompanhe as entregas e converse com sua equipe — tudo em um só lugar.</p>
-              <Link className="btn-primary" href={baseReady ? '/portal/demandas' : '/portal/briefing-basico'}>
+              <p>Abra chamados, acompanhe entregas e converse com sua equipe — tudo em um só lugar.</p>
+              <Link className="btn-primary" href={demandsHref}>
                 {baseReady ? 'Abrir demandas →' : 'Concluir Briefing Básico →'}
               </Link>
             </div>
           </section>
 
-          {/* Atividade recente */}
+          <section className="card">
+            <div className="card-head">
+              <h2><span className="card-head-ico">{IcoBolt}</span> Precisam de você</h2>
+              {attention.length > 0 && <span className="card-head-count">{attention.length}</span>}
+            </div>
+            {attention.length === 0 ? (
+              <div className="dash-empty">
+                <span className="dash-empty-ico">{IcoBolt}</span>
+                <p>Nada pendente do seu lado. 🎉</p>
+                <span className="muted small">Quando algo precisar da sua atenção, aparece aqui.</span>
+              </div>
+            ) : (
+              <ul className="att-list">
+                {attention.map((a) => {
+                  const meta = ATTENTION_META[a.reason];
+                  return (
+                    <li key={a.id}>
+                      <Link href={`/portal/demandas?d=${a.id}`}>
+                        <span className={`att-tag ${meta.cls}`}>{meta.label}</span>
+                        <strong className="att-title">{a.title ?? 'Demanda'}</strong>
+                        <span className="muted small">
+                          {a.project_title ? `${a.project_title} · ` : ''}
+                          {formatDue(a.ends_at)}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </div>
+
+        {/* Coluna 2 — Projetos + Atividade */}
+        <div className="dash-col">
+          <section className="card">
+            <div className="card-head">
+              <h2><span className="card-head-ico">{IcoLayers}</span> Seus projetos</h2>
+              <Link className="card-head-link" href="/portal/projetos">Ver todos →</Link>
+            </div>
+            {!extras || extras.projects.total === 0 ? (
+              <div className="dash-empty">
+                <span className="dash-empty-ico">{IcoLayers}</span>
+                <p>Você ainda não tem projetos.</p>
+                <Link className="btn-soft" href={projectHref}>Criar primeiro projeto →</Link>
+              </div>
+            ) : (
+              <div className="proj-mini">
+                <div className="proj-mini-item">
+                  <strong>{extras.projects.active}</strong>
+                  <span>Em andamento</span>
+                </div>
+                <div className="proj-mini-item">
+                  <strong>{extras.projects.completed}</strong>
+                  <span>Concluídos</span>
+                </div>
+                <div className="proj-mini-item">
+                  <strong>{extras.projects.total}</strong>
+                  <span>No total</span>
+                </div>
+              </div>
+            )}
+          </section>
+
           <section className="card">
             <div className="card-head">
               <h2><span className="card-head-ico">{IcoClock}</span> Atividade recente</h2>
@@ -195,8 +357,8 @@ export default async function Dashboard() {
           </section>
         </div>
 
+        {/* Coluna 3 — Equipe + Serviços */}
         <div className="dash-col">
-          {/* Sua equipe */}
           <section className="card">
             <div className="card-head">
               <h2><span className="card-head-ico">{IcoUsers}</span> Sua equipe</h2>
@@ -227,14 +389,13 @@ export default async function Dashboard() {
             )}
           </section>
 
-          {/* Seus serviços */}
           <section className="card">
             <div className="card-head">
-              <h2><span className="card-head-ico">{IcoLayers}</span> Seus serviços</h2>
+              <h2><span className="card-head-ico">{IcoRocket}</span> Seus serviços</h2>
             </div>
             {services.length === 0 ? (
               <div className="dash-empty">
-                <span className="dash-empty-ico">{IcoLayers}</span>
+                <span className="dash-empty-ico">{IcoRocket}</span>
                 <p>Nenhum serviço ativo no momento.</p>
               </div>
             ) : (

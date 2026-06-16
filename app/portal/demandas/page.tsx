@@ -133,7 +133,13 @@ export default function DemandasPage() {
   // Filtro por projeto (via ?projeto=<id>, vindo do card de Projetos).
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   useEffect(() => {
-    try { setProjectFilter(new URLSearchParams(window.location.search).get('projeto')); } catch { /* */ }
+    try {
+      const params = new URLSearchParams(window.location.search);
+      setProjectFilter(params.get('projeto'));
+      // Deep-link da Início: ?d=<id> abre a demanda direto.
+      const d = params.get('d');
+      if (d) setCurrentId(d);
+    } catch { /* */ }
   }, []);
   function clearProjectFilter() {
     setProjectFilter(null);
@@ -180,7 +186,10 @@ export default function DemandasPage() {
     try {
       const list = await listMyDemands();
       setDemands(list);
-      setCurrentId((prev) => prev ?? (list.length > 0 ? list[0].id : null));
+      setCurrentId((prev) => {
+        if (prev && list.some((d) => d.id === prev)) return prev; // ?d válido ou seleção atual
+        return list.length > 0 ? list[0].id : null;
+      });
       return list;
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
