@@ -15,6 +15,7 @@ import {
 } from '@/lib/api/demandas';
 import { initials } from '@/lib/format';
 import { toast } from '@/lib/toast';
+import { errMessage } from '@/lib/errors';
 import styles from './Modal.module.css';
 
 type Mode = 'simple' | 'project';
@@ -91,7 +92,7 @@ export default function NewDemandModal({
         // mundo no ClickUp); o cliente pode desmarcar quem não deve participar.
         setSelectedOps(new Set(ops.map((o) => String(o.id))));
       } catch (e) {
-        setOpsError(e instanceof Error ? e.message : String(e));
+        setOpsError(errMessage(e));
         setOperators([]);
       }
     }

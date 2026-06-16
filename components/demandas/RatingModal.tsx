@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { submitClientRating } from '@/lib/api/demandas';
 import { toast } from '@/lib/toast';
+import { errMessage } from '@/lib/errors';
 import styles from './Modal.module.css';
 
 const STAR = '12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2';
@@ -48,7 +49,7 @@ export default function RatingModal({
       toast('Avaliação enviada. Obrigado!', 'success');
       onSubmitted();
     } catch (e) {
-      toast('Erro ao enviar avaliação: ' + (e instanceof Error ? e.message : String(e)), 'error');
+      toast('Erro ao enviar avaliação: ' + errMessage(e), 'error');
       setBusy(false);
     }
   }

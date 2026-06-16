@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  finalizeMyPart,
+  clientCompleteDemand,
   getDemand,
   getDemandMembers,
   getMe,
@@ -21,6 +21,7 @@ import {
 import { getMessage, hydrateAttachments, isImage, listMessages, postMessage, subscribe, type Attachment, type ChatMessage } from '@/lib/chat';
 import { fmtDate, initials } from '@/lib/format';
 import { toast } from '@/lib/toast';
+import { errMessage } from '@/lib/errors';
 import ChatComposer from '@/components/demandas/ChatComposer';
 import NewDemandModal from '@/components/demandas/NewDemandModal';
 import RatingModal from '@/components/demandas/RatingModal';
@@ -192,7 +193,7 @@ export default function DemandasPage() {
       });
       return list;
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
+      setLoadError(errMessage(e));
       return [];
     }
   }, []);
@@ -419,9 +420,6 @@ export default function DemandasPage() {
   const currentMsgs = currentId ? messages[currentId] || [] : [];
   const currentMembers = currentId ? members[currentId] || [] : [];
   const operators = currentMembers.filter((m) => m.role === 'operator');
-  // Membros CLIENTES (não operadores). Operadores entram com user_id sintético
-  // (operator_id) e user_role='operator' — não devem contar como cliente.
-  const clientMembers = currentMembers.filter((m) => m.role !== 'operator' && m.user_role !== 'operator');
 
   // Pessoas envolvidas = operadores ATRIBUÍDOS + quem da equipe/externo já RESPONDEU
   // no chat (autores não-cliente). Dedup por nome.
@@ -472,47 +470,66 @@ export default function DemandasPage() {
     void loadMessages(created.id);
   }
 
-  // ── Finalizar minha parte (apenas membro CLIENTE = o próprio logado) ──
-  // Operadores NÃO aprovam por aqui (têm user_id sintético + user_role='operator').
-  const isClientMember = !!me && clientMembers.some((m) => m.user_id === me.id);
-  const alreadyApproved = !!me && clientMembers.some((m) => m.user_id === me.id && m.approved_finish);
+  // ── Aprovar entrega e concluir (cliente, só quando "Em revisão") ──
+  // A equipe entrega e marca "Em revisão"; o cliente aprova → demanda vira `done`,
+  // o que dispara o convite de avaliação (abrimos o modal na sequência).
+  const canComplete = current?.status === 'review';
 
-  async function doFinalize() {
-    if (!currentId || !current) return;
-    if (!window.confirm('Confirmar que sua parte está concluída?\n\nA demanda só é fechada quando todos os operadores aprovarem.')) return;
+  async function doComplete() {
+    if (!currentId || !current || current.status !== 'review') return;
+    if (!window.confirm('Aprovar a entrega e concluir esta demanda?\n\nVocê poderá avaliar o atendimento em seguida.')) return;
     try {
-      const res = await finalizeMyPart(currentId);
-      await ensureMembers(currentId, true);
+      await clientCompleteDemand(currentId);
       const updated = await getDemand(currentId);
       if (updated) setDemands((prev) => prev.map((x) => (x.id === currentId ? updated : x)));
-      if (res?.status === 'done') toast('Demanda concluída! Todos os operadores aprovaram.', 'success');
-      else toast('Sua parte foi marcada como concluída.', 'success');
+      toast('Demanda concluída! Obrigado. 🎉', 'success');
+      setRatingFor(currentId); // abre a avaliação na hora
     } catch (e) {
-      toast('Erro: ' + (e instanceof Error ? e.message : String(e)), 'error');
+      toast(errMessage(e), 'error');
     }
   }
 
-  // ── Etapas (timeline) ──
+  // ── Etapas (timeline) ── reflete o status real: aberta → equipe → revisão → concluída
   function renderSteps() {
     if (!current) return null;
-    const opCount = operators.length; // só p/ "Equipe trabalhando"
-    // Aprovação conta SOMENTE membros clientes — demand_operators não tem coluna
-    // de aprovação (operadores não aprovam). Não entram no denominador.
-    const approved = clientMembers.filter((m) => m.approved_finish).length;
-    const total = clientMembers.length;
+    const s = current.status;
+    const opCount = operators.length;
+
+    if (s === 'canceled') {
+      return (
+        <div className={styles.steps}>
+          <div className={`${styles.step} ${styles.done}`}>
+            <span className={styles.dot}><Check /></span>
+            <span>
+              <span className={styles.stepTitle}>Demanda aberta</span>
+              <span className={styles.stepWhen}>{fmtDate(current.created_at)}</span>
+            </span>
+          </div>
+          <div className={`${styles.step} ${styles.current}`}>
+            <span className={styles.dot} />
+            <span>
+              <span className={styles.stepTitle}>Cancelada</span>
+              <span className={styles.stepWhen}>Esta demanda foi cancelada</span>
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    const working = s === 'open' || s === 'in_progress';
+    const workDone = s === 'review' || s === 'done';
+    const reviewDone = s === 'done';
     return (
       <div className={styles.steps}>
         <div className={`${styles.step} ${styles.done}`}>
-          <span className={styles.dot}>
-            <Check />
-          </span>
+          <span className={styles.dot}><Check /></span>
           <span>
             <span className={styles.stepTitle}>Demanda aberta</span>
             <span className={styles.stepWhen}>{fmtDate(current.created_at)}</span>
           </span>
         </div>
-        <div className={`${styles.step} ${current.status === 'open' ? styles.current : styles.done}`}>
-          <span className={styles.dot}>{current.status !== 'open' && <Check />}</span>
+        <div className={`${styles.step} ${workDone ? styles.done : working ? styles.current : ''}`}>
+          <span className={styles.dot}>{workDone && <Check />}</span>
           <span>
             <span className={styles.stepTitle}>Equipe trabalhando</span>
             <span className={styles.stepWhen}>
@@ -520,28 +537,22 @@ export default function DemandasPage() {
             </span>
           </span>
         </div>
-        <div className={`${styles.step} ${current.status === 'done' ? styles.done : styles.current}`}>
-          <span className={styles.dot}>{current.status === 'done' && <Check />}</span>
+        <div className={`${styles.step} ${reviewDone ? styles.done : s === 'review' ? styles.current : ''}`}>
+          <span className={styles.dot}>{reviewDone && <Check />}</span>
           <span>
-            <span className={styles.stepTitle}>
-              Aprovação {approved}/{total}
-            </span>
+            <span className={styles.stepTitle}>Em revisão</span>
             <span className={styles.stepWhen}>
-              {total === 0 ? 'Aguardando equipe' : approved === total ? 'Todos aprovaram' : 'Aguardando todos confirmarem'}
+              {s === 'review' ? 'Aguardando sua aprovação' : reviewDone ? 'Aprovada por você' : 'Aguardando entrega da equipe'}
             </span>
           </span>
         </div>
-        {current.status === 'done' && (
-          <div className={`${styles.step} ${styles.done}`}>
-            <span className={styles.dot}>
-              <Check />
-            </span>
-            <span>
-              <span className={styles.stepTitle}>Concluída</span>
-              <span className={styles.stepWhen}>{fmtDate(current.finalized_at)}</span>
-            </span>
-          </div>
-        )}
+        <div className={`${styles.step} ${s === 'done' ? styles.done : ''}`}>
+          <span className={styles.dot}>{s === 'done' && <Check />}</span>
+          <span>
+            <span className={styles.stepTitle}>Concluída</span>
+            <span className={styles.stepWhen}>{s === 'done' ? fmtDate(current.finalized_at) : '—'}</span>
+          </span>
+        </div>
       </div>
     );
   }
@@ -979,23 +990,18 @@ export default function DemandasPage() {
                           <span style={{ fontWeight: 600, display: 'block' }}>{m.name || '—'}</span>
                           <span className={styles.teamRole}>{m.role || '—'}</span>
                         </span>
-                        {m.approved && (
-                          <span className={styles.approvedTick} title="Aprovou finalização">
-                            ✓
-                          </span>
-                        )}
                       </div>
                     ))
                   )}
                 </div>
               </div>
 
-              {isClientMember && current.status !== 'done' && current.status !== 'canceled' && (
+              {canComplete && (
                 <div className={styles.detailSection}>
-                  <button type="button" className={styles.finalizeBtn} onClick={() => void doFinalize()} disabled={alreadyApproved}>
-                    {alreadyApproved ? 'Você já aprovou. Aguardando outros…' : 'Finalizar minha parte'}
+                  <button type="button" className={styles.finalizeBtn} onClick={() => void doComplete()}>
+                    Aprovar entrega e concluir
                   </button>
-                  <small className={styles.finalizeHint}>A demanda é concluída quando todos aprovam.</small>
+                  <small className={styles.finalizeHint}>A equipe enviou para sua aprovação. Ao concluir, você poderá avaliar o atendimento.</small>
                 </div>
               )}
             </>
