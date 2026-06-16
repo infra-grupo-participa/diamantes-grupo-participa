@@ -1,0 +1,68 @@
+/* BriefingReadView — modo leitura compartilhado (admin card aluno, detalhe de
+   demanda do cliente, panorama do projeto). Tokens portados de
+   components/admin/admin.module.css (.bSection/.bRow/...) para paridade visual. */
+
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+.section:last-child {
+  margin-bottom: 0;
+}
+.sectionHead {
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+  color: var(--text);
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sectionTag {
+  font-size: 0.7rem;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.row {
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+.row:last-child {
+  border-bottom: none;
+}
+.rowLabel {
+  color: var(--muted);
+  min-width: 220px;
+  flex-shrink: 0;
+}
+.rowValue {
+  color: var(--text);
+  font-weight: 500;
+  word-break: break-word;
+}
+.empty {
+  color: var(--muted);
+  text-align: center;
+  padding: 20px;
+  font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+  .row {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .rowLabel {
+    min-width: 0;
+  }
+}

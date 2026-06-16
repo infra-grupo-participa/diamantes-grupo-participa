@@ -23,10 +23,31 @@ import { getMessage, hydrateAttachments, isImage, listMessages, postMessage, sub
 import { fmtDate, initials } from '@/lib/format';
 import { toast } from '@/lib/toast';
 import { errMessage } from '@/lib/errors';
+import { listMyProjects, type Project } from '@/lib/api/projects';
+import { getClientBriefing } from '@/lib/api/briefing';
+import { BRIEFING_SERVICE_LABELS, type BriefingAnswers, type ProjectBriefing } from '@/lib/briefing-templates';
+import BriefingReadView, {
+  buildGeneralSection,
+  buildProjectSections,
+  buildAccessSections,
+  type BriefingViewSection,
+} from '@/components/briefing/BriefingReadView';
 import ChatComposer from '@/components/demandas/ChatComposer';
 import NewDemandModal from '@/components/demandas/NewDemandModal';
 import RatingModal from '@/components/demandas/RatingModal';
 import styles from './page.module.css';
+
+// Normaliza o briefing de um projeto para o shape { general, services } —
+// projetos legados podem divergir (campo ausente / formato antigo).
+function normalizeProjectBriefing(b: ProjectBriefing | null | undefined): {
+  general: BriefingAnswers;
+  services: Record<string, BriefingAnswers>;
+} {
+  const obj = (b && typeof b === 'object' ? b : {}) as ProjectBriefing;
+  const general = (obj.general && typeof obj.general === 'object' ? obj.general : {}) as BriefingAnswers;
+  const services = (obj.services && typeof obj.services === 'object' ? obj.services : {}) as Record<string, BriefingAnswers>;
+  return { general, services };
+}
 
 type Filter = 'all' | 'in_progress' | 'awaiting' | 'done';
 
@@ -132,6 +153,10 @@ export default function DemandasPage() {
   const [ratings, setRatings] = useState<Record<string, Rating | null>>({});
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [me, setMe] = useState<Me | null>(null);
+  // Briefing (F1): projetos do cliente indexados por id (1 query em lote) +
+  // Briefing Básico (acessos) do cliente logado (1 fetch cacheado por sessão).
+  const [projectsById, setProjectsById] = useState<Record<string, Project>>({});
+  const [basicAccess, setBasicAccess] = useState<Record<string, BriefingAnswers>>({});
   // Filtro por projeto (via ?projeto=<id>, vindo do card de Projetos).
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   useEffect(() => {
@@ -238,6 +263,21 @@ export default function DemandasPage() {
       setMe(profile);
       await loadAll();
       if (!cancel) setLoading(false);
+      // Briefing (F1): carga LAZY/best-effort, 2 fetches cacheados por sessão.
+      // Não bloqueia a lista de demandas nem o chat.
+      void (async () => {
+        try {
+          const [projs, brief] = await Promise.all([
+            listMyProjects().catch(() => [] as Project[]),
+            getClientBriefing().then((b) => b.access).catch(() => ({} as Record<string, BriefingAnswers>)),
+          ]);
+          if (cancel) return;
+          setProjectsById(Object.fromEntries(projs.map((p) => [p.id, p])));
+          setBasicAccess(brief);
+        } catch {
+          /* best-effort: a seção de briefing simplesmente não aparece */
+        }
+      })();
     })();
     return () => {
       cancel = true;
@@ -444,6 +484,32 @@ export default function DemandasPage() {
     });
     return [...map.values()];
   }, [operators, currentMsgs]);
+
+  // ── Briefing desta demanda (F1) — só quando há projeto vinculado ──
+  // Mostra: Briefing Básico (acessos do cliente) + briefing do projeto vinculado.
+  const briefingSections = useMemo<BriefingViewSection[]>(() => {
+    const pid = current?.project_id;
+    if (!pid) return []; // demanda sem projeto → seção oculta
+    const project = projectsById[pid];
+    if (!project) return [];
+    const services = project.services || [];
+    const { general, services: svcAns } = normalizeProjectBriefing(project.briefing);
+
+    const out: BriefingViewSection[] = [];
+    // 1) Briefing do projeto: bloco geral + campanha por serviço.
+    out.push(buildGeneralSection(general));
+    services.forEach((svc) => {
+      const lbl = BRIEFING_SERVICE_LABELS[svc] || svc;
+      out.push(...buildProjectSections(svc, lbl, svcAns[svc] || {}));
+    });
+    // 2) Briefing Básico (acessos) — só os serviços deste projeto.
+    services.forEach((svc) => {
+      const lbl = BRIEFING_SERVICE_LABELS[svc] || svc;
+      out.push(...buildAccessSections(svc, lbl, basicAccess[svc] || {}));
+    });
+    return out;
+  }, [current?.project_id, projectsById, basicAccess]);
+  const hasBriefing = briefingSections.some((sec) => sec.rows.length > 0);
 
   // ── Nova demanda (gate-aware) ──
   async function openNewDemand() {
@@ -1075,6 +1141,16 @@ export default function DemandasPage() {
                   )}
                 </div>
               </div>
+
+              {current.project_id && hasBriefing && (
+                <div className={styles.detailSection}>
+                  <h3>
+                    Briefing desta demanda{' '}
+                    {current.project_title ? <span className="small">📁 {current.project_title}</span> : null}
+                  </h3>
+                  <BriefingReadView sections={briefingSections} />
+                </div>
+              )}
 
               {canComplete && (
                 <div className={styles.detailSection}>

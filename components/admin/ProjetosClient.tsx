@@ -11,6 +11,7 @@ import {
 } from '@/lib/briefing-templates';
 import { fmtDate } from '@/lib/format';
 import BriefingModal from './BriefingModal';
+import ProjectPanoramaModal from './ProjectPanoramaModal';
 
 // Rótulos espelhados do legado admin/projetos.html (com emoji)
 const SERVICE_LABELS: Record<string, string> = {
@@ -76,6 +77,7 @@ export default function ProjetosClient() {
   const [rows, setRows] = useState<ProjectRow[] | null>(null);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<ProjectRow | null>(null);
+  const [panorama, setPanorama] = useState<ProjectRow | null>(null);
 
   const load = useCallback(async () => {
     setRows(null);
@@ -193,6 +195,9 @@ export default function ProjetosClient() {
                     <td>{fmtDate(p.created_at)}</td>
                     <td>
                       <div style={{ display: 'inline-flex', gap: 8 }}>
+                        <button className={s.btnView} onClick={() => setPanorama(p)} title="Panorama do projeto: briefings, operadores e chat">
+                          Painel
+                        </button>
                         <button className={s.btnView} onClick={() => setSelected(p)}>
                           Ver briefing
                         </button>
@@ -212,6 +217,9 @@ export default function ProjetosClient() {
       </div>
 
       {selected && <BriefingModal project={selected} serviceLabels={SERVICE_LABELS} onClose={() => setSelected(null)} />}
+      {panorama && (
+        <ProjectPanoramaModal project={panorama} serviceLabels={SERVICE_LABELS} onClose={() => setPanorama(null)} />
+      )}
     </div>
   );
 }

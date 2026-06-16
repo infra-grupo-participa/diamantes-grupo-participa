@@ -390,9 +390,15 @@ export async function setOperatorStatus(id: string, status: string): Promise<Ope
   return updateOperator(id, { status });
 }
 
+/**
+ * B1: exclusão via RPC `delete_operator` (atômica, com guarda admin e tradução
+ * do erro de FK). Se o operador tem demandas vinculadas, o banco RECUSA — a
+ * mensagem orienta a INATIVAR (preserva histórico/avaliações). Inativar é o
+ * caminho primário na UI: use `setOperatorStatus(id, 'inactive')`.
+ */
 export async function deleteOperator(id: string): Promise<true> {
   if (!id) throw new Error('id obrigatório');
-  const { error } = await client().from('operators').delete().eq('id', id);
+  const { error } = await client().rpc('delete_operator', { target_id: id });
   if (error) throw error;
   return true;
 }
