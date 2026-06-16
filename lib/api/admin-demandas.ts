@@ -231,6 +231,78 @@ export async function getDemandFullDetails(demandId: string): Promise<{
   return { demand: demand as Demand, members: memb, messages: msgs };
 }
 
+// ── Operadores da demanda (responsáveis reais — tabela demand_operators) ──────
+export type DemandOperator = {
+  operator_id: string;
+  name: string | null;
+  email: string | null;
+  clickup_user_id: string | null;
+  position_name: string | null;
+  position_color: string | null;
+};
+
+/** Operadores atualmente atribuídos à demanda (demand_operators → operators). */
+export async function getDemandOperators(demandId: string): Promise<DemandOperator[]> {
+  const supabase = createClient();
+  const { data: dops, error } = await supabase.from('demand_operators').select('operator_id').eq('demand_id', demandId);
+  if (error) throw error;
+  const ids = [...new Set(((dops ?? []) as Array<{ operator_id: string }>).map((d) => d.operator_id))];
+  if (!ids.length) return [];
+  const { data: ops, error: e2 } = await supabase
+    .from('operators')
+    .select('id, name, email, clickup_user_id, position_id')
+    .in('id', ids);
+  if (e2) throw e2;
+  const rows = (ops ?? []) as Array<Record<string, unknown>>;
+  const pids = [...new Set(rows.map((o) => o.position_id).filter(Boolean))] as Array<string | number>;
+  let posById: Record<string, { name?: string; color?: string }> = {};
+  if (pids.length) {
+    const { data: positions } = await supabase.from('positions').select('id, name, color').in('id', pids);
+    posById = Object.fromEntries(((positions ?? []) as Array<Record<string, unknown>>).map((p) => [String(p.id), p as { name?: string; color?: string }]));
+  }
+  return rows.map((o) => ({
+    operator_id: o.id as string,
+    name: (o.name as string) ?? null,
+    email: (o.email as string) ?? null,
+    clickup_user_id: (o.clickup_user_id as string) ?? null,
+    position_name: posById[String(o.position_id)]?.name ?? null,
+    position_color: posById[String(o.position_id)]?.color ?? null,
+  }));
+}
+
+/** Operadores ativos (para o seletor de adicionar à demanda). */
+export async function listActiveOperators(): Promise<DemandOperator[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('v_operators')
+    .select('id, name, email, clickup_user_id, position_name, position_color, status')
+    .neq('status', 'inactive')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return ((data ?? []) as Array<Record<string, unknown>>).map((o) => ({
+    operator_id: o.id as string,
+    name: (o.name as string) ?? null,
+    email: (o.email as string) ?? null,
+    clickup_user_id: (o.clickup_user_id as string) ?? null,
+    position_name: (o.position_name as string) ?? null,
+    position_color: (o.position_color as string) ?? null,
+  }));
+}
+
+/** Atribui um operador à demanda (RPC; re-sincroniza assignees no ClickUp). */
+export async function addDemandOperator(demandId: string, operatorId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('admin_add_demand_operator', { p_demand_id: demandId, p_operator_id: operatorId });
+  if (error) throw new Error(error.message || 'Não foi possível adicionar o operador.');
+}
+
+/** Remove um operador da demanda (RPC; re-sincroniza assignees no ClickUp). */
+export async function removeDemandOperator(demandId: string, operatorId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('admin_remove_demand_operator', { p_demand_id: demandId, p_operator_id: operatorId });
+  if (error) throw new Error(error.message || 'Não foi possível remover o operador.');
+}
+
 /** Muda o status de uma demanda (com finalized_at quando done). */
 export async function adminUpdateDemandStatus(
   id: string,

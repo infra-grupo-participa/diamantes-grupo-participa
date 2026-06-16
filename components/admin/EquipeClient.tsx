@@ -25,6 +25,7 @@ import Pagination from './Pagination';
 import { Stars, StatusCell, OpStatusCell, PositionPill } from './cells';
 import EmployeeModal from './EmployeeModal';
 import OperatorModal from './OperatorModal';
+import OperatorPerformanceDrawer from './OperatorPerformanceDrawer';
 import {
   IconSearch,
   IconEdit,
@@ -71,6 +72,7 @@ export default function EquipeClient() {
   // ── Modals ──
   const [empModal, setEmpModal] = useState<{ open: boolean; editing: EmployeeRow | null }>({ open: false, editing: null });
   const [opModal, setOpModal] = useState<{ open: boolean; editing: OperatorRow | null }>({ open: false, editing: null });
+  const [perfFor, setPerfFor] = useState<OperatorRow | null>(null);
 
   const aSearchInput = useRef('');
   const oSearchInput = useRef('');
@@ -477,7 +479,9 @@ export default function EquipeClient() {
                         <code className={s.mono}>{o.clickup_user_id || '—'}</code>
                       </td>
                       <td data-label="Avaliação">
-                        <Stars rating={o.rating_avg} />
+                        <button className={s.linkBtn} title="Ver performance" onClick={() => setPerfFor(o)}>
+                          <Stars rating={o.rating_avg} />
+                        </button>
                       </td>
                       <td data-label="Alunos" style={{ textAlign: 'center' }}>
                         <span className={`${s.countPill} ${(o.students_count ?? 0) === 0 ? s.zero : ''}`}>{o.students_count ?? 0}</span>
@@ -487,6 +491,9 @@ export default function EquipeClient() {
                       </td>
                       <td className={s.cardActions} data-label="Ações">
                         <div className={s.rowActions}>
+                          <button className={s.iconBtn} title="Ver performance" onClick={() => setPerfFor(o)}>
+                            <IconStar />
+                          </button>
                           <button className={s.iconBtn} title="Editar" onClick={() => setOpModal({ open: true, editing: o })}>
                             <IconEdit />
                           </button>
@@ -532,6 +539,16 @@ export default function EquipeClient() {
           loadStats();
         }}
       />
+
+      {perfFor && (
+        <OperatorPerformanceDrawer
+          operatorId={perfFor.id}
+          operatorName={perfFor.name}
+          positionName={perfFor.position_name}
+          positionColor={perfFor.position_color}
+          onClose={() => setPerfFor(null)}
+        />
+      )}
     </div>
   );
 }

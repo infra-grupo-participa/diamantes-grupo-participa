@@ -38,6 +38,34 @@ export type OperatorRow = {
   created_at?: string | null;
 };
 
+export type OperatorPerformance = {
+  operator_id: string;
+  name: string | null;
+  email: string | null;
+  position_name: string | null;
+  position_color: string | null;
+  status: string;
+  points_score: number;
+  demands_count: number;
+  demand_rating_count: number;
+  demand_avg: number;
+  demand_star_distribution: Record<string, number>;
+  project_rating_count: number;
+  project_avg: number;
+  project_nps_avg: number;
+};
+
+/** Performance detalhada de um operador (view v_operator_performance). */
+export async function getOperatorPerformance(operatorId: string): Promise<OperatorPerformance | null> {
+  const { data, error } = await client()
+    .from('v_operator_performance')
+    .select('*')
+    .eq('operator_id', operatorId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as OperatorPerformance | null;
+}
+
 export type Position = {
   id: string;
   slug: string;

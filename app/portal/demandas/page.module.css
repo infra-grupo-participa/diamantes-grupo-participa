@@ -813,6 +813,26 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+.requestBtn {
+  width: 100%;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  padding: 11px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 0.9rem;
+  font-family: inherit;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.requestBtn:hover {
+  background: var(--accent-soft);
+}
 .finalizeHint {
   display: block;
   color: var(--muted);
