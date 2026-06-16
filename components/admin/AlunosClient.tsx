@@ -1008,7 +1008,7 @@ function TeamModal({
   }
 
   return (
-    <div className={s.modalOverlay} style={{ zIndex: 101 }} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={s.modalOverlay} style={{ zIndex: 200 }} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className={s.modalCard}>
         <div className={s.modalHead}>
           <h3>Adicionar integrante</h3>

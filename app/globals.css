@@ -1115,6 +1115,54 @@ a {
 .att-deadline { color: var(--danger-strong); background: var(--danger-soft); }
 .att-title { font-size: 0.9rem; font-weight: 600; line-height: 1.25; }
 
+/* ── Onboarding (primeiro acesso) ── */
+.dash-onb-grid {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.dash-side { display: flex; flex-direction: column; gap: 16px; }
+.onb-head { margin-bottom: 18px; }
+.onb-head h2 { margin: 0 0 4px; font-size: 1.2rem; font-weight: 800; letter-spacing: -0.01em; }
+.onb-head p { margin: 0; }
+.onb-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.onb-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+.onb-step.is-active {
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-sm);
+}
+.onb-step.is-locked { opacity: 0.55; }
+.onb-num {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-weight: 800;
+  font-size: 0.95rem;
+  background: var(--hero-tint);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.onb-num svg { width: 17px; height: 17px; }
+.onb-step.is-active .onb-num { background: var(--accent); color: #fff; border-color: transparent; }
+.onb-step.is-done .onb-num { background: var(--success-strong); color: #fff; border-color: transparent; }
+.onb-step-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.onb-step-body strong { font-size: 0.98rem; font-weight: 700; }
+.onb-cta { margin: 0; white-space: nowrap; flex-shrink: 0; }
+
 /* Mini-resumo de projetos */
 .proj-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .proj-mini-item {
@@ -1399,12 +1447,21 @@ video {
     max-width: calc(100vw - 24px);
   }
   .dash-bento,
-  .dash-bento3 {
+  .dash-bento3,
+  .dash-onb-grid {
     grid-template-columns: 1fr;
   }
   .dash-stats,
   .dash-actions {
     grid-template-columns: 1fr 1fr;
+  }
+  .onb-step {
+    flex-wrap: wrap;
+  }
+  .onb-cta {
+    width: 100%;
+    justify-content: center;
+    margin-top: 4px;
   }
   .toast-stack {
     left: 12px;
