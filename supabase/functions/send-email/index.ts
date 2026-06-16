@@ -1,7 +1,8 @@
-// send-email v2 — e-mails transacionais do portal (Resend).
+// send-email v5 — e-mails transacionais do portal (Resend).
 // Disparada por triggers pg_net:
-//   • portal._notify_demanda_criada  → { type:'demanda_criada', demand_id }
-//   • portal._notify_projeto_criado  → { type:'projeto_criado', project_id }
+//   • portal._notify_demanda_criada     → { type:'demanda_criada', demand_id }
+//   • portal._notify_projeto_criado     → { type:'projeto_criado', project_id }
+//   • portal._notify_demanda_em_revisao → { type:'demanda_em_revisao', demand_id, stamp }
 // (Nova mensagem NÃO dispara e-mail: o ClickUp já notifica. Reset de senha é via
 //  SMTP do Supabase Auth.)
 //
@@ -169,6 +170,41 @@ async function handleProjetoCriado(supabase: any, apiKey: string, project_id: st
   return res.ok ? { sent: to.email } : { failed: res.error };
 }
 
+// Demanda finalizada pela equipe (entrou em "em revisão") → cliente precisa aprovar.
+// `stamp` (clock_timestamp da transição, vindo do trigger) dedupa a MESMA transição
+// (retries) sem bloquear futuras revisões (pedir ajustes → equipe refinaliza → review).
+async function handleDemandaEmRevisao(supabase: any, apiKey: string, demand_id: string, stamp?: string) {
+  const { data: demand } = await supabase.schema("portal")
+    .from("demands").select("id, title, client_slug, created_by, status").eq("id", demand_id).maybeSingle();
+  if (!demand) return { skipped: "unknown_demand" };
+  if (demand.status !== "review") return { skipped: "not_in_review" };
+
+  const dedupKey = `demanda_em_revisao:${demand_id}:${stamp || ""}`;
+  const { data: dup } = await supabase.schema("portal").from("email_log")
+    .select("id").eq("dedup_key", dedupKey).eq("status", "sent").limit(1).maybeSingle();
+  if (dup) return { skipped: "already_sent" };
+
+  const to = await resolveClientRecipient(supabase, demand);
+  if (!to) return { skipped: "no_recipient" };
+
+  const subject = `Pronta para sua aprovação: ${demand.title}`;
+  const html = baseLayout({
+    title: "Sua demanda foi finalizada ✨",
+    intro: `Olá${to.name ? " " + esc(to.name.split(" ")[0]) : ""}, a equipe concluiu o trabalho da demanda <strong>${esc(demand.title)}</strong> e enviou para a sua aprovação. Revise a entrega e, se estiver tudo certo, aprove — ou peça ajustes pelo portal.`,
+    bodyHtml: "",
+    ctaLabel: "Revisar e aprovar",
+    ctaHref: `${PORTAL_URL}/portal/demandas?d=${demand_id}`,
+  });
+
+  const res = await sendViaProvider(apiKey, to.email, subject, html);
+  await logEmail(supabase, {
+    type: "demanda_em_revisao", to_email: to.email, subject,
+    ref_type: "demand", ref_id: demand_id, dedup_key: res.ok ? dedupKey : null,
+    status: res.ok ? "sent" : "failed", resend_id: res.id || null, error: res.error || null,
+  });
+  return res.ok ? { sent: to.email } : { failed: res.error };
+}
+
 Deno.serve(async (req: Request) => {
   let body: any = {}; try { body = await req.json(); } catch (_) { body = {}; }
   const { type, demand_id, project_id, to, subject, html } = body;
@@ -200,6 +236,10 @@ Deno.serve(async (req: Request) => {
       case "projeto_criado":
         if (!project_id) return new Response(JSON.stringify({ error: "project_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
         result = await handleProjetoCriado(supabase, apiKey, project_id);
+        break;
+      case "demanda_em_revisao":
+        if (!demand_id) return new Response(JSON.stringify({ error: "demand_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
+        result = await handleDemandaEmRevisao(supabase, apiKey, demand_id, body.stamp);
         break;
       case "custom": {
         // Teste/manual: { type:'custom', to, subject, html }
