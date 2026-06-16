@@ -28,6 +28,8 @@ export type ChatMessage = {
   author_name: string | null;
   author_role: string | null;
   avatar_url: string | null;
+  _pending?: boolean; // UI otimista: aguardando confirmação do envio
+  _failed?: boolean; // UI otimista: falhou ao enviar
 };
 
 function safeFileName(name: string): string {

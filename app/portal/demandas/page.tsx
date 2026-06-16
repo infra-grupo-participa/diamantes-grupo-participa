@@ -887,10 +887,20 @@ export default function DemandasPage() {
                           {m.author_name || 'Alguém'} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>•</span>{' '}
                           <span className="role">{role}</span>
                         </span>
-                        {m.content && <span className={styles.msgBubble} style={{ display: 'block' }}>{m.content}</span>}
+                        {m.content && (
+                          <span className={styles.msgBubble} style={{ display: 'block', opacity: m._pending ? 0.65 : 1 }}>
+                            {m.content}
+                          </span>
+                        )}
                         {renderAttachments(m.attachments)}
                         <span className={styles.msgTime} style={{ display: 'block', textAlign: mine ? 'right' : 'left' }}>
-                          {fmtTime(m.created_at)}
+                          {m._failed ? (
+                            <span style={{ color: 'var(--danger-strong)' }}>não enviado</span>
+                          ) : m._pending ? (
+                            'enviando…'
+                          ) : (
+                            fmtTime(m.created_at)
+                          )}
                         </span>
                       </span>
                     </div>,
@@ -906,13 +916,53 @@ export default function DemandasPage() {
             disabled={!current}
             onSend={async ({ content, attachments }) => {
               if (!currentId || !me) return;
-              const inserted = (await postMessage(currentId, content, attachments, me.id, me.client_slug || '')) as
-                | { id?: string | number }
-                | null;
-              // Append incremental do próprio envio (dedup cobre o eco do realtime).
-              if (inserted?.id != null) await appendMessage(currentId, String(inserted.id));
-              else await loadMessages(currentId);
-              markRead(currentId, new Date().toISOString());
+              const did = currentId;
+              // ── UI otimista: a mensagem aparece NA HORA; o insert + sync ClickUp
+              //    (criar pasta/tarefa/comentário) acontecem em segundo plano. ──
+              const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+              const optimistic: ChatMessage = {
+                id: tempId,
+                user_id: me.id,
+                content,
+                attachments: attachments ?? [],
+                origin: 'portal',
+                created_at: new Date().toISOString(),
+                author_name: me.name ?? 'Você',
+                author_role: 'client',
+                avatar_url: me.metadata?.avatar_url ?? null,
+                _pending: true,
+              };
+              setMessages((prev) => ({ ...prev, [did]: [...(prev[did] || []), optimistic] }));
+              markRead(did, optimistic.created_at);
+
+              // Envia em segundo plano (não trava o composer nem o input).
+              void (async () => {
+                try {
+                  const inserted = (await postMessage(did, content, attachments ?? [], me.id, me.client_slug || '')) as
+                    | { id?: string | number }
+                    | null;
+                  const realId = inserted?.id != null ? String(inserted.id) : null;
+                  setMessages((prev) => {
+                    const list = prev[did] || [];
+                    if (!realId) {
+                      return { ...prev, [did]: list.map((m) => (m.id === tempId ? { ...m, _failed: true, _pending: false } : m)) };
+                    }
+                    // Se o realtime já trouxe a versão real, descarta a otimista;
+                    // senão, converte a otimista no id real (dedup por id evita duplicar).
+                    const hasReal = list.some((m) => m.id === realId);
+                    const next = hasReal
+                      ? list.filter((m) => m.id !== tempId)
+                      : list.map((m) => (m.id === tempId ? { ...m, id: realId, _pending: false } : m));
+                    return { ...prev, [did]: next };
+                  });
+                } catch (e) {
+                  setMessages((prev) => ({
+                    ...prev,
+                    [did]: (prev[did] || []).map((m) => (m.id === tempId ? { ...m, _failed: true, _pending: false } : m)),
+                  }));
+                  toast('Não foi possível enviar: ' + errMessage(e), 'error');
+                }
+              })();
             }}
           />
         </section>
