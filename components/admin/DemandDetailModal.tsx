@@ -6,13 +6,19 @@ import { toast } from '@/lib/toast';
 import {
   getDemandFullDetails,
   adminUpdateDemandStatus,
+  getDemandOperators,
+  listActiveOperators,
+  addDemandOperator,
+  removeDemandOperator,
   STATUS_BADGE,
   clickupTaskUrl,
   type DemandStatus,
   type Demand,
   type DemandMemberFull,
   type DemandMessage,
+  type DemandOperator,
 } from '@/lib/api/admin-demandas';
+import { errMessage } from '@/lib/errors';
 import styles from '@/app/admin/demandas/demandas.module.css';
 
 const STATUSES: DemandStatus[] = ['open', 'in_progress', 'review', 'done', 'canceled'];
@@ -37,20 +43,62 @@ export default function DemandDetailModal({
 }) {
   const [det, setDet] = useState<Details | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ops, setOps] = useState<DemandOperator[]>([]);
+  const [allOps, setAllOps] = useState<DemandOperator[]>([]);
+  const [opBusy, setOpBusy] = useState(false);
+  const [selOp, setSelOp] = useState('');
 
   const load = useCallback(async () => {
     try {
-      const d = await getDemandFullDetails(demandId);
+      const [d, dops, active] = await Promise.all([
+        getDemandFullDetails(demandId),
+        getDemandOperators(demandId),
+        listActiveOperators(),
+      ]);
       if (!d) {
         onClose();
         return;
       }
       setDet(d);
+      setOps(dops);
+      setAllOps(active);
     } catch (e) {
-      toast('Erro: ' + ((e as Error).message || e), 'error');
+      toast('Erro: ' + errMessage(e), 'error');
       onClose();
     }
   }, [demandId, onClose]);
+
+  async function addOp() {
+    if (!selOp || opBusy) return;
+    setOpBusy(true);
+    try {
+      await addDemandOperator(demandId, selOp);
+      setSelOp('');
+      setOps(await getDemandOperators(demandId));
+      toast('Operador adicionado. O ClickUp será sincronizado.', 'success');
+      onChanged();
+    } catch (e) {
+      toast(errMessage(e), 'error');
+    } finally {
+      setOpBusy(false);
+    }
+  }
+
+  async function removeOp(operatorId: string, name: string | null) {
+    if (opBusy) return;
+    if (!window.confirm(`Remover ${name || 'este operador'} da demanda?`)) return;
+    setOpBusy(true);
+    try {
+      await removeDemandOperator(demandId, operatorId);
+      setOps(await getDemandOperators(demandId));
+      toast('Operador removido.', 'success');
+      onChanged();
+    } catch (e) {
+      toast(errMessage(e), 'error');
+    } finally {
+      setOpBusy(false);
+    }
+  }
 
   useEffect(() => {
     load();
@@ -244,6 +292,70 @@ export default function DemandDetailModal({
                     })
                   )}
                 </div>
+              </div>
+
+              {/* Operadores responsáveis (reais — demand_operators) */}
+              <div>
+                <h4 className={styles.sectionTitle}>Operadores responsáveis</h4>
+                <div className={styles.teamList}>
+                  {ops.length === 0 ? (
+                    <div className={styles.teamEmpty}>Nenhum operador atribuído ainda.</div>
+                  ) : (
+                    ops.map((o) => (
+                      <div key={o.operator_id} className={styles.teamRow}>
+                        <div
+                          className={styles.avatar}
+                          style={o.position_color ? { background: `linear-gradient(135deg,${o.position_color}33,${o.position_color})` } : undefined}
+                        >
+                          {initials(o.name)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div className={styles.teamName}>{o.name || '—'}</div>
+                          <div className={styles.teamRole}>{o.position_name || o.email || ''}</div>
+                        </div>
+                        <div className={styles.teamRight}>
+                          {o.clickup_user_id ? (
+                            <span className={styles.cuBadge} title={`Vinculado ao ClickUp (ID ${o.clickup_user_id})`}>
+                              <ClickUpIcon />
+                              ClickUp
+                            </span>
+                          ) : (
+                            <span className={styles.cuNone} title="Sem usuário no ClickUp — não recebe notificação">
+                              sem ClickUp
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            className={styles.opRemove}
+                            disabled={opBusy}
+                            onClick={() => void removeOp(o.operator_id, o.name)}
+                            title="Remover da demanda"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className={styles.opAddRow}>
+                  <select className={styles.opSelect} value={selOp} onChange={(e) => setSelOp(e.target.value)} disabled={opBusy}>
+                    <option value="">Adicionar operador…</option>
+                    {allOps
+                      .filter((a) => !ops.some((o) => o.operator_id === a.operator_id))
+                      .map((a) => (
+                        <option key={a.operator_id} value={a.operator_id}>
+                          {a.name}
+                          {a.position_name ? ` — ${a.position_name}` : ''}
+                          {a.clickup_user_id ? '' : ' (sem ClickUp)'}
+                        </option>
+                      ))}
+                  </select>
+                  <button type="button" className={styles.opAddBtn} disabled={!selOp || opBusy} onClick={() => void addOp()}>
+                    Adicionar
+                  </button>
+                </div>
+                <small className={styles.opHint}>Operadores recebem a demanda como responsáveis no ClickUp (notificação).</small>
               </div>
 
               {/* Chat (read-only) */}

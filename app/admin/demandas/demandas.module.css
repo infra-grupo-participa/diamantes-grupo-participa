@@ -848,10 +848,78 @@
 .teamRight {
   display: inline-flex;
   align-items: center;
+  gap: 8px;
 }
 .teamEmpty {
   color: var(--d-muted);
   font-size: 0.84rem;
+}
+
+/* Gestão de operadores */
+.opRemove {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--d-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.opRemove:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+  border-color: var(--danger-soft);
+}
+.opRemove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.opAddRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.opSelect {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface, #fff);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+}
+.opAddBtn {
+  padding: 9px 16px;
+  border-radius: 9px;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, opacity 0.15s;
+}
+.opAddBtn:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+.opAddBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.opHint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.74rem;
+  color: var(--d-muted);
 }
 
 /* chat */
