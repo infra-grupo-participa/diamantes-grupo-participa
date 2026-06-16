@@ -328,18 +328,27 @@ export async function assignTeamMember({
   if (!client_slug || !operator_id) throw new Error('client_slug e operator_id são obrigatórios.');
   const supabase = createClient();
 
+  // Operador → setor (position_id) + e-mail (para derivar o user_id legado).
+  const { data: op, error: opErr } = await supabase
+    .from('operators')
+    .select('position_id, email')
+    .eq('id', operator_id)
+    .maybeSingle();
+  if (opErr) throw opErr;
   if (!position_id) {
-    const { data: op, error: opErr } = await supabase
-      .from('operators')
-      .select('position_id')
-      .eq('id', operator_id)
-      .maybeSingle();
-    if (opErr) throw opErr;
     position_id = (op?.position_id as string) ?? null;
     if (!position_id)
       throw new Error(
         'Operador sem setor definido. Atribua um cargo na aba Equipe Operacional antes de vinculá-lo a um cliente.',
       );
+  }
+
+  // team_assignments.user_id é coluna legada: mapeia operador → user por e-mail
+  // quando houver (o vínculo real é por operator_id).
+  let userId: string | null = null;
+  if (op?.email) {
+    const { data: u } = await supabase.from('users').select('id').ilike('email', op.email as string).maybeSingle();
+    userId = (u?.id as string) ?? null;
   }
 
   const sess = (await supabase.auth.getSession()).data.session;
@@ -351,7 +360,7 @@ export async function assignTeamMember({
 
   const { data, error } = await supabase
     .from('team_assignments')
-    .insert({ client_slug, operator_id, position_id, notes, assigned_by: profile?.id ?? null })
+    .insert({ client_slug, operator_id, position_id, notes, assigned_by: profile?.id ?? null, user_id: userId })
     .select()
     .single();
 
