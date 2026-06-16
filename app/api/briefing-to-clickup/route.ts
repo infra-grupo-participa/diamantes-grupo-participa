@@ -98,6 +98,25 @@ async function cuCreateTask(
   return { taskId };
 }
 
+/** Garante e devolve a lista do PROJETO no ClickUp (pasta do aluno → lista),
+ *  via edge clickup-sync (que cria a estrutura sob demanda). '' em falha. */
+async function ensureProjectListViaEdge(projectId: string): Promise<string> {
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '');
+  const service = (process.env.SUPABASE_SERVICE_ROLE || '').trim();
+  if (!url || !service) return '';
+  try {
+    const r = await fetch(url + '/functions/v1/clickup-sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + service },
+      body: JSON.stringify({ action: 'ensure_project_list', project_id: projectId }),
+    });
+    const j = (await r.json()) as Json;
+    return r.ok && j.list_id ? String(j.list_id) : '';
+  } catch {
+    return '';
+  }
+}
+
 export async function POST(req: Request) {
   const clickupKey = (process.env.CLICKUP_TOKEN || '').trim();
   if (clickupKey === '') {
@@ -176,7 +195,7 @@ export async function POST(req: Request) {
   if (isProject) {
     const { data: rows } = await admin
       .from('projects')
-      .select('id, title, client_slug')
+      .select('id, title, client_slug, clickup_task_id')
       .eq('id', projectId)
       .limit(1);
     const entity = Array.isArray(rows) ? rows[0] : null;
@@ -190,7 +209,8 @@ export async function POST(req: Request) {
     clientSlug = String(entity.client_slug ?? '');
     entityTable = 'projects';
     entityId = projectId;
-    existingTaskId = ''; // projetos sempre criam task nova
+    // Reusa a task "Briefing" do projeto (não duplica a cada reenvio).
+    existingTaskId = String(entity.clickup_task_id ?? '').trim();
   } else {
     const { data: rows } = await admin
       .from('demands')
@@ -211,18 +231,28 @@ export async function POST(req: Request) {
     existingTaskId = String(entity.clickup_task_id ?? '').trim();
   }
 
-  // ── Resolve lista do cliente ───────────────────────────────────────────────
-  const { data: cRows } = await admin
-    .from('clients')
-    .select('cu_list_id')
-    .eq('slug', clientSlug)
-    .limit(1);
-  const listId = String((Array.isArray(cRows) ? cRows[0]?.cu_list_id : '') ?? '').trim();
-  if (listId === '') {
-    return jsonOut(
-      { ok: false, error: 'Cliente não possui lista do ClickUp configurada (cu_list_id).' },
-      422,
-    );
+  // ── Resolve a lista de destino ─────────────────────────────────────────────
+  // Projeto → LISTA DO PROJETO (pasta do aluno → lista do projeto), garantida via
+  // edge. Demanda → lista folderless do cliente (legado).
+  let listId = '';
+  if (isProject) {
+    listId = await ensureProjectListViaEdge(projectId);
+    if (listId === '') {
+      return jsonOut({ ok: false, error: 'Não foi possível resolver a lista do projeto no ClickUp.' }, 502);
+    }
+  } else {
+    const { data: cRows } = await admin
+      .from('clients')
+      .select('cu_list_id')
+      .eq('slug', clientSlug)
+      .limit(1);
+    listId = String((Array.isArray(cRows) ? cRows[0]?.cu_list_id : '') ?? '').trim();
+    if (listId === '') {
+      return jsonOut(
+        { ok: false, error: 'Cliente não possui lista do ClickUp configurada (cu_list_id).' },
+        422,
+      );
+    }
   }
 
   // ── Resolve task ID (cria se necessário) ───────────────────────────────────

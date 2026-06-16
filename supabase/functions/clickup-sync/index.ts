@@ -1,7 +1,8 @@
-// clickup-sync v10 — hierarquia Pasta(aluno) → Lista(projeto/avulsas) → Tarefa(demanda).
+// clickup-sync v11 — hierarquia Pasta(aluno) → Lista(projeto/avulsas) → Tarefa(demanda).
 // portal.demands (INSERT/UPDATE) → trigger pg_net (portal._sync_demand_to_clickup)
 // → esta função cria/atualiza a task no ClickUp e grava demands.clickup_task_id.
-// Também aceita {action:"provision_structure"} para criar pastas/listas em lote.
+// Ações extras: {action:"provision_structure"} cria pastas/listas em lote;
+// {action:"ensure_project_list", project_id} garante e devolve a lista do projeto.
 //
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
@@ -349,6 +350,19 @@ Deno.serve(async (req: Request) => {
     // Modo lote: cria a estrutura (pastas + listas) para todos os clientes/projetos.
     if (body.action === "provision_structure") {
       return await provisionStructure(supabase, apiKey, cfg);
+    }
+
+    // Garante a pasta do aluno + a lista do projeto e devolve o list_id (usado pelo
+    // /api/briefing-to-clickup para anexar o PDF do briefing na lista do projeto).
+    if (body.action === "ensure_project_list") {
+      const pid = body.project_id;
+      if (!pid) return new Response(JSON.stringify({ error: "project_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      const { data: project } = await supabase.schema("portal").from("projects").select("id, client_slug").eq("id", pid).maybeSingle();
+      if (!project) return new Response(JSON.stringify({ error: "projeto não encontrado" }), { status: 404, headers: { "Content-Type": "application/json" } });
+      const ensured = await ensureClientFolder(supabase, apiKey, cfg, project.client_slug);
+      if (!ensured) return new Response(JSON.stringify({ error: "cliente sem pasta possível (sem slug/space_id)" }), { status: 422, headers: { "Content-Type": "application/json" } });
+      const listId = await ensureProjectList(supabase, apiKey, ensured.folderId, pid);
+      return new Response(JSON.stringify({ ok: true, list_id: listId, folder_id: ensured.folderId }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
     if (!demand_id) {
