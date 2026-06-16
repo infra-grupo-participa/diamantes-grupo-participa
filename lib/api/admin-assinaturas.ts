@@ -431,3 +431,180 @@ export function downloadBlob(blob: Blob, filename: string) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// ── Financeiro manual (operacional) ────────────────────────────────────────
+// Harmoniza com a Hotmart: registrar pagamento/adiantamento/acordo estende a MESMA
+// régua (services.access_until) e chama o mesmo recálculo, via RPCs guardadas por is_admin.
+
+export type ClientServiceRow = {
+  id: string;
+  service_type: string;
+  status: string;
+  access_until: string | null;
+  monthly_value: number | null;
+  billing_source: string;
+  offer_code: string | null;
+};
+
+export async function listClientServices(clientSlug: string): Promise<ClientServiceRow[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('services')
+    .select('id, service_type, status, access_until, monthly_value, billing_source, offer_code')
+    .eq('client_slug', clientSlug)
+    .neq('status', 'canceled')
+    .order('service_type');
+  if (error) throw error;
+  return (data ?? []) as ClientServiceRow[];
+}
+
+export async function registerManualPayment(p: {
+  client_slug: string;
+  amount: number;
+  method: string;
+  paid_at: string;
+  whole_plan?: boolean;
+  service_ids?: string[];
+  months?: number;
+  new_access_until?: string | null;
+  notes?: string | null;
+}) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('register_manual_payment', {
+    p_client_slug: p.client_slug,
+    p_amount: Number(p.amount) || 0,
+    p_method: p.method || null,
+    p_paid_at: p.paid_at,
+    p_whole_plan: p.whole_plan ?? true,
+    p_service_ids: p.service_ids ?? [],
+    p_months: p.months ?? 1,
+    p_new_access_until: p.new_access_until || null,
+    p_notes: p.notes || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export type AgreementInstallmentInput = { due_date: string; amount: number };
+
+export async function createAgreement(p: {
+  client_slug: string;
+  title: string;
+  notes?: string | null;
+  installments: AgreementInstallmentInput[];
+}): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('create_agreement', {
+    p_client_slug: p.client_slug,
+    p_title: p.title,
+    p_notes: p.notes || null,
+    p_installments: p.installments,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function settleInstallment(p: {
+  installment_id: string;
+  method: string;
+  paid_at: string;
+  extend?: boolean;
+  whole_plan?: boolean;
+  service_ids?: string[];
+  months?: number;
+}) {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('settle_installment', {
+    p_installment_id: p.installment_id,
+    p_method: p.method || null,
+    p_paid_at: p.paid_at,
+    p_extend: p.extend ?? false,
+    p_whole_plan: p.whole_plan ?? true,
+    p_service_ids: p.service_ids ?? [],
+    p_months: p.months ?? 1,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function setServiceBillingSource(
+  serviceId: string,
+  source: 'hotmart' | 'manual' | 'courtesy',
+): Promise<true> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('set_service_billing_source', { p_service_id: serviceId, p_source: source });
+  if (error) throw error;
+  return true;
+}
+
+export type PaymentRow = {
+  id: string;
+  service_id: string | null;
+  amount: number;
+  method: string | null;
+  paid_at: string;
+  source: string;
+  months: number;
+  notes: string | null;
+  created_at: string;
+};
+
+export async function listClientPayments(clientSlug: string, limit = 50): Promise<PaymentRow[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('payments')
+    .select('id, service_id, amount, method, paid_at, source, months, notes, created_at')
+    .eq('client_slug', clientSlug)
+    .order('paid_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as PaymentRow[];
+}
+
+export type AgreementInstallmentRow = {
+  id: string;
+  seq: number;
+  due_date: string;
+  amount: number;
+  status: string;
+  paid_at: string | null;
+};
+export type AgreementRow = {
+  id: string;
+  title: string;
+  total_amount: number;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  installments: AgreementInstallmentRow[];
+};
+
+export async function listClientAgreements(clientSlug: string): Promise<AgreementRow[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('payment_agreements')
+    .select(
+      'id, title, total_amount, status, notes, created_at, agreement_installments(id, seq, due_date, amount, status, paid_at)',
+    )
+    .eq('client_slug', clientSlug)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as Array<Record<string, unknown>>).map((a) => ({
+    id: a.id as string,
+    title: a.title as string,
+    total_amount: Number(a.total_amount),
+    status: a.status as string,
+    notes: (a.notes as string) ?? null,
+    created_at: a.created_at as string,
+    installments: (((a.agreement_installments as Array<Record<string, unknown>>) ?? [])
+      .map((i) => ({
+        id: i.id as string,
+        seq: i.seq as number,
+        due_date: i.due_date as string,
+        amount: Number(i.amount),
+        status: i.status as string,
+        paid_at: (i.paid_at as string) ?? null,
+      }))
+      .sort((x, y) => x.seq - y.seq)),
+  }));
+}

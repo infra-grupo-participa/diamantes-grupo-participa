@@ -29,6 +29,7 @@ import {
   type ClientOption,
   type SubscriptionPayload,
 } from '@/lib/api/admin-assinaturas';
+import FinanceClientModal from './FinanceClientModal';
 import s from './assinaturas.module.css';
 
 // Mapa por setor (saída de canonicalSector)
@@ -104,6 +105,7 @@ export default function AssinaturasClient() {
   const [histClients, setHistClients] = useState<{ slug: string; name: string }[]>([]);
 
   const [modal, setModal] = useState<null | { editing: SubscriptionRow | null }>(null);
+  const [financeClient, setFinanceClient] = useState<null | { slug: string; name: string }>(null);
 
   // ── Tabela ──
   const load = useCallback(async () => {
@@ -368,7 +370,13 @@ export default function AssinaturasClient() {
                   </tr>
                 ) : (
                   subs.map((sub) => (
-                    <SubRow key={sub.id} sub={sub} onEdit={() => setModal({ editing: sub })} onDelete={() => onDelete(sub)} />
+                    <SubRow
+                      key={sub.id}
+                      sub={sub}
+                      onEdit={() => setModal({ editing: sub })}
+                      onDelete={() => onDelete(sub)}
+                      onFinance={() => setFinanceClient({ slug: sub.client_slug, name: sub.client_name })}
+                    />
                   ))
                 )}
               </tbody>
@@ -558,6 +566,16 @@ export default function AssinaturasClient() {
           onSaved={async () => {
             setModal(null);
             await Promise.all([load(), loadStats()]);
+          }}
+        />
+      )}
+      {financeClient && (
+        <FinanceClientModal
+          clientSlug={financeClient.slug}
+          clientName={financeClient.name}
+          onClose={() => setFinanceClient(null)}
+          onChanged={() => {
+            void Promise.all([load(), loadStats()]);
           }}
         />
       )}
@@ -780,7 +798,7 @@ function nextBillingCell(sub: SubscriptionRow): React.ReactNode {
   return <span style={{ color: 'var(--muted)' }}>—</span>;
 }
 
-function SubRow({ sub, onEdit, onDelete }: { sub: SubscriptionRow; onEdit: () => void; onDelete: () => void }) {
+function SubRow({ sub, onEdit, onDelete, onFinance }: { sub: SubscriptionRow; onEdit: () => void; onDelete: () => void; onFinance: () => void }) {
   const svcsText =
     [...new Set((sub.active_services || []).map((sv) => canonicalSector(sv.service_type)).filter(Boolean))].join(', ') ||
     sub.plan_name ||
@@ -814,6 +832,12 @@ function SubRow({ sub, onEdit, onDelete }: { sub: SubscriptionRow; onEdit: () =>
       </td>
       <td className={s.cardActions} data-label="Ação" style={{ textAlign: 'right' }}>
         <div className={s.rowActions}>
+          <button className={s.iconBtn} title="Financeiro (pagamentos, adiantamento, acordos)" onClick={onFinance}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </button>
           <button className={s.iconBtn} title="Editar" onClick={onEdit}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9" />
