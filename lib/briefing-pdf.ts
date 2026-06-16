@@ -9,12 +9,84 @@ export interface PdfUnit {
   fields: Array<{ label: string; value: string }>;
 }
 
-/** Converte valor cru em string exibível (Sim/Não/vazio). */
+/** Converte valor cru em string exibível (Sim/Não/vazio). Legado — prefira formatFieldValue. */
 export function displayVal(v: unknown): string {
   if (v === true) return 'Sim';
   if (v === false) return 'Não';
   if (v == null) return '';
   return String(v);
+}
+
+/**
+ * E2: formata o valor de um campo do briefing de forma legível e fiel ao tipo,
+ * eliminando o "[object Object]" (campos compostos como cartão saíam quebrados).
+ *
+ * - boolean → Sim/Não · date (YYYY-MM-DD) → dd/mm/aaaa · arrays → "a, b, c"
+ * - card → "Bandeira •••• 1234" (+ validade só quando NÃO redigido)
+ * - objeto genérico → "chave: valor; ..." (nunca "[object Object]")
+ *
+ * `redactCard`: omite a validade do cartão. Use TRUE para texto que vira
+ * pesquisável/indexável (o briefing_summary vai pra descrição/comentário da task
+ * no ClickUp, visível a todo o workspace — LGPD). Use FALSE no PDF confidencial.
+ */
+export function formatFieldValue(
+  type: string | undefined,
+  value: unknown,
+  opts: { redactCard?: boolean } = {},
+): string {
+  if (value === true) return 'Sim';
+  if (value === false) return 'Não';
+  if (value === null || value === undefined || value === '') return '';
+
+  if (type === 'card' && typeof value === 'object') {
+    const c = value as { brand?: string; last4?: string; expiry?: string };
+    const brand = c.brand ? String(c.brand) : 'Cartão';
+    const last4 = c.last4 ? `•••• ${c.last4}` : '';
+    const base = [brand, last4].filter(Boolean).join(' ').trim() || 'Cartão informado';
+    if (opts.redactCard) return base;
+    return c.expiry ? `${base} · venc. ${c.expiry}` : base;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => formatFieldValue(undefined, v, opts))
+      .filter((s) => s !== '')
+      .join(', ');
+  }
+
+  if (type === 'date' && typeof value === 'string') {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : value;
+  }
+
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      .map(([k, v]) => `${k}: ${formatFieldValue(undefined, v, opts)}`)
+      .filter((s) => !s.endsWith(': '))
+      .join('; ');
+  }
+
+  return String(value);
+}
+
+/**
+ * E2: monta o resumo textual do briefing (briefing_summary) em TEXTO CRU
+ * (sem markdown — o ClickUp renderiza literal). Pula campos vazios.
+ * Recebe unidades com `value` já formatado (a travessia/resolução fica na página).
+ */
+export function buildBriefingSummary(
+  units: Array<{ group?: string; title: string; fields: Array<{ label: string; value: string }> }>,
+): string {
+  const blocks: string[] = [];
+  for (const u of units) {
+    const filled = u.fields.filter((f) => f.value !== '');
+    if (!filled.length) continue;
+    const head = (u.group ? `${u.group} · ` : '') + u.title;
+    const lines = filled.map((f) => `- ${f.label}: ${f.value}`);
+    blocks.push(`${head}\n${lines.join('\n')}`);
+  }
+  return blocks.join('\n\n');
 }
 
 /** Gera o PDF do briefing e devolve um Blob. (async: carrega jspdf sob demanda) */

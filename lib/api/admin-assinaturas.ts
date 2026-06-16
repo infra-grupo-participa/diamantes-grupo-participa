@@ -137,29 +137,33 @@ export async function getSubscriptionStats(): Promise<SubscriptionStats> {
 }
 
 /**
- * Somatórios financeiros (a receber / inadimplência / ticket médio) derivados
- * apenas das colunas status + monthly_value — sem baixar as 1000 linhas completas
- * que a tabela paginada já carrega. Uma query enxuta cobre todos os agregados.
+ * Somatórios financeiros na granularidade de SERVIÇO (fonte da verdade), via RPC
+ * `admin_money_summary` (SECURITY INVOKER + is_admin no banco).
+ *
+ * Por que RPC e não somar `subscriptions` no front: a tabela `subscriptions` é
+ * agregada POR CLIENTE com um único valor e status "pior caso". Somar o valor
+ * inteiro de quem está `partial` como "inadimplência" inflava o número (~75%):
+ * jogava no balde de atraso serviços que estão em dia. Agora o atraso é a soma
+ * só dos serviços de fato vencidos (access_until < hoje).
  */
-export async function getSubscriptionMoneySummary(): Promise<{ due: number; late: number; avg: number }> {
+export async function getSubscriptionMoneySummary(): Promise<{
+  late: number;
+  onTime: number;
+  avg: number;
+  clientsOverdue: number;
+}> {
   const supabase = createClient();
-  const { data, error } = await supabase.from('subscriptions').select('status, monthly_value');
+  const { data, error } = await supabase.rpc('admin_money_summary');
   if (error) throw error;
-  const rows = (data ?? []) as Array<{ status: string; monthly_value: number }>;
-  let due = 0;
-  let late = 0;
-  let activeSum = 0;
-  let activeCount = 0;
-  for (const r of rows) {
-    const v = Number(r.monthly_value || 0);
-    if (r.status === 'pending') due += v;
-    if (r.status === 'overdue' || r.status === 'late' || r.status === 'partial') late += v;
-    if (r.status !== 'canceled') {
-      activeSum += v;
-      activeCount++;
-    }
-  }
-  return { due, late, avg: activeCount ? activeSum / activeCount : 0 };
+  const row = (Array.isArray(data) ? data[0] : data) as
+    | { late?: number; on_time?: number; avg_ticket?: number; clients_overdue?: number }
+    | undefined;
+  return {
+    late: Number(row?.late || 0),
+    onTime: Number(row?.on_time || 0),
+    avg: Number(row?.avg_ticket || 0),
+    clientsOverdue: Number(row?.clients_overdue || 0),
+  };
 }
 
 export async function getMrrSparkline(): Promise<SparkPoint[]> {

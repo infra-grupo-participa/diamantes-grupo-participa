@@ -4,7 +4,7 @@
 // Port de buildNewDemandModal()/ndGoStep2()/ndForm de portal/demandas.html.
 // Gate-aware: o caller só abre se isBaseReady().
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   createDemand,
   listMyProjects,
@@ -19,6 +19,29 @@ import { errMessage } from '@/lib/errors';
 import styles from './Modal.module.css';
 
 type Mode = 'simple' | 'project';
+
+// Prazo: lógica por DIAS ÚTEIS (pula fim de semana).
+// Mínimo = turnaround realista que a equipe consegue cumprir; sugestão = prazo confortável.
+const MIN_LEAD_BD = 2; // prazo final mínimo (dias úteis a partir de hoje)
+const SUGGESTED_LEAD_BD = 5; // sugestão pré-preenchida (dias úteis)
+
+function toYMD(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function addBusinessDays(from: Date, n: number): Date {
+  const d = new Date(from);
+  let added = 0;
+  while (added < n) {
+    d.setDate(d.getDate() + 1);
+    const dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++; // ignora domingo(0) e sábado(6)
+  }
+  return d;
+}
+function fmtBR(ymd: string): string {
+  const [y, m, d] = ymd.split('-');
+  return `${d}/${m}/${y}`;
+}
 
 export default function NewDemandModal({
   onClose,
@@ -45,6 +68,16 @@ export default function NewDemandModal({
   const [endsAt, setEndsAt] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Datas de referência (estáveis durante a sessão do modal).
+  const dateHints = useMemo(() => {
+    const today = new Date();
+    return {
+      todayStr: toYMD(today),
+      minEnds: toYMD(addBusinessDays(today, MIN_LEAD_BD)),
+      suggestedEnds: toYMD(addBusinessDays(today, SUGGESTED_LEAD_BD)),
+    };
+  }, []);
 
   // a11y: fecha no Esc e foca o modal ao abrir.
   useEffect(() => {
@@ -84,6 +117,8 @@ export default function NewDemandModal({
   async function goStep2() {
     if (!canNext) return;
     setStep(2);
+    // Sugestão de prazo: pré-preenche o prazo final se o cliente ainda não escolheu.
+    if (!endsAt) setEndsAt(dateHints.suggestedEnds);
     if (operators === null) {
       try {
         const ops = await listOperatorsForClient();
@@ -121,14 +156,13 @@ export default function NewDemandModal({
       return;
     }
     // Validação de datas (comparação por dia-calendário YYYY-MM-DD; inputs date já vêm nesse formato).
-    const today = new Date();
-    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const { todayStr, minEnds } = dateHints;
     if (startsAt && startsAt < todayStr) {
       setError('A data de início não pode estar no passado.');
       return;
     }
-    if (endsAt && endsAt < todayStr) {
-      setError('O prazo final não pode estar no passado.');
+    if (endsAt && endsAt < minEnds) {
+      setError(`O prazo final mínimo é ${fmtBR(minEnds)} (${MIN_LEAD_BD} dias úteis) — tempo mínimo para a equipe entregar com qualidade.`);
       return;
     }
     if (startsAt && endsAt && endsAt < startsAt) {
@@ -325,11 +359,26 @@ export default function NewDemandModal({
             <div className={styles.grid2}>
               <div>
                 <label className={styles.label}>Data de início</label>
-                <input className={styles.input} type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
+                <input
+                  className={styles.input}
+                  type="date"
+                  min={dateHints.todayStr}
+                  value={startsAt}
+                  onChange={(e) => setStartsAt(e.target.value)}
+                />
               </div>
               <div>
                 <label className={styles.label}>Prazo final</label>
-                <input className={styles.input} type="date" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} />
+                <input
+                  className={styles.input}
+                  type="date"
+                  min={dateHints.minEnds}
+                  value={endsAt}
+                  onChange={(e) => setEndsAt(e.target.value)}
+                />
+                <small className={styles.hint}>
+                  Sugerimos {SUGGESTED_LEAD_BD} dias úteis. Prazo mínimo: {fmtBR(dateHints.minEnds)}.
+                </small>
               </div>
             </div>
             {error && <div className={styles.error}>{error}</div>}

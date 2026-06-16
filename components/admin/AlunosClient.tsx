@@ -28,6 +28,9 @@ import {
   type StudentStats,
 } from '@/lib/api/admin-alunos';
 import { listAllDemands, STATUS_BADGE, type Demand as ClientDemand } from '@/lib/api/admin-demandas';
+import { getClientBriefingAccess } from '@/lib/api/admin';
+import { BRIEFING_SERVICE_LABELS, type BriefingAnswers } from '@/lib/briefing-templates';
+import BriefingReadView, { buildBasicBriefingSections } from '@/components/briefing/BriefingReadView';
 import s from './alunos.module.css';
 
 // Mapa por setor (saída de canonicalServiceName)
@@ -108,6 +111,7 @@ export default function AlunosClient() {
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [demands, setDemands] = useState<ClientDemand[]>([]);
+  const [basicAccess, setBasicAccess] = useState<Record<string, BriefingAnswers>>({});
   const [detailLoading, setDetailLoading] = useState(false);
   // Serviços por slug (para badge na linha)
   const [servicesBySlug, setServicesBySlug] = useState<Record<string, ServiceRow[]>>({});
@@ -184,15 +188,18 @@ export default function AlunosClient() {
     setTeam([]);
     setServices([]);
     setDemands([]);
+    setBasicAccess({});
     try {
-      const [t, svc, dem] = await Promise.all([
+      const [t, svc, dem, access] = await Promise.all([
         getStudentTeam(row.slug),
         getStudentServices(row.slug),
         listAllDemands({ clientSlug: row.slug }).catch(() => []),
+        getClientBriefingAccess(row.slug).catch(() => ({})),
       ]);
       setTeam(t);
       setServices(svc);
       setDemands(dem);
+      setBasicAccess(access as Record<string, BriefingAnswers>);
       setServicesBySlug((prev) => ({ ...prev, [row.slug]: svc }));
     } catch (e) {
       console.error(e);
@@ -557,6 +564,18 @@ export default function AlunosClient() {
           <div className={s.section}>
             <h4 className={s.sectionTitle}>Serviços contratados</h4>
             {detailLoading ? <DetailSkeleton /> : <ServiceGrid services={services} />}
+          </div>
+
+          <div className={s.section}>
+            <h4 className={s.sectionTitle}>Briefing Básico</h4>
+            {detailLoading ? (
+              <DetailSkeleton />
+            ) : (
+              <BriefingReadView
+                sections={buildBasicBriefingSections(basicAccess, BRIEFING_SERVICE_LABELS)}
+                emptyText="O cliente ainda não preencheu o Briefing Básico (acessos)."
+              />
+            )}
           </div>
 
           <div className={s.section}>

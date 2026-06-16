@@ -21,7 +21,7 @@ import {
   getSessionJwt,
   type ProjectRow,
 } from '@/lib/api/briefing';
-import { generateBriefingPdf, displayVal, type PdfUnit } from '@/lib/briefing-pdf';
+import { generateBriefingPdf, formatFieldValue, buildBriefingSummary, type PdfUnit } from '@/lib/briefing-pdf';
 import { toast } from '@/lib/toast';
 import styles from '@/components/briefing/BriefingForm.module.css';
 
@@ -269,14 +269,28 @@ export default function ProjectBriefingPage() {
   }
 
   async function buildPdf(): Promise<Blob> {
+    // PDF: documento confidencial anexado — mostra validade do cartão.
     const pdfUnits: PdfUnit[] = units.map((u) => ({
       group: u.group,
       title: u.title,
       fields: u.fields
-        .map((f) => ({ label: f.label, value: displayVal(getValue(u, f.id)) }))
+        .map((f) => ({ label: f.label, value: formatFieldValue(f.type, getValue(u, f.id)) }))
         .filter((x) => x.value !== ''),
     }));
     return generateBriefingPdf(servicesLabel(), project?.title ?? 'Projeto', pdfUnits);
+  }
+
+  // E2: resumo textual para a descrição/comentário da task (texto cru, cartão redigido — LGPD).
+  function buildSummary(): string {
+    const summaryUnits = units.map((u) => ({
+      group: u.group,
+      title: u.title,
+      fields: u.fields.map((f) => ({
+        label: f.label,
+        value: formatFieldValue(f.type, getValue(u, f.id), { redactCard: true }),
+      })),
+    }));
+    return buildBriefingSummary(summaryUnits);
   }
 
   async function attachPdf(blob: Blob) {
@@ -285,6 +299,7 @@ export default function ProjectBriefingPage() {
     const form = new FormData();
     form.append('project_id', projectId);
     form.append('pdf', blob, 'Briefing.pdf');
+    form.append('briefing_summary', buildSummary());
     const res = await fetch('/api/briefing-to-clickup', {
       method: 'POST',
       headers: { Authorization: 'Bearer ' + jwt },

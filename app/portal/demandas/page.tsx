@@ -13,6 +13,7 @@ import {
   getMyDemandRating,
   isBaseReady,
   listMyDemands,
+  markDemandRead,
   type Demand,
   type DemandMember,
   type DemandStatus,
@@ -23,10 +24,31 @@ import { getMessage, hydrateAttachments, isImage, listMessages, postMessage, sub
 import { fmtDate, initials } from '@/lib/format';
 import { toast } from '@/lib/toast';
 import { errMessage } from '@/lib/errors';
+import { listMyProjects, type Project } from '@/lib/api/projects';
+import { getClientBriefing } from '@/lib/api/briefing';
+import { BRIEFING_SERVICE_LABELS, type BriefingAnswers, type ProjectBriefing } from '@/lib/briefing-templates';
+import BriefingReadView, {
+  buildGeneralSection,
+  buildProjectSections,
+  buildAccessSections,
+  type BriefingViewSection,
+} from '@/components/briefing/BriefingReadView';
 import ChatComposer from '@/components/demandas/ChatComposer';
 import NewDemandModal from '@/components/demandas/NewDemandModal';
 import RatingModal from '@/components/demandas/RatingModal';
 import styles from './page.module.css';
+
+// Normaliza o briefing de um projeto para o shape { general, services } —
+// projetos legados podem divergir (campo ausente / formato antigo).
+function normalizeProjectBriefing(b: ProjectBriefing | null | undefined): {
+  general: BriefingAnswers;
+  services: Record<string, BriefingAnswers>;
+} {
+  const obj = (b && typeof b === 'object' ? b : {}) as ProjectBriefing;
+  const general = (obj.general && typeof obj.general === 'object' ? obj.general : {}) as BriefingAnswers;
+  const services = (obj.services && typeof obj.services === 'object' ? obj.services : {}) as Record<string, BriefingAnswers>;
+  return { general, services };
+}
 
 type Filter = 'all' | 'in_progress' | 'awaiting' | 'done';
 
@@ -62,6 +84,9 @@ const FileIcon = () => (
     <polyline points="14 2 14 8 20 8" />
   </svg>
 );
+
+// Chave da "pasta" de demandas sem projeto (avulsas).
+const AVULSAS_KEY = '__avulsas__';
 
 // ── Helpers de data/categoria (port das funções inline do legado) ──
 function fmtTime(s?: string | null): string {
@@ -132,6 +157,10 @@ export default function DemandasPage() {
   const [ratings, setRatings] = useState<Record<string, Rating | null>>({});
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [me, setMe] = useState<Me | null>(null);
+  // Briefing (F1): projetos do cliente indexados por id (1 query em lote) +
+  // Briefing Básico (acessos) do cliente logado (1 fetch cacheado por sessão).
+  const [projectsById, setProjectsById] = useState<Record<string, Project>>({});
+  const [basicAccess, setBasicAccess] = useState<Record<string, BriefingAnswers>>({});
   // Filtro por projeto (via ?projeto=<id>, vindo do card de Projetos).
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   useEffect(() => {
@@ -238,6 +267,21 @@ export default function DemandasPage() {
       setMe(profile);
       await loadAll();
       if (!cancel) setLoading(false);
+      // Briefing (F1): carga LAZY/best-effort, 2 fetches cacheados por sessão.
+      // Não bloqueia a lista de demandas nem o chat.
+      void (async () => {
+        try {
+          const [projs, brief] = await Promise.all([
+            listMyProjects().catch(() => [] as Project[]),
+            getClientBriefing().then((b) => b.access).catch(() => ({} as Record<string, BriefingAnswers>)),
+          ]);
+          if (cancel) return;
+          setProjectsById(Object.fromEntries(projs.map((p) => [p.id, p])));
+          setBasicAccess(brief);
+        } catch {
+          /* best-effort: a seção de briefing simplesmente não aparece */
+        }
+      })();
     })();
     return () => {
       cancel = true;
@@ -249,6 +293,8 @@ export default function DemandasPage() {
     if (!currentId) return;
     const d = demands.find((x) => x.id === currentId);
     markRead(currentId, (d?.last_message_at as string) || new Date().toISOString());
+    // Registra a leitura NO SERVIDOR (otimização: e-mail de chat só quando ausente).
+    void markDemandRead(currentId);
   }, [currentId, demands, markRead]);
 
   // Atualiza a lista (não-lidas + ordem por atividade) ao voltar o foco/visibilidade.
@@ -396,6 +442,9 @@ export default function DemandasPage() {
     [demands, needsYou],
   );
 
+  // Pastas (por projeto) recolhidas — chave do grupo no Set.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
   const filtered = useMemo(() => {
     let items = demands;
     if (projectFilter) items = items.filter((d) => d.project_id === projectFilter);
@@ -410,6 +459,22 @@ export default function DemandasPage() {
     }
     return items;
   }, [demands, filter, search, projectFilter, needsYou]);
+
+  // Agrupa as demandas filtradas em "pastas" por projeto (avulsas por último).
+  const groups = useMemo(() => {
+    const map = new Map<string, { key: string; title: string; items: Demand[] }>();
+    for (const d of filtered) {
+      const key = d.project_id || AVULSAS_KEY;
+      const title = d.project_id ? (d.project_title as string) || 'Projeto' : 'Demandas avulsas';
+      if (!map.has(key)) map.set(key, { key, title, items: [] });
+      map.get(key)!.items.push(d);
+    }
+    return [...map.values()].sort((a, b) => {
+      if (a.key === AVULSAS_KEY) return 1;
+      if (b.key === AVULSAS_KEY) return -1;
+      return a.title.localeCompare(b.title, 'pt-BR');
+    });
+  }, [filtered]);
 
   // Nome do projeto filtrado (de qualquer demanda dele) p/ o banner.
   const projectFilterName = useMemo(
@@ -444,6 +509,32 @@ export default function DemandasPage() {
     });
     return [...map.values()];
   }, [operators, currentMsgs]);
+
+  // ── Briefing desta demanda (F1) — só quando há projeto vinculado ──
+  // Mostra: Briefing Básico (acessos do cliente) + briefing do projeto vinculado.
+  const briefingSections = useMemo<BriefingViewSection[]>(() => {
+    const pid = current?.project_id;
+    if (!pid) return []; // demanda sem projeto → seção oculta
+    const project = projectsById[pid];
+    if (!project) return [];
+    const services = project.services || [];
+    const { general, services: svcAns } = normalizeProjectBriefing(project.briefing);
+
+    const out: BriefingViewSection[] = [];
+    // 1) Briefing do projeto: bloco geral + campanha por serviço.
+    out.push(buildGeneralSection(general));
+    services.forEach((svc) => {
+      const lbl = BRIEFING_SERVICE_LABELS[svc] || svc;
+      out.push(...buildProjectSections(svc, lbl, svcAns[svc] || {}));
+    });
+    // 2) Briefing Básico (acessos) — só os serviços deste projeto.
+    services.forEach((svc) => {
+      const lbl = BRIEFING_SERVICE_LABELS[svc] || svc;
+      out.push(...buildAccessSections(svc, lbl, basicAccess[svc] || {}));
+    });
+    return out;
+  }, [current?.project_id, projectsById, basicAccess]);
+  const hasBriefing = briefingSections.some((sec) => sec.rows.length > 0);
 
   // ── Nova demanda (gate-aware) ──
   async function openNewDemand() {
@@ -636,6 +727,79 @@ export default function DemandasPage() {
 
   const rating = currentId ? ratings[currentId] : null;
 
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+
+  // Item da lista (reusado no modo plano e dentro das pastas por projeto).
+  const renderDemandItem = (d: Demand) => {
+    const urg = dueUrgency(d);
+    const unread = isUnread(d);
+    return (
+      <button
+        key={d.id}
+        type="button"
+        className={`${styles.listItem} ${d.id === currentId ? styles.active : ''} ${d.status === 'review' ? styles.awaiting : ''}`}
+        onClick={() => setCurrentId(d.id)}
+      >
+        <span className={`${styles.listIcon} ${styles[iconKeyFor(d)]}`}>
+          <PenIcon />
+        </span>
+        <span className={styles.listBody}>
+          <span className={styles.listTitle} style={{ display: 'block', fontWeight: unread ? 700 : undefined }}>
+            {d.title || 'Sem título'}
+          </span>
+          <span className={styles.listMeta}>
+            {(() => {
+              const cat = categoryOf(members[d.id]);
+              return cat ? (
+                <>
+                  <span>{cat}</span>
+                  <span>•</span>
+                </>
+              ) : null;
+            })()}
+            <span
+              style={
+                urg === 'late'
+                  ? { color: 'var(--danger-strong)', fontWeight: 600 }
+                  : urg === 'soon'
+                    ? { color: 'var(--warning-strong)', fontWeight: 600 }
+                    : undefined
+              }
+            >
+              {dueLabel(d)}
+            </span>
+          </span>
+          {d.last_message_preview ? (
+            <span
+              className={styles.listMeta}
+              style={{ display: 'block', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: unread ? 1 : 0.9 }}
+            >
+              <span style={{ fontWeight: unread ? 600 : 500 }}>
+                {d.last_message_from === 'client' ? 'Você: ' : 'Equipe: '}
+              </span>
+              {(d.last_message_preview as string).replace(/\s+/g, ' ').slice(0, 80)}
+            </span>
+          ) : null}
+        </span>
+        {unread ? (
+          <span
+            aria-label="Mensagens novas"
+            title="Mensagens novas"
+            style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, alignSelf: 'center' }}
+          />
+        ) : (
+          <span />
+        )}
+      </button>
+    );
+  };
+
   return (
     <div className={styles.wrap}>
       <div className={styles.pageHead}>
@@ -730,68 +894,57 @@ export default function DemandasPage() {
                   </>
                 )}
               </div>
+            ) : projectFilter ? (
+              // Filtro de projeto ativo → lista plana (o chip acima já indica o projeto).
+              filtered.map((d) => renderDemandItem(d))
             ) : (
-              filtered.map((d) => {
-                const urg = dueUrgency(d);
-                const unread = isUnread(d);
+              // Organização em PASTAS por projeto (colapsáveis); avulsas por último.
+              groups.map((g) => {
+                const isCollapsed = collapsedGroups.has(g.key);
                 return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    className={`${styles.listItem} ${d.id === currentId ? styles.active : ''} ${d.status === 'review' ? styles.awaiting : ''}`}
-                    onClick={() => setCurrentId(d.id)}
-                  >
-                    <span className={`${styles.listIcon} ${styles[iconKeyFor(d)]}`}>
-                      <PenIcon />
-                    </span>
-                    <span className={styles.listBody}>
-                      <span className={styles.listTitle} style={{ display: 'block', fontWeight: unread ? 700 : undefined }}>
-                        {d.title || 'Sem título'}
+                  <div key={g.key}>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(g.key)}
+                      aria-expanded={!isCollapsed}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        width: '100%',
+                        padding: '9px 12px',
+                        margin: '8px 0 2px',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: '1px solid var(--border)',
+                        cursor: 'pointer',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        color: 'var(--muted)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.9rem' }}>{g.key === AVULSAS_KEY ? '⚡' : '📁'}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                        {g.title}
                       </span>
-                      <span className={styles.listMeta}>
-                        {(() => {
-                          const cat = categoryOf(members[d.id]);
-                          return cat ? (
-                            <>
-                              <span>{cat}</span>
-                              <span>•</span>
-                            </>
-                          ) : null;
-                        })()}
-                        <span
-                          style={
-                            urg === 'late'
-                              ? { color: 'var(--danger-strong)', fontWeight: 600 }
-                              : urg === 'soon'
-                                ? { color: 'var(--warning-strong)', fontWeight: 600 }
-                                : undefined
-                          }
-                        >
-                          {dueLabel(d)}
-                        </span>
-                      </span>
-                      {d.last_message_preview ? (
-                        <span
-                          className={styles.listMeta}
-                          style={{ display: 'block', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: unread ? 1 : 0.9 }}
-                        >
-                          <span style={{ fontWeight: unread ? 600 : 500 }}>
-                            {d.last_message_from === 'client' ? 'Você: ' : 'Equipe: '}
-                          </span>
-                          {(d.last_message_preview as string).replace(/\s+/g, ' ').slice(0, 80)}
-                        </span>
-                      ) : null}
-                    </span>
-                    {unread ? (
                       <span
-                        aria-label="Mensagens novas"
-                        title="Mensagens novas"
-                        style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, alignSelf: 'center' }}
-                      />
-                    ) : (
-                      <span />
-                    )}
-                  </button>
+                        style={{
+                          flexShrink: 0,
+                          background: 'var(--accent-soft)',
+                          color: 'var(--accent-strong)',
+                          borderRadius: 999,
+                          padding: '1px 8px',
+                          fontSize: '0.72rem',
+                        }}
+                      >
+                        {g.items.length}
+                      </span>
+                      <span style={{ flexShrink: 0, fontSize: '0.7rem' }}>{isCollapsed ? '▸' : '▾'}</span>
+                    </button>
+                    {!isCollapsed && g.items.map((d) => renderDemandItem(d))}
+                  </div>
                 );
               })
             )}
@@ -1075,6 +1228,16 @@ export default function DemandasPage() {
                   )}
                 </div>
               </div>
+
+              {current.project_id && hasBriefing && (
+                <div className={styles.detailSection}>
+                  <h3>
+                    Briefing desta demanda{' '}
+                    {current.project_title ? <span className="small">📁 {current.project_title}</span> : null}
+                  </h3>
+                  <BriefingReadView sections={briefingSections} />
+                </div>
+              )}
 
               {canComplete && (
                 <div className={styles.detailSection}>

@@ -89,6 +89,20 @@ function db() {
   return createClient();
 }
 
+/**
+ * Marca a demanda como lida pelo cliente (servidor). Alimenta a otimização de
+ * e-mail "só quando ausente": se o cliente leu in-app, o worker de chat não
+ * dispara e-mail. Best-effort — falha não atrapalha a navegação.
+ */
+export async function markDemandRead(demandId: string): Promise<void> {
+  if (!demandId) return;
+  try {
+    await db().rpc('mark_demand_read', { p_demand_id: demandId });
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Perfil do logado (portal.users). */
 export async function getMe(): Promise<Me | null> {
   const supabase = db();

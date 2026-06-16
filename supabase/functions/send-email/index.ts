@@ -1,13 +1,18 @@
-// send-email v5 — e-mails transacionais do portal (Resend).
+// send-email v7 — e-mails transacionais do portal (Resend).
 // Disparada por triggers pg_net:
-//   • portal._notify_demanda_criada     → { type:'demanda_criada', demand_id }
-//   • portal._notify_projeto_criado     → { type:'projeto_criado', project_id }
-//   • portal._notify_demanda_em_revisao → { type:'demanda_em_revisao', demand_id, stamp }
-// (Nova mensagem NÃO dispara e-mail: o ClickUp já notifica. Reset de senha é via
-//  SMTP do Supabase Auth.)
+//   • _notify_demanda_criada           → { type:'demanda_criada', demand_id }
+//   • _notify_projeto_criado           → { type:'projeto_criado', project_id }
+//   • _notify_demand_status_change     → demanda_em_revisao | demanda_concluida |
+//                                        demanda_cancelada | demanda_ajustes (+demand_id, stamp)
+//   • _notify_nova_mensagem            → { type:'nova_mensagem', message_id }
+//   • _retry_failed_emails (cron 5min) → { type:'retry_failed' }
 //
-// Provider-agnóstico: a troca de provedor mexe só em sendViaProvider() + no
-// secret do Vault. Dedup "uma vez só" via portal.email_log (dedup_key).
+// D1: cada e-mail é logado em portal.email_log; falha NÃO se perde (status='failed'
+//     + attempts/next_attempt_at). O retry_failed reenvia em background e atualiza a
+//     MESMA linha (sem duplicar). dedup_key (índice único) é o backstop anti-duplicidade.
+// D2: notificação de chat ao cliente (autor ≠ cliente) com dedup por janela de 10 min.
+//
+// Provider-agnóstico: trocar de provedor mexe só em sendViaProvider() + secret do Vault.
 //
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
@@ -17,11 +22,9 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-// Remetente — domínio a verificar no Resend (DNS SPF/DKIM).
 const FROM       = "Diamantes <nao-responder@diamantes.grupoparticipa.app.br>";
 const PORTAL_URL = "https://diamantes.grupoparticipa.app.br";
 
-// ── Branding (alinhado a app/globals.css) ───────────────────────────
 const C = {
   bg: "#f7f4fc", surface: "#ffffff", text: "#1a1430", muted: "#6b6584",
   border: "#e7e2f3", accent: "#f29725", accentStrong: "#d97f15", tint: "#efe8fb",
@@ -62,14 +65,12 @@ function baseLayout(opts: { title: string; intro: string; bodyHtml: string; ctaL
 </td></tr></table></body></html>`;
 }
 
-// ── Secrets / provider ──────────────────────────────────────────────
 async function getSecret(supabase: any, name: string): Promise<string> {
   const { data, error } = await supabase.schema("portal").rpc("get_internal_secret", { p_name: name });
   if (error) throw new Error(`secret ${name}: ${error.message}`);
   return data || "";
 }
 
-// Único ponto acoplado ao provedor. Troca = só aqui + o secret.
 async function sendViaProvider(apiKey: string, to: string, subject: string, html: string): Promise<{ ok: boolean; id?: string; error?: string }> {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -82,143 +83,229 @@ async function sendViaProvider(apiKey: string, to: string, subject: string, html
   return { ok: true, id: j?.id ? String(j.id) : undefined };
 }
 
-async function logEmail(supabase: any, row: any) {
-  try { await supabase.schema("portal").from("email_log").insert(row); }
-  catch (e) { console.error("email_log insert err", e); }
-}
+const firstName = (n?: string | null) => (n ? " " + esc(n.split(" ")[0]) : "");
 
-// Destinatário cliente da demanda: usuário primário do client_slug.
-async function resolveClientRecipient(supabase: any, demand: any): Promise<{ email: string; name: string } | null> {
-  if (demand.client_slug) {
+async function resolveClientRecipient(supabase: any, entity: any): Promise<{ email: string; name: string } | null> {
+  if (entity?.client_slug) {
     const { data } = await supabase.schema("portal").from("users")
       .select("email, name, is_primary")
-      .eq("client_slug", demand.client_slug).eq("role", "user")
+      .eq("client_slug", entity.client_slug).eq("role", "user")
       .not("email", "is", null)
       .order("is_primary", { ascending: false, nullsFirst: false })
       .limit(1).maybeSingle();
     if (data?.email) return { email: data.email, name: data.name || "" };
   }
-  if (demand.created_by) {
+  if (entity?.created_by) {
     const { data } = await supabase.schema("portal").from("users")
-      .select("email, name, role").eq("id", demand.created_by).maybeSingle();
+      .select("email, name, role").eq("id", entity.created_by).maybeSingle();
     if (data?.email && data.role === "user") return { email: data.email, name: data.name || "" };
   }
   return null;
 }
 
-// ── Handlers ────────────────────────────────────────────────────────
-async function handleDemandaCriada(supabase: any, apiKey: string, demand_id: string) {
-  const { data: demand } = await supabase.schema("portal")
-    .from("demands").select("id, title, client_slug, created_by, status").eq("id", demand_id).maybeSingle();
-  if (!demand) return { skipped: "unknown_demand" };
-
-  const dedupKey = `demanda_criada:${demand_id}`;
-  const { data: dup } = await supabase.schema("portal").from("email_log")
-    .select("id").eq("dedup_key", dedupKey).eq("status", "sent").limit(1).maybeSingle();
-  if (dup) return { skipped: "already_sent" };
-
-  const to = await resolveClientRecipient(supabase, demand);
-  if (!to) return { skipped: "no_recipient" };
-
-  const subject = `Demanda registrada: ${demand.title}`;
-  const html = baseLayout({
-    title: "Sua demanda foi registrada ✅",
-    intro: `Olá${to.name ? " " + esc(to.name.split(" ")[0]) : ""}, recebemos sua demanda <strong>${esc(demand.title)}</strong>. Nossa equipe já foi notificada e você acompanha tudo pelo portal.`,
-    bodyHtml: "",
-    ctaLabel: "Acompanhar demanda",
-    ctaHref: `${PORTAL_URL}/portal/demandas`,
-  });
-
-  const res = await sendViaProvider(apiKey, to.email, subject, html);
-  await logEmail(supabase, {
-    type: "demanda_criada", to_email: to.email, subject,
-    ref_type: "demand", ref_id: demand_id, dedup_key: res.ok ? dedupKey : null,
-    status: res.ok ? "sent" : "failed", resend_id: res.id || null, error: res.error || null,
-  });
-  return res.ok ? { sent: to.email } : { failed: res.error };
+// Operadores da demanda (têm e-mail @ — não têm login no portal; CTA aponta ao ClickUp).
+async function resolveDemandOperators(supabase: any, demand_id: string): Promise<Array<{ email: string; name: string }>> {
+  const { data: dops } = await supabase.schema("portal")
+    .from("demand_operators").select("operator_id").eq("demand_id", demand_id);
+  const ids = (dops || []).map((d: any) => d.operator_id);
+  if (!ids.length) return [];
+  const { data: ops } = await supabase.schema("portal")
+    .from("operators").select("name, email").in("id", ids).not("email", "is", null);
+  return (ops || []).filter((o: any) => o.email).map((o: any) => ({ email: o.email, name: o.name || "" }));
 }
 
-async function handleProjetoCriado(supabase: any, apiKey: string, project_id: string) {
-  const { data: project } = await supabase.schema("portal")
-    .from("projects").select("id, title, client_slug, created_by").eq("id", project_id).maybeSingle();
-  if (!project) return { skipped: "unknown_project" };
+type Spec = { to: string; name?: string; subject: string; html: string; dedupKey: string | null; refType: string | null; refId: string | null };
 
-  const dedupKey = `projeto_criado:${project_id}`;
-  const { data: dup } = await supabase.schema("portal").from("email_log")
-    .select("id").eq("dedup_key", dedupKey).eq("status", "sent").limit(1).maybeSingle();
-  if (dup) return { skipped: "already_sent" };
+// Compõe as especificações de e-mail (0..n) para (type, payload). Sem enviar/logar.
+async function composeSpecs(supabase: any, type: string, payload: any): Promise<Spec[]> {
+  const { demand_id, project_id, message_id, stamp } = payload;
 
-  const to = await resolveClientRecipient(supabase, project);
-  if (!to) return { skipped: "no_recipient" };
+  if (type === "demanda_criada") {
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, client_slug, created_by, status").eq("id", demand_id).maybeSingle();
+    if (!d) return [];
+    const to = await resolveClientRecipient(supabase, d); if (!to) return [];
+    return [{
+      to: to.email, name: to.name, dedupKey: `demanda_criada:${demand_id}`, refType: "demand", refId: demand_id,
+      subject: `Demanda registrada: ${d.title}`,
+      html: baseLayout({ title: "Sua demanda foi registrada ✅",
+        intro: `Olá${firstName(to.name)}, recebemos sua demanda <strong>${esc(d.title)}</strong>. Nossa equipe já foi notificada e você acompanha tudo pelo portal.`,
+        bodyHtml: "", ctaLabel: "Acompanhar demanda", ctaHref: `${PORTAL_URL}/portal/demandas` }),
+    }];
+  }
 
-  const title = project.title || "Novo projeto";
-  const subject = `Projeto criado: ${title}`;
-  const html = baseLayout({
-    title: "Seu projeto foi criado 🎯",
-    intro: `Olá${to.name ? " " + esc(to.name.split(" ")[0]) : ""}, criamos o projeto <strong>${esc(title)}</strong>. O próximo passo é preencher o briefing para a equipe começar a trabalhar.`,
-    bodyHtml: "",
-    ctaLabel: "Preencher briefing",
-    ctaHref: `${PORTAL_URL}/portal/briefing/${project.id}`,
-  });
+  if (type === "projeto_criado") {
+    const { data: p } = await supabase.schema("portal").from("projects")
+      .select("id, title, client_slug, created_by").eq("id", project_id).maybeSingle();
+    if (!p) return [];
+    const to = await resolveClientRecipient(supabase, p); if (!to) return [];
+    const title = p.title || "Novo projeto";
+    return [{
+      to: to.email, name: to.name, dedupKey: `projeto_criado:${project_id}`, refType: "project", refId: project_id,
+      subject: `Projeto criado: ${title}`,
+      html: baseLayout({ title: "Seu projeto foi criado 🎯",
+        intro: `Olá${firstName(to.name)}, criamos o projeto <strong>${esc(title)}</strong>. O próximo passo é preencher o briefing para a equipe começar a trabalhar.`,
+        bodyHtml: "", ctaLabel: "Preencher briefing", ctaHref: `${PORTAL_URL}/portal/briefing/${p.id}` }),
+    }];
+  }
 
-  const res = await sendViaProvider(apiKey, to.email, subject, html);
-  await logEmail(supabase, {
-    type: "projeto_criado", to_email: to.email, subject,
-    ref_type: "project", ref_id: project_id, dedup_key: res.ok ? dedupKey : null,
-    status: res.ok ? "sent" : "failed", resend_id: res.id || null, error: res.error || null,
-  });
-  return res.ok ? { sent: to.email } : { failed: res.error };
+  if (type === "demanda_em_revisao") {
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, client_slug, created_by, status").eq("id", demand_id).maybeSingle();
+    if (!d || d.status !== "review") return [];
+    const to = await resolveClientRecipient(supabase, d); if (!to) return [];
+    return [{
+      to: to.email, name: to.name, dedupKey: `demanda_em_revisao:${demand_id}:${stamp || ""}`, refType: "demand", refId: demand_id,
+      subject: `Pronta para sua aprovação: ${d.title}`,
+      html: baseLayout({ title: "Sua demanda foi finalizada ✨",
+        intro: `Olá${firstName(to.name)}, a equipe concluiu o trabalho da demanda <strong>${esc(d.title)}</strong> e enviou para a sua aprovação. Revise a entrega e, se estiver tudo certo, aprove — ou peça ajustes pelo portal.`,
+        bodyHtml: "", ctaLabel: "Revisar e aprovar", ctaHref: `${PORTAL_URL}/portal/demandas?d=${demand_id}` }),
+    }];
+  }
+
+  if (type === "demanda_concluida") {
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, client_slug, created_by, status").eq("id", demand_id).maybeSingle();
+    if (!d || d.status !== "done") return [];
+    const to = await resolveClientRecipient(supabase, d); if (!to) return [];
+    return [{
+      to: to.email, name: to.name, dedupKey: `demanda_concluida:${demand_id}`, refType: "demand", refId: demand_id,
+      subject: `Demanda concluída: ${d.title}`,
+      html: baseLayout({ title: "Demanda concluída ✅",
+        intro: `Olá${firstName(to.name)}, a demanda <strong>${esc(d.title)}</strong> foi marcada como concluída. Obrigado! Se precisar de algo novo, é só abrir outra demanda pelo portal.`,
+        bodyHtml: "", ctaLabel: "Ver minhas demandas", ctaHref: `${PORTAL_URL}/portal/demandas` }),
+    }];
+  }
+
+  if (type === "demanda_cancelada") {
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, client_slug, created_by, status").eq("id", demand_id).maybeSingle();
+    if (!d || d.status !== "canceled") return [];
+    const to = await resolveClientRecipient(supabase, d); if (!to) return [];
+    return [{
+      to: to.email, name: to.name, dedupKey: `demanda_cancelada:${demand_id}`, refType: "demand", refId: demand_id,
+      subject: `Demanda cancelada: ${d.title}`,
+      html: baseLayout({ title: "Demanda cancelada",
+        intro: `Olá${firstName(to.name)}, a demanda <strong>${esc(d.title)}</strong> foi cancelada. Se isso não era esperado ou precisar reabrir, fale com a equipe pelo portal.`,
+        bodyHtml: "", ctaLabel: "Abrir o portal", ctaHref: `${PORTAL_URL}/portal/demandas` }),
+    }];
+  }
+
+  // Cliente pediu ajustes (review → in_progress): avisa os OPERADORES (CTA p/ ClickUp).
+  if (type === "demanda_ajustes") {
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, status, clickup_task_id").eq("id", demand_id).maybeSingle();
+    if (!d || d.status !== "in_progress") return [];
+    const ops = await resolveDemandOperators(supabase, demand_id);
+    if (!ops.length) return [];
+    const ctaHref = d.clickup_task_id ? `https://app.clickup.com/t/${d.clickup_task_id}` : `${PORTAL_URL}`;
+    return ops.map((op) => ({
+      to: op.email, name: op.name, dedupKey: `demanda_ajustes:${demand_id}:${stamp || ""}:${op.email}`,
+      refType: "demand", refId: demand_id,
+      subject: `Ajustes solicitados: ${d.title}`,
+      html: baseLayout({ title: "O cliente pediu ajustes 🔧",
+        intro: `Olá${firstName(op.name)}, o cliente revisou a demanda <strong>${esc(d.title)}</strong> e pediu ajustes. A demanda voltou para "em andamento" — confira os comentários na tarefa do ClickUp.`,
+        bodyHtml: "", ctaLabel: "Abrir tarefa no ClickUp", ctaHref }),
+    }));
+  }
+
+  // Resposta no chat → avisa o CLIENTE (se o autor não for o próprio cliente).
+  if (type === "nova_mensagem") {
+    const { data: m } = await supabase.schema("portal").from("demand_messages")
+      .select("id, demand_id, user_id, origin").eq("id", message_id).maybeSingle();
+    if (!m || m.origin === "clickup") return [];
+    const { data: author } = await supabase.schema("portal").from("users")
+      .select("role").eq("id", m.user_id).maybeSingle();
+    if (author?.role === "user") return []; // o próprio cliente escreveu → não notifica ele
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, client_slug, created_by").eq("id", m.demand_id).maybeSingle();
+    if (!d) return [];
+    const to = await resolveClientRecipient(supabase, d); if (!to) return [];
+    // Dedup por janela de 10 min: no máximo 1 e-mail de "nova mensagem" por demanda/10min.
+    const window = Math.floor(Date.now() / 600000);
+    return [{
+      to: to.email, name: to.name, dedupKey: `chat:${m.demand_id}:${window}`, refType: "message", refId: message_id,
+      subject: `Nova mensagem na demanda: ${d.title}`,
+      html: baseLayout({ title: "Você tem uma nova mensagem 💬",
+        intro: `Olá${firstName(to.name)}, a equipe respondeu na demanda <strong>${esc(d.title)}</strong>. Abra o portal para ver a mensagem e responder.`,
+        bodyHtml: "", ctaLabel: "Ver conversa", ctaHref: `${PORTAL_URL}/portal/demandas?d=${m.demand_id}` }),
+    }];
+  }
+
+  return [];
 }
 
-// Demanda finalizada pela equipe (entrou em "em revisão") → cliente precisa aprovar.
-// `stamp` (clock_timestamp da transição, vindo do trigger) dedupa a MESMA transição
-// (retries) sem bloquear futuras revisões (pedir ajustes → equipe refinaliza → review).
-async function handleDemandaEmRevisao(supabase: any, apiKey: string, demand_id: string, stamp?: string) {
-  const { data: demand } = await supabase.schema("portal")
-    .from("demands").select("id, title, client_slug, created_by, status").eq("id", demand_id).maybeSingle();
-  if (!demand) return { skipped: "unknown_demand" };
-  if (demand.status !== "review") return { skipped: "not_in_review" };
+// Envio inicial: só envia se NÃO existe linha para o dedup_key (evita duplicidade);
+// loga o resultado (failed mantém attempts/next_attempt_at p/ o retry cron).
+async function executeInitial(supabase: any, apiKey: string, type: string, spec: Spec) {
+  if (spec.dedupKey) {
+    const { data: existing } = await supabase.schema("portal").from("email_log")
+      .select("id").eq("dedup_key", spec.dedupKey).limit(1).maybeSingle();
+    if (existing) return { skipped: "dedup" };
+  }
+  const res = await sendViaProvider(apiKey, spec.to, spec.subject, spec.html);
+  const row: any = {
+    type, to_email: spec.to, subject: spec.subject, ref_type: spec.refType, ref_id: spec.refId,
+    dedup_key: spec.dedupKey, status: res.ok ? "sent" : "failed",
+    resend_id: res.id || null, error: res.error || null,
+    attempts: 1, next_attempt_at: res.ok ? null : new Date(Date.now() + 5 * 60000).toISOString(),
+  };
+  const { error: insErr } = await supabase.schema("portal").from("email_log").insert(row);
+  if (insErr) return { skipped: "log_conflict" }; // unique(dedup_key) → outra execução já registrou
+  return res.ok ? { sent: spec.to } : { failed: res.error };
+}
 
-  const dedupKey = `demanda_em_revisao:${demand_id}:${stamp || ""}`;
-  const { data: dup } = await supabase.schema("portal").from("email_log")
-    .select("id").eq("dedup_key", dedupKey).eq("status", "sent").limit(1).maybeSingle();
-  if (dup) return { skipped: "already_sent" };
+// Retry (cron): reenvia linhas 'failed' devidas, ATUALIZANDO a mesma linha (sem duplicar).
+async function runRetry(supabase: any, apiKey: string) {
+  const nowIso = new Date().toISOString();
+  const { data: rows } = await supabase.schema("portal").from("email_log")
+    .select("id, type, ref_id, to_email, attempts, max_attempts")
+    .eq("status", "failed")
+    .or(`next_attempt_at.is.null,next_attempt_at.lte.${nowIso}`)
+    .gt("created_at", new Date(Date.now() - 3 * 86400000).toISOString())
+    .limit(25);
+  let processed = 0, sent = 0;
+  for (const row of (rows || [])) {
+    if (row.attempts >= (row.max_attempts ?? 3)) {
+      await supabase.schema("portal").from("email_log").update({ status: "gaveup" }).eq("id", row.id);
+      continue;
+    }
+    processed++;
+    const payload: any = {};
+    if (row.type === "projeto_criado") payload.project_id = row.ref_id;
+    else if (row.type === "nova_mensagem") payload.message_id = row.ref_id;
+    else payload.demand_id = row.ref_id;
 
-  const to = await resolveClientRecipient(supabase, demand);
-  if (!to) return { skipped: "no_recipient" };
-
-  const subject = `Pronta para sua aprovação: ${demand.title}`;
-  const html = baseLayout({
-    title: "Sua demanda foi finalizada ✨",
-    intro: `Olá${to.name ? " " + esc(to.name.split(" ")[0]) : ""}, a equipe concluiu o trabalho da demanda <strong>${esc(demand.title)}</strong> e enviou para a sua aprovação. Revise a entrega e, se estiver tudo certo, aprove — ou peça ajustes pelo portal.`,
-    bodyHtml: "",
-    ctaLabel: "Revisar e aprovar",
-    ctaHref: `${PORTAL_URL}/portal/demandas?d=${demand_id}`,
-  });
-
-  const res = await sendViaProvider(apiKey, to.email, subject, html);
-  await logEmail(supabase, {
-    type: "demanda_em_revisao", to_email: to.email, subject,
-    ref_type: "demand", ref_id: demand_id, dedup_key: res.ok ? dedupKey : null,
-    status: res.ok ? "sent" : "failed", resend_id: res.id || null, error: res.error || null,
-  });
-  return res.ok ? { sent: to.email } : { failed: res.error };
+    const specs = await composeSpecs(supabase, row.type, payload);
+    const spec = specs.find((s) => s.to === row.to_email) || specs[0];
+    const attempts = (row.attempts ?? 1) + 1;
+    if (!spec) {
+      await supabase.schema("portal").from("email_log").update({ status: "skipped", attempts }).eq("id", row.id);
+      continue;
+    }
+    const res = await sendViaProvider(apiKey, spec.to, spec.subject, spec.html);
+    if (res.ok) sent++;
+    await supabase.schema("portal").from("email_log").update({
+      status: res.ok ? "sent" : "failed",
+      resend_id: res.id || null, error: res.error || null, attempts,
+      next_attempt_at: res.ok ? null : new Date(Date.now() + attempts * 5 * 60000).toISOString(),
+    }).eq("id", row.id);
+  }
+  return { processed, sent };
 }
 
 Deno.serve(async (req: Request) => {
   let body: any = {}; try { body = await req.json(); } catch (_) { body = {}; }
-  const { type, demand_id, project_id, to, subject, html } = body;
+  const { type } = body;
 
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Auth: x-internal-key (mesmo segredo interno do ClickUp) ou service-role.
     const provided = req.headers.get("x-internal-key") || "";
     const auth     = req.headers.get("Authorization") || "";
     const bearer   = auth.replace(/^Bearer /i, "").trim();
     const internalKey = await getSecret(supabase, "clickup_sync_internal_key");
     const okInternal = internalKey && provided === internalKey;
-    // Comparação EXATA do Bearer (não substring) para evitar bypass por prefixo.
     const okService  = SERVICE_KEY.length > 20 && bearer === SERVICE_KEY;
     if (!okInternal && !okService) {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
@@ -227,35 +314,36 @@ Deno.serve(async (req: Request) => {
     const apiKey = await getSecret(supabase, "resend_api_key");
     if (!apiKey) return new Response(JSON.stringify({ error: "resend_api_key ausente" }), { status: 500, headers: { "Content-Type": "application/json" } });
 
-    let result: any;
-    switch (type) {
-      case "demanda_criada":
-        if (!demand_id) return new Response(JSON.stringify({ error: "demand_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        result = await handleDemandaCriada(supabase, apiKey, demand_id);
-        break;
-      case "projeto_criado":
-        if (!project_id) return new Response(JSON.stringify({ error: "project_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        result = await handleProjetoCriado(supabase, apiKey, project_id);
-        break;
-      case "demanda_em_revisao":
-        if (!demand_id) return new Response(JSON.stringify({ error: "demand_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        result = await handleDemandaEmRevisao(supabase, apiKey, demand_id, body.stamp);
-        break;
-      case "custom": {
-        // Teste/manual: { type:'custom', to, subject, html }
-        if (!to || !subject) return new Response(JSON.stringify({ error: "to e subject obrigatórios" }), { status: 400, headers: { "Content-Type": "application/json" } });
-        const res = await sendViaProvider(apiKey, to, subject, html || "<p>(sem corpo)</p>");
-        await logEmail(supabase, { type: "custom", to_email: to, subject, status: res.ok ? "sent" : "failed", resend_id: res.id || null, error: res.error || null });
-        result = res.ok ? { sent: to } : { failed: res.error };
-        break;
-      }
-      default:
-        return new Response(JSON.stringify({ error: `type inválido: ${type}` }), { status: 400, headers: { "Content-Type": "application/json" } });
+    if (type === "retry_failed") {
+      const r = await runRetry(supabase, apiKey);
+      return new Response(JSON.stringify({ ok: true, type, ...r }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    return new Response(JSON.stringify({ ok: true, type, ...result }), { status: 200, headers: { "Content-Type": "application/json" } });
+    if (type === "custom") {
+      const { to, subject, html } = body;
+      if (!to || !subject) return new Response(JSON.stringify({ error: "to e subject obrigatórios" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      const res = await sendViaProvider(apiKey, to, subject, html || "<p>(sem corpo)</p>");
+      await supabase.schema("portal").from("email_log").insert({
+        type: "custom", to_email: to, subject, status: res.ok ? "sent" : "failed",
+        resend_id: res.id || null, error: res.error || null, attempts: 1,
+      });
+      return new Response(JSON.stringify({ ok: true, type, ...(res.ok ? { sent: to } : { failed: res.error }) }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    const KNOWN = ["demanda_criada","projeto_criado","demanda_em_revisao","demanda_concluida","demanda_cancelada","demanda_ajustes","nova_mensagem"];
+    if (!KNOWN.includes(type)) {
+      return new Response(JSON.stringify({ error: `type inválido: ${type}` }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+
+    const specs = await composeSpecs(supabase, type, body);
+    if (!specs.length) {
+      return new Response(JSON.stringify({ ok: true, type, skipped: "no_recipient_or_state" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    const results = [];
+    for (const spec of specs) results.push(await executeInitial(supabase, apiKey, type, spec));
+    return new Response(JSON.stringify({ ok: true, type, results }), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch (e) {
     console.error(e);
-    return new Response(JSON.stringify({ error: String(e?.message || e) }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: String((e as any)?.message || e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 });

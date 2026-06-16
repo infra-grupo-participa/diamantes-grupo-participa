@@ -86,7 +86,9 @@ export default function AssinaturasClient() {
   const [status, setStatus] = useState('all');
 
   const [stats, setStats] = useState<SubscriptionStats | null>(null);
-  const [summary, setSummary] = useState<{ due: number; late: number; avg: number } | null>(null);
+  const [summary, setSummary] = useState<{ late: number; onTime: number; avg: number; clientsOverdue: number } | null>(
+    null,
+  );
   const [spark, setSpark] = useState<SparkPoint[]>([]);
   const [servicesByType, setServicesByType] = useState<ServiceByType[]>([]);
   const [monthly, setMonthly] = useState<MonthlyStat[]>([]);
@@ -293,8 +295,8 @@ export default function AssinaturasClient() {
       <div className={s.kpiGrid}>
         <Kpi label="Receita" value={stats ? fmtBRL(stats.mrr) : '—'} bg="#eaf2ff" color="#3b82f6" icon="dollar" />
         <Kpi label="Assinantes ativos" value={stats?.active ?? '—'} bg="#f1ecff" color="#8b5cf6" icon="users" />
-        <Kpi label="Inadimplentes" value={stats ? (stats.late || 0) + (stats.partial || 0) : '—'} bg="#fee2e2" color="#ef4444" icon="alert" />
-        <Kpi label="Pendentes" value={stats?.pending ?? '—'} bg="#fff4d6" color="#eab308" icon="clock" />
+        <Kpi label="Inadimplentes" value={summary ? summary.clientsOverdue : '—'} bg="#fee2e2" color="#ef4444" icon="alert" />
+        <Kpi label="Em atraso" value={summary ? fmtBRL(summary.late) : '—'} bg="#fff4d6" color="#eab308" icon="clock" />
         <Kpi label="Retenção (não cancelados)" value={stats ? stats.retention + '%' : '—'} bg="#e7f7ee" color="#16a34a" icon="trend" />
       </div>
 
@@ -419,7 +421,7 @@ export default function AssinaturasClient() {
           <MrrChart mrr={stats?.mrr ?? 0} months={spark} />
           <div className={s.miniStats}>
             <MiniStat label="MRR" value={stats ? fmtBRL(stats.mrr) : '—'} variant="pos" />
-            <MiniStat label="A receber" value={summary ? fmtBRL(summary.due) : '—'} />
+            <MiniStat label="Em dia" value={summary ? fmtBRL(summary.onTime) : '—'} variant="pos" />
             <MiniStat label="Inadimplência" value={summary ? fmtBRL(summary.late) : '—'} variant="neg" />
             <MiniStat label="Ticket médio" value={summary ? fmtBRL(summary.avg) : '—'} />
           </div>
