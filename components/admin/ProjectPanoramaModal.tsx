@@ -13,7 +13,7 @@ import s from './admin.module.css';
 import { initials, fmtDate } from '@/lib/format';
 import { toast } from '@/lib/toast';
 import { errMessage } from '@/lib/errors';
-import type { ProjectRow } from '@/lib/api/admin';
+import type { ProjectRow, ProjectDemandStats } from '@/lib/api/admin';
 import { getProjectPanorama, type ProjectPanorama } from '@/lib/api/admin-projetos';
 import { STATUS_BADGE, type Demand } from '@/lib/api/admin-demandas';
 import {
@@ -28,18 +28,48 @@ import BriefingReadView, {
 } from '@/components/briefing/BriefingReadView';
 import DemandDetailModal from './DemandDetailModal';
 
+type Tab = 'geral' | 'briefings' | 'operadores' | 'demandas';
+
+const PROJ_STATUS_LABEL: Record<string, string> = {
+  briefing: 'Briefing',
+  active: 'Ativo',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
+};
+
+// SLA a partir das demandas em aberto (mesma regra da coluna da tabela).
+function slaChip(st?: ProjectDemandStats): { label: string; color: string; bg: string } {
+  if (!st || st.demands_open === 0) return { label: 'sem pendências', color: '#6b6584', bg: '#f1eef8' };
+  if (st.demands_overdue > 0) {
+    const n = st.demands_overdue;
+    return { label: `${n} atrasada${n > 1 ? 's' : ''}`, color: '#b42318', bg: '#fee2e2' };
+  }
+  if (st.next_due) {
+    const days = Math.ceil((new Date(st.next_due).getTime() - Date.now()) / 86400000);
+    if (days <= 0) return { label: 'vence hoje', color: '#b45309', bg: '#fff4d6' };
+    if (days <= 3) return { label: `vence em ${days}d`, color: '#b45309', bg: '#fff4d6' };
+    return { label: `no prazo · ${days}d`, color: '#15803d', bg: '#e7f7ee' };
+  }
+  return { label: 'no prazo', color: '#15803d', bg: '#e7f7ee' };
+}
+
 export default function ProjectPanoramaModal({
   project,
   serviceLabels,
+  stats,
+  briefingProgress,
   onClose,
 }: {
   project: ProjectRow;
   serviceLabels: Record<string, string>;
+  stats?: ProjectDemandStats;
+  briefingProgress?: number;
   onClose: () => void;
 }) {
   const [data, setData] = useState<ProjectPanorama | null>(null);
   const [error, setError] = useState('');
   const [openDemand, setOpenDemand] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>('geral');
 
   async function load() {
     setError('');
@@ -122,7 +152,84 @@ export default function ProjectPanoramaModal({
             </div>
           ) : (
             <>
+              {/* Abas */}
+              <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', marginBottom: 16, flexWrap: 'wrap' }}>
+                {([
+                  ['geral', 'Visão geral'],
+                  ['briefings', 'Briefings'],
+                  ['operadores', `Operadores (${operators.length})`],
+                  ['demandas', `Demandas (${demands.length})`],
+                ] as [Tab, string][]).map(([k, lbl]) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setTab(k)}
+                    style={{
+                      padding: '8px 12px',
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      borderBottom: tab === k ? '2px solid var(--accent)' : '2px solid transparent',
+                      color: tab === k ? 'var(--accent-strong)' : 'var(--muted)',
+                      fontWeight: tab === k ? 700 : 600,
+                      fontSize: '0.86rem',
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+
+              {/* ── Visão geral: status, SLA, andamento ── */}
+              {tab === 'geral' && (() => {
+                const total = stats?.demands_total ?? demands.length;
+                const done = stats?.demands_done ?? demands.filter((d) => d.status === 'done').length;
+                const donePct = total > 0 ? Math.round((done / total) * 100) : 0;
+                const sla = slaChip(stats);
+                const card: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px', background: 'var(--surface)' };
+                const cardLabel: React.CSSProperties = { fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 };
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+                    <div style={card}>
+                      <div style={cardLabel}>Status</div>
+                      <span className={`${s.bBadge}`}>{PROJ_STATUS_LABEL[project.status] || project.status}</span>
+                    </div>
+                    <div style={card}>
+                      <div style={cardLabel}>SLA</div>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 10px', borderRadius: 999, color: sla.color, background: sla.bg }}>{sla.label}</span>
+                    </div>
+                    <div style={card}>
+                      <div style={cardLabel}>Andamento das demandas</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, background: 'var(--border-strong)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ width: `${donePct}%`, height: '100%', background: stats && stats.demands_overdue > 0 ? '#ef4444' : 'var(--accent)' }} />
+                        </div>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{done}/{total}</span>
+                      </div>
+                    </div>
+                    <div style={card}>
+                      <div style={cardLabel}>Briefing</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, background: 'var(--border-strong)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ width: `${briefingProgress ?? 0}%`, height: '100%', background: 'var(--accent)' }} />
+                        </div>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{briefingProgress ?? 0}%</span>
+                      </div>
+                    </div>
+                    <div style={card}>
+                      <div style={cardLabel}>Serviços</div>
+                      <div style={{ fontSize: '0.84rem' }}>{services.map((sv) => serviceLabels[sv] || sv).join(', ') || '—'}</div>
+                    </div>
+                    <div style={card}>
+                      <div style={cardLabel}>Criado em</div>
+                      <div style={{ fontSize: '0.84rem' }}>{fmtDate(project.created_at)}</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Operadores escalados */}
+              {tab === 'operadores' && (
               <div className={s.bSection}>
                 <div className={s.bSectionHead}>
                   <span>Operadores escalados</span>
@@ -175,8 +282,10 @@ export default function ProjectPanoramaModal({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Demandas do projeto — chat por demanda (abre o DemandDetailModal) */}
+              {tab === 'demandas' && (
               <div className={s.bSection}>
                 <div className={s.bSectionHead}>
                   <span>Demandas &amp; chat</span>
@@ -208,7 +317,10 @@ export default function ProjectPanoramaModal({
                   </div>
                 )}
               </div>
+              )}
 
+              {tab === 'briefings' && (
+              <>
               {/* Briefing do projeto */}
               <div className={s.bSection}>
                 <div className={s.bSectionHead}>
@@ -227,6 +339,8 @@ export default function ProjectPanoramaModal({
                   emptyText="O cliente ainda não preencheu os acessos no Briefing Básico."
                 />
               </div>
+              </>
+              )}
             </>
           )}
         </div>

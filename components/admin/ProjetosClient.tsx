@@ -16,7 +16,6 @@ import {
   validateProjectBriefing,
 } from '@/lib/briefing-templates';
 import { fmtDate } from '@/lib/format';
-import BriefingModal from './BriefingModal';
 import ProjectPanoramaModal from './ProjectPanoramaModal';
 
 // Rótulos espelhados do legado admin/projetos.html (com emoji)
@@ -99,7 +98,6 @@ export default function ProjetosClient() {
   const [briefing, setBriefing] = useState('');
   const [rows, setRows] = useState<ProjectRow[] | null>(null);
   const [error, setError] = useState('');
-  const [selected, setSelected] = useState<ProjectRow | null>(null);
   const [panorama, setPanorama] = useState<ProjectRow | null>(null);
   const [stats, setStats] = useState<Record<string, ProjectDemandStats>>({});
 
@@ -262,7 +260,7 @@ export default function ProjetosClient() {
                           className={s.btnView}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                           onClick={() => setPanorama(p)}
-                          title="Panorama do projeto: briefings, operadores e chat"
+                          title="Painel do projeto: visão geral, SLA, briefings, operadores e chat"
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                             <line x1="18" y1="20" x2="18" y2="10" />
@@ -270,17 +268,6 @@ export default function ProjetosClient() {
                             <line x1="6" y1="20" x2="6" y2="14" />
                           </svg>
                           Painel
-                        </button>
-                        <button
-                          className={s.btnView}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                          onClick={() => setSelected(p)}
-                        >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                          Ver briefing
                         </button>
                         {p.status === 'active' && (
                           <button
@@ -306,9 +293,14 @@ export default function ProjetosClient() {
         </table>
       </div>
 
-      {selected && <BriefingModal project={selected} serviceLabels={SERVICE_LABELS} onClose={() => setSelected(null)} />}
       {panorama && (
-        <ProjectPanoramaModal project={panorama} serviceLabels={SERVICE_LABELS} onClose={() => setPanorama(null)} />
+        <ProjectPanoramaModal
+          project={panorama}
+          serviceLabels={SERVICE_LABELS}
+          stats={stats[panorama.id]}
+          briefingProgress={calcProgress(panorama)}
+          onClose={() => setPanorama(null)}
+        />
       )}
     </div>
   );
