@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fmtSize, isImage, uploadAttachment, type Attachment } from '@/lib/chat';
 import { toast } from '@/lib/toast';
+import { errMessage } from '@/lib/errors';
 import styles from './ChatComposer.module.css';
 
 type Pending = {
@@ -118,7 +119,7 @@ export default function ChatComposer({
           setPending((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'ready', meta } : p)));
         } catch (e) {
           setPending((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'error' } : p)));
-          toast('Falha no upload: ' + (e instanceof Error ? e.message : String(e)), 'error');
+          toast('Falha no upload: ' + errMessage(e), 'error');
         }
       }
     },
@@ -150,7 +151,7 @@ export default function ChatComposer({
       setText('');
       if (taRef.current) taRef.current.style.height = 'auto';
     } catch (e) {
-      toast('Erro ao enviar: ' + (e instanceof Error ? e.message : String(e)), 'error');
+      toast('Erro ao enviar: ' + errMessage(e), 'error');
     } finally {
       setSending(false);
       taRef.current?.focus();

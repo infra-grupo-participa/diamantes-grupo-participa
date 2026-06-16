@@ -1,7 +1,7 @@
 // API de Demandas do cliente — port das funções de demanda de portal-api.js.
 // Client-side (RLS protege). Espelha fielmente o backend (schema portal):
 // view v_demands, tabelas demand_members/demand_operators/operators/positions,
-// team_assignments, ratings, projects, e RPCs create_demand / finalize_my_part /
+// team_assignments, ratings, projects, e RPCs create_demand / client_complete_demand /
 // submit_client_rating / get_client_briefing.
 
 import { createClient } from '@/lib/supabase/client';
@@ -283,10 +283,14 @@ export async function createDemand(input: CreateDemandInput): Promise<Demand> {
   return data as Demand;
 }
 
-/** Operador membro finaliza sua parte (RPC). Conclui quando todos aprovam. */
-export async function finalizeMyPart(demandId: string): Promise<FinalizeResult> {
-  const { data, error } = await db().rpc('finalize_my_part', { p_demand_id: demandId });
-  if (error) throw error;
+/**
+ * Cliente aprova a entrega e conclui a demanda (RPC client_complete_demand).
+ * Só permitido quando a demanda está "Em revisão". Vira `done`, o que dispara o
+ * convite de avaliação (5★). Lança Error com mensagem amigável do backend.
+ */
+export async function clientCompleteDemand(demandId: string): Promise<FinalizeResult> {
+  const { data, error } = await db().rpc('client_complete_demand', { p_demand_id: demandId });
+  if (error) throw new Error(error.message || 'Não foi possível concluir a demanda.');
   return data as FinalizeResult;
 }
 
