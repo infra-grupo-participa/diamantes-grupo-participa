@@ -95,6 +95,80 @@ const IcoUser = (
 const IcoStar = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
 );
+const IcoCheck = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+);
+
+// Cartões reutilizados nos dois modos (onboarding e completo).
+function TeamCard({ team }: { team: DashboardData['team'] }) {
+  const list = team ?? [];
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2><span className="card-head-ico">{IcoUsers}</span> Sua equipe</h2>
+        {list.length > 0 && <span className="card-head-count">{list.length}</span>}
+      </div>
+      {list.length === 0 ? (
+        <div className="dash-empty">
+          <span className="dash-empty-ico">{IcoUsers}</span>
+          <p>Estamos montando o time perfeito para você. 💪</p>
+        </div>
+      ) : (
+        <ul className="people">
+          {list.map((m, i) => (
+            <li key={i}>
+              <span
+                className="avatar-md"
+                style={m.position_color ? { background: `linear-gradient(135deg, ${m.position_color}cc, ${m.position_color})` } : undefined}
+              >
+                {initials(m.user_name)}
+              </span>
+              <div className="people-info">
+                <strong>{m.user_name ?? '—'}</strong>
+                <span className="muted small">{m.position_name ?? 'Equipe'}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ServicesCard({ services }: { services: DashboardData['services'] }) {
+  const list = services ?? [];
+  return (
+    <section className="card">
+      <div className="card-head">
+        <h2><span className="card-head-ico">{IcoRocket}</span> Seus serviços</h2>
+      </div>
+      {list.length === 0 ? (
+        <div className="dash-empty">
+          <span className="dash-empty-ico">{IcoRocket}</span>
+          <p>Nenhum serviço ativo no momento.</p>
+        </div>
+      ) : (
+        <ul className="svc-list">
+          {list.map((s, i) => {
+            const meta = serviceMeta(s.service_type);
+            const delinquent = s.status === 'delinquent';
+            return (
+              <li key={i} className="svc-item">
+                <span className="svc-ico" style={{ background: `${meta.color}1f`, color: meta.color }}>
+                  {SVC_ICON[meta.label] ?? '🔹'}
+                </span>
+                <span className="svc-name">{meta.label}</span>
+                <span className={`svc-status ${delinquent ? 'svc-late' : 'svc-active'}`}>
+                  {delinquent ? 'Pagamento pendente' : 'Ativo'}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 export default async function Dashboard() {
   let data: DashboardData;
@@ -127,23 +201,15 @@ export default async function Dashboard() {
   const attention = extras?.attention ?? [];
   const pendingRatings = extras?.pendingRatings ?? 0;
 
-  const demandsHref = baseReady ? '/portal/demandas' : '/portal/briefing-basico';
-  const projectHref = baseReady ? '/portal/novo-projeto' : '/portal/briefing-basico';
+  // Passos do onboarding (só enquanto o Briefing Básico não foi enviado).
+  const steps = [
+    { done: baseReady, title: 'Preencha o Briefing Básico', desc: 'Uma vez só — libera projetos e demandas.', href: '/portal/briefing-basico', cta: 'Preencher' },
+    { done: false, title: 'Crie seu primeiro projeto', desc: 'Diga o que precisa e a equipe começa a trabalhar.', cta: 'Criar projeto' },
+    { done: false, title: 'Abra sua primeira demanda', desc: 'Peça ajustes ou novas entregas quando quiser.', cta: 'Abrir demanda' },
+  ];
 
   return (
     <div className="dash">
-      {!baseReady && (
-        <div className="gate-banner">
-          <div>
-            <strong>Falta concluir seu Briefing Básico</strong>
-            <span>Preencha uma vez só para liberar projetos e demandas.</span>
-          </div>
-          <Link className="btn-primary" href="/portal/briefing-basico">
-            Preencher agora →
-          </Link>
-        </div>
-      )}
-
       {pending && (
         <div className="resume-banner">
           <div className="resume-banner-main">
@@ -202,224 +268,198 @@ export default async function Dashboard() {
           </div>
         </div>
 
-        <div className="dash-stats">
-          <div className="dash-stat">
-            <span className="dash-stat-ico ico-violet">{IcoUsers}</span>
-            <div>
-              <strong>{team.length}</strong>
-              <span>{team.length === 1 ? 'Integrante' : 'Integrantes'}</span>
+        {/* Stats só fazem sentido quando já há atividade (modo completo). */}
+        {baseReady && (
+          <div className="dash-stats">
+            <div className="dash-stat">
+              <span className="dash-stat-ico ico-violet">{IcoUsers}</span>
+              <div>
+                <strong>{team.length}</strong>
+                <span>{team.length === 1 ? 'Integrante' : 'Integrantes'}</span>
+              </div>
+            </div>
+            <div className="dash-stat">
+              <span className="dash-stat-ico ico-accent">{IcoChat}</span>
+              <div>
+                <strong>{openDemands}</strong>
+                <span>{openDemands === 1 ? 'Demanda em aberto' : 'Demandas em aberto'}</span>
+              </div>
+            </div>
+            <div className="dash-stat">
+              <span className="dash-stat-ico ico-violet">{IcoLayers}</span>
+              <div>
+                <strong>{activeProjects}</strong>
+                <span>{activeProjects === 1 ? 'Projeto ativo' : 'Projetos ativos'}</span>
+              </div>
+            </div>
+            <div className="dash-stat">
+              <span className="dash-stat-ico ico-accent">{IcoRocket}</span>
+              <div>
+                <strong>{activeServices.length}</strong>
+                <span>{activeServices.length === 1 ? 'Serviço ativo' : 'Serviços ativos'}</span>
+              </div>
             </div>
           </div>
-          <div className="dash-stat">
-            <span className="dash-stat-ico ico-accent">{IcoChat}</span>
-            <div>
-              <strong>{openDemands}</strong>
-              <span>{openDemands === 1 ? 'Demanda em aberto' : 'Demandas em aberto'}</span>
-            </div>
-          </div>
-          <div className="dash-stat">
-            <span className="dash-stat-ico ico-violet">{IcoLayers}</span>
-            <div>
-              <strong>{activeProjects}</strong>
-              <span>{activeProjects === 1 ? 'Projeto ativo' : 'Projetos ativos'}</span>
-            </div>
-          </div>
-          <div className="dash-stat">
-            <span className="dash-stat-ico ico-accent">{IcoRocket}</span>
-            <div>
-              <strong>{activeServices.length}</strong>
-              <span>{activeServices.length === 1 ? 'Serviço ativo' : 'Serviços ativos'}</span>
-            </div>
-          </div>
-        </div>
+        )}
       </header>
 
-      {/* ── AÇÕES RÁPIDAS ── */}
-      <nav className="dash-actions" aria-label="Atalhos">
-        <Link className="dash-action" href={demandsHref}>
-          <span className="dash-action-ico ico-accent">{IcoPlus}</span>
-          <span className="dash-action-txt"><strong>Nova demanda</strong><span>Abra um chamado</span></span>
-        </Link>
-        <Link className="dash-action" href={projectHref}>
-          <span className="dash-action-ico ico-violet">{IcoRocket}</span>
-          <span className="dash-action-txt"><strong>Novo projeto</strong><span>Comece um briefing</span></span>
-        </Link>
-        <Link className="dash-action" href="/portal/projetos">
-          <span className="dash-action-ico ico-accent">{IcoLayers}</span>
-          <span className="dash-action-txt"><strong>Meus projetos</strong><span>Acompanhe entregas</span></span>
-        </Link>
-        <Link className="dash-action" href="/portal/perfil">
-          <span className="dash-action-ico ico-violet">{IcoUser}</span>
-          <span className="dash-action-txt"><strong>Meu perfil</strong><span>Dados e preferências</span></span>
-        </Link>
-      </nav>
-
-      {/* ── BENTO (3 colunas) ── */}
-      <div className="dash-bento3">
-        {/* Coluna 1 — Demandas */}
-        <div className="dash-col">
-          <section className="card dash-demands">
-            <span className="dash-demands-ico" aria-hidden>{IcoChat}</span>
-            <div className="dash-demands-body">
-              <h2>Suas demandas</h2>
-              <p>Abra chamados, acompanhe entregas e converse com sua equipe — tudo em um só lugar.</p>
-              <Link className="btn-primary" href={demandsHref}>
-                {baseReady ? 'Abrir demandas →' : 'Concluir Briefing Básico →'}
-              </Link>
+      {!baseReady ? (
+        /* ════ MODO ONBOARDING (primeiro acesso) ════ */
+        <div className="dash-onb-grid">
+          <section className="card onb">
+            <div className="onb-head">
+              <h2>Vamos começar 🚀</h2>
+              <p className="muted">3 passos rápidos e seu portal fica pronto para trabalhar.</p>
             </div>
-          </section>
-
-          <section className="card">
-            <div className="card-head">
-              <h2><span className="card-head-ico">{IcoBolt}</span> Precisam de você</h2>
-              {attention.length > 0 && <span className="card-head-count">{attention.length}</span>}
-            </div>
-            {attention.length === 0 ? (
-              <div className="dash-empty">
-                <span className="dash-empty-ico">{IcoBolt}</span>
-                <p>Nada pendente do seu lado. 🎉</p>
-                <span className="muted small">Quando algo precisar da sua atenção, aparece aqui.</span>
-              </div>
-            ) : (
-              <ul className="att-list">
-                {attention.map((a) => {
-                  const meta = ATTENTION_META[a.reason];
-                  return (
-                    <li key={a.id}>
-                      <Link href={`/portal/demandas?d=${a.id}`}>
-                        <span className={`att-tag ${meta.cls}`}>{meta.label}</span>
-                        <strong className="att-title">{a.title ?? 'Demanda'}</strong>
-                        <span className="muted small">
-                          {a.project_title ? `${a.project_title} · ` : ''}
-                          {formatDue(a.ends_at)}
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        </div>
-
-        {/* Coluna 2 — Projetos + Atividade */}
-        <div className="dash-col">
-          <section className="card">
-            <div className="card-head">
-              <h2><span className="card-head-ico">{IcoLayers}</span> Seus projetos</h2>
-              <Link className="card-head-link" href="/portal/projetos">Ver todos →</Link>
-            </div>
-            {!extras || extras.projects.total === 0 ? (
-              <div className="dash-empty">
-                <span className="dash-empty-ico">{IcoLayers}</span>
-                <p>Você ainda não tem projetos.</p>
-                <Link className="btn-soft" href={projectHref}>Criar primeiro projeto →</Link>
-              </div>
-            ) : (
-              <div className="proj-mini">
-                <div className="proj-mini-item">
-                  <strong>{extras.projects.active}</strong>
-                  <span>Em andamento</span>
-                </div>
-                <div className="proj-mini-item">
-                  <strong>{extras.projects.completed}</strong>
-                  <span>Concluídos</span>
-                </div>
-                <div className="proj-mini-item">
-                  <strong>{extras.projects.total}</strong>
-                  <span>No total</span>
-                </div>
-              </div>
-            )}
-          </section>
-
-          <section className="card">
-            <div className="card-head">
-              <h2><span className="card-head-ico">{IcoClock}</span> Atividade recente</h2>
-            </div>
-            {activity.length === 0 ? (
-              <div className="dash-empty">
-                <span className="dash-empty-ico">{IcoClock}</span>
-                <p>Sem novidades nos últimos 7 dias.</p>
-                <span className="muted small">Quando houver atualizações, elas aparecem aqui.</span>
-              </div>
-            ) : (
-              <ul className="activity">
-                {activity.slice(0, 6).map((a, i) => (
-                  <li key={i}>
-                    <span className="activity-dot" aria-hidden />
-                    <span className="activity-text">{formatEvent(a.event)}</span>
-                    <span className="muted small">{fmtRelative(a.created_at)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-
-        {/* Coluna 3 — Equipe + Serviços */}
-        <div className="dash-col">
-          <section className="card">
-            <div className="card-head">
-              <h2><span className="card-head-ico">{IcoUsers}</span> Sua equipe</h2>
-              {team.length > 0 && <span className="card-head-count">{team.length}</span>}
-            </div>
-            {team.length === 0 ? (
-              <div className="dash-empty">
-                <span className="dash-empty-ico">{IcoUsers}</span>
-                <p>Estamos montando o time perfeito para você. 💪</p>
-              </div>
-            ) : (
-              <ul className="people">
-                {team.map((m, i) => (
-                  <li key={i}>
-                    <span
-                      className="avatar-md"
-                      style={m.position_color ? { background: `linear-gradient(135deg, ${m.position_color}cc, ${m.position_color})` } : undefined}
-                    >
-                      {initials(m.user_name)}
-                    </span>
-                    <div className="people-info">
-                      <strong>{m.user_name ?? '—'}</strong>
-                      <span className="muted small">{m.position_name ?? 'Equipe'}</span>
+            <ol className="onb-steps">
+              {steps.map((step, i) => {
+                const active = !step.done && (i === 0 || steps[i - 1].done);
+                const state = step.done ? 'is-done' : active ? 'is-active' : 'is-locked';
+                return (
+                  <li key={i} className={`onb-step ${state}`}>
+                    <span className="onb-num">{step.done ? IcoCheck : i + 1}</span>
+                    <div className="onb-step-body">
+                      <strong>{step.title}</strong>
+                      <span className="muted small">{step.desc}</span>
                     </div>
+                    {active && step.href && (
+                      <Link className="btn-primary onb-cta" href={step.href}>
+                        {step.cta} →
+                      </Link>
+                    )}
                   </li>
-                ))}
-              </ul>
-            )}
+                );
+              })}
+            </ol>
           </section>
 
-          <section className="card">
-            <div className="card-head">
-              <h2><span className="card-head-ico">{IcoRocket}</span> Seus serviços</h2>
-            </div>
-            {services.length === 0 ? (
-              <div className="dash-empty">
-                <span className="dash-empty-ico">{IcoRocket}</span>
-                <p>Nenhum serviço ativo no momento.</p>
-              </div>
-            ) : (
-              <ul className="svc-list">
-                {services.map((s, i) => {
-                  const meta = serviceMeta(s.service_type);
-                  const delinquent = s.status === 'delinquent';
-                  return (
-                    <li key={i} className="svc-item">
-                      <span className="svc-ico" style={{ background: `${meta.color}1f`, color: meta.color }}>
-                        {SVC_ICON[meta.label] ?? '🔹'}
-                      </span>
-                      <span className="svc-name">{meta.label}</span>
-                      <span className={`svc-status ${delinquent ? 'svc-late' : 'svc-active'}`}>
-                        {delinquent ? 'Pagamento pendente' : 'Ativo'}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
+          <div className="dash-side">
+            <ServicesCard services={services} />
+            <TeamCard team={team} />
+          </div>
         </div>
-      </div>
+      ) : (
+        /* ════ MODO COMPLETO (já tem briefing) ════ */
+        <>
+          <nav className="dash-actions" aria-label="Atalhos">
+            <Link className="dash-action" href="/portal/demandas">
+              <span className="dash-action-ico ico-accent">{IcoPlus}</span>
+              <span className="dash-action-txt"><strong>Nova demanda</strong><span>Abra um chamado</span></span>
+            </Link>
+            <Link className="dash-action" href="/portal/novo-projeto">
+              <span className="dash-action-ico ico-violet">{IcoRocket}</span>
+              <span className="dash-action-txt"><strong>Novo projeto</strong><span>Comece um briefing</span></span>
+            </Link>
+            <Link className="dash-action" href="/portal/projetos">
+              <span className="dash-action-ico ico-accent">{IcoLayers}</span>
+              <span className="dash-action-txt"><strong>Meus projetos</strong><span>Acompanhe entregas</span></span>
+            </Link>
+            <Link className="dash-action" href="/portal/perfil">
+              <span className="dash-action-ico ico-violet">{IcoUser}</span>
+              <span className="dash-action-txt"><strong>Meu perfil</strong><span>Dados e preferências</span></span>
+            </Link>
+          </nav>
+
+          <div className="dash-bento3">
+            {/* Coluna 1 — Demandas */}
+            <div className="dash-col">
+              <section className="card">
+                <div className="card-head">
+                  <h2><span className="card-head-ico">{IcoBolt}</span> Precisam de você</h2>
+                  {attention.length > 0 && <span className="card-head-count">{attention.length}</span>}
+                </div>
+                {attention.length === 0 ? (
+                  <div className="dash-empty">
+                    <span className="dash-empty-ico">{IcoBolt}</span>
+                    <p>Nada pendente do seu lado. 🎉</p>
+                    <span className="muted small">Quando algo precisar da sua atenção, aparece aqui.</span>
+                  </div>
+                ) : (
+                  <ul className="att-list">
+                    {attention.map((a) => {
+                      const meta = ATTENTION_META[a.reason];
+                      return (
+                        <li key={a.id}>
+                          <Link href={`/portal/demandas?d=${a.id}`}>
+                            <span className={`att-tag ${meta.cls}`}>{meta.label}</span>
+                            <strong className="att-title">{a.title ?? 'Demanda'}</strong>
+                            <span className="muted small">
+                              {a.project_title ? `${a.project_title} · ` : ''}
+                              {formatDue(a.ends_at)}
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              <section className="card">
+                <div className="card-head">
+                  <h2><span className="card-head-ico">{IcoClock}</span> Atividade recente</h2>
+                </div>
+                {activity.length === 0 ? (
+                  <div className="dash-empty">
+                    <span className="dash-empty-ico">{IcoClock}</span>
+                    <p>Sem novidades nos últimos 7 dias.</p>
+                    <span className="muted small">Quando houver atualizações, elas aparecem aqui.</span>
+                  </div>
+                ) : (
+                  <ul className="activity">
+                    {activity.slice(0, 6).map((a, i) => (
+                      <li key={i}>
+                        <span className="activity-dot" aria-hidden />
+                        <span className="activity-text">{formatEvent(a.event)}</span>
+                        <span className="muted small">{fmtRelative(a.created_at)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+
+            {/* Coluna 2 — Projetos */}
+            <div className="dash-col">
+              <section className="card">
+                <div className="card-head">
+                  <h2><span className="card-head-ico">{IcoLayers}</span> Seus projetos</h2>
+                  <Link className="card-head-link" href="/portal/projetos">Ver todos →</Link>
+                </div>
+                {!extras || extras.projects.total === 0 ? (
+                  <div className="dash-empty">
+                    <span className="dash-empty-ico">{IcoLayers}</span>
+                    <p>Você ainda não tem projetos.</p>
+                    <Link className="btn-soft" href="/portal/novo-projeto">Criar primeiro projeto →</Link>
+                  </div>
+                ) : (
+                  <div className="proj-mini">
+                    <div className="proj-mini-item">
+                      <strong>{extras.projects.active}</strong>
+                      <span>Em andamento</span>
+                    </div>
+                    <div className="proj-mini-item">
+                      <strong>{extras.projects.completed}</strong>
+                      <span>Concluídos</span>
+                    </div>
+                    <div className="proj-mini-item">
+                      <strong>{extras.projects.total}</strong>
+                      <span>No total</span>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <ServicesCard services={services} />
+            </div>
+
+            {/* Coluna 3 — Equipe */}
+            <div className="dash-col">
+              <TeamCard team={team} />
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
