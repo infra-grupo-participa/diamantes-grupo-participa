@@ -258,14 +258,41 @@ export default function ProjetosClient() {
                     <td>{fmtDate(p.created_at)}</td>
                     <td>
                       <div style={{ display: 'inline-flex', gap: 8 }}>
-                        <button className={s.btnView} onClick={() => setPanorama(p)} title="Panorama do projeto: briefings, operadores e chat">
+                        <button
+                          className={s.btnView}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                          onClick={() => setPanorama(p)}
+                          title="Panorama do projeto: briefings, operadores e chat"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="20" x2="18" y2="10" />
+                            <line x1="12" y1="20" x2="12" y2="4" />
+                            <line x1="6" y1="20" x2="6" y2="14" />
+                          </svg>
                           Painel
                         </button>
-                        <button className={s.btnView} onClick={() => setSelected(p)}>
+                        <button
+                          className={s.btnView}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                          onClick={() => setSelected(p)}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+                            <circle cx="12" cy="12" r="3" />
+                          </svg>
                           Ver briefing
                         </button>
                         {p.status === 'active' && (
-                          <button className={s.btnView} onClick={() => onComplete(p)} title="Concluir projeto e solicitar avaliação">
+                          <button
+                            className={s.btnView}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                            onClick={() => onComplete(p)}
+                            title="Concluir projeto e solicitar avaliação"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                              <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg>
                             Concluir
                           </button>
                         )}
