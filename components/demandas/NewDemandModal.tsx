@@ -320,7 +320,7 @@ export default function NewDemandModal({
                   })
                 )}
               </div>
-              <small className={styles.hint}>Sua equipe já vem selecionada e será notificada no ClickUp — desmarque quem não deve participar desta demanda.</small>
+              <small className={styles.hint}>Sua equipe já vem selecionada e será avisada — desmarque quem não deve participar desta demanda.</small>
             </div>
             <div className={styles.grid2}>
               <div>

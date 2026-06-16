@@ -260,7 +260,7 @@ export default async function Dashboard() {
             <h1>
               Olá, {firstName(name) || 'tudo bem'} <span className="wave">👋</span>
             </h1>
-            <p className="muted">{data.client?.display_name ?? 'Bem-vindo de volta ao seu portal Diamante.'}</p>
+            <p className="muted">{data.client?.display_name ?? 'Bem-vindo ao seu portal Diamante.'}</p>
           </div>
           <div className="dash-plan">
             <span className="dash-plan-badge">💎 Plano Diamante</span>

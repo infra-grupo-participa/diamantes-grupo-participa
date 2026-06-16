@@ -27,6 +27,7 @@ import {
   type OperatorOption,
   type StudentStats,
 } from '@/lib/api/admin-alunos';
+import { listAllDemands, STATUS_BADGE, type Demand as ClientDemand } from '@/lib/api/admin-demandas';
 import s from './alunos.module.css';
 
 // Mapa por setor (saída de canonicalServiceName)
@@ -106,6 +107,7 @@ export default function AlunosClient() {
   const [current, setCurrent] = useState<StudentRow | null>(null);
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [services, setServices] = useState<ServiceRow[]>([]);
+  const [demands, setDemands] = useState<ClientDemand[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
   // Serviços por slug (para badge na linha)
   const [servicesBySlug, setServicesBySlug] = useState<Record<string, ServiceRow[]>>({});
@@ -181,10 +183,16 @@ export default function AlunosClient() {
     setDetailLoading(true);
     setTeam([]);
     setServices([]);
+    setDemands([]);
     try {
-      const [t, svc] = await Promise.all([getStudentTeam(row.slug), getStudentServices(row.slug)]);
+      const [t, svc, dem] = await Promise.all([
+        getStudentTeam(row.slug),
+        getStudentServices(row.slug),
+        listAllDemands({ clientSlug: row.slug }).catch(() => []),
+      ]);
       setTeam(t);
       setServices(svc);
+      setDemands(dem);
       setServicesBySlug((prev) => ({ ...prev, [row.slug]: svc }));
     } catch (e) {
       console.error(e);
@@ -553,9 +561,39 @@ export default function AlunosClient() {
 
           <div className={s.section}>
             <h4 className={s.sectionTitle}>
-              Demandas em aberto <span className={s.count}>via ClickUp (futuro)</span>
+              Demandas
+              {demands.length > 0 && (
+                <span className={s.count}>
+                  {demands.filter((d) => d.status !== 'done' && d.status !== 'canceled').length} em aberto · {demands.length} no total
+                </span>
+              )}
             </h4>
-            <div className={s.placeholder}>As demandas serão exibidas quando integrarmos com o ClickUp.</div>
+            {detailLoading ? (
+              <DetailSkeleton />
+            ) : demands.length === 0 ? (
+              <div className={s.placeholder}>Nenhuma demanda ainda.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {demands.slice(0, 6).map((d) => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.85rem' }}>
+                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {d.title || 'Sem título'}
+                    </span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                      {(STATUS_BADGE[d.status] ?? { label: d.status }).label}
+                    </span>
+                  </div>
+                ))}
+                {demands.length > 6 && (
+                  <a
+                    href="/admin/demandas"
+                    style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--accent-strong)', textDecoration: 'none', marginTop: 2 }}
+                  >
+                    Ver todas no painel de Demandas →
+                  </a>
+                )}
+              </div>
+            )}
           </div>
 
           <div className={s.section}>
