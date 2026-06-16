@@ -225,12 +225,6 @@ export default function DemandDetailModal({
                     <div className={styles.metaLbl}>Aberta em</div>
                     <div className={styles.metaVal}>{fmtDateTime(d.created_at)}</div>
                   </div>
-                  <div className={styles.metaItem}>
-                    <div className={styles.metaLbl}>Aprovações</div>
-                    <div className={styles.metaVal}>
-                      {d.operators_approved || 0} / {d.operators_total || 0}
-                    </div>
-                  </div>
                 </div>
                 {d.description && d.description.trim() && (
                   <div className={styles.descWrap}>{d.description}</div>
@@ -282,9 +276,6 @@ export default function DemandDetailModal({
                                   sem ClickUp
                                 </span>
                               )}
-                              <span className={m.approved_finish ? styles.approved : `${styles.approved} ${styles.no}`}>
-                                {m.approved_finish ? '✓ Aprovou' : 'aguardando'}
-                              </span>
                             </div>
                           )}
                         </div>

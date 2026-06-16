@@ -66,10 +66,6 @@ export function DemandCard({
   onOpen: (id: string) => void;
 }) {
   const due = dueLabel(demand);
-  const ops = members.filter((m) => m.role === 'operator');
-  const totalOps = ops.length;
-  const approvedOps = ops.filter((m) => m.approved_finish).length;
-  const progress = totalOps > 0 ? Math.round((approvedOps / totalOps) * 100) : 0;
   const dueCls = due.cls ? `${styles.due} ${styles[due.cls]}` : styles.due;
 
   return (
@@ -82,16 +78,6 @@ export function DemandCard({
           </div>
         </div>
       </div>
-      {totalOps > 0 && (
-        <>
-          <div className={styles.approvLine}>
-            Aprovações: <strong>{approvedOps}/{totalOps}</strong>
-          </div>
-          <div className={styles.progress}>
-            <div style={{ width: `${progress}%` }} />
-          </div>
-        </>
-      )}
       <div className={styles.metaRow}>
         <Avatars members={members} usersById={usersById} max={4} />
         <span className={dueCls}>{due.text}</span>
