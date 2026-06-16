@@ -13,6 +13,7 @@ import {
   getMyDemandRating,
   isBaseReady,
   listMyDemands,
+  markDemandRead,
   type Demand,
   type DemandMember,
   type DemandStatus,
@@ -83,6 +84,9 @@ const FileIcon = () => (
     <polyline points="14 2 14 8 20 8" />
   </svg>
 );
+
+// Chave da "pasta" de demandas sem projeto (avulsas).
+const AVULSAS_KEY = '__avulsas__';
 
 // ── Helpers de data/categoria (port das funções inline do legado) ──
 function fmtTime(s?: string | null): string {
@@ -289,6 +293,8 @@ export default function DemandasPage() {
     if (!currentId) return;
     const d = demands.find((x) => x.id === currentId);
     markRead(currentId, (d?.last_message_at as string) || new Date().toISOString());
+    // Registra a leitura NO SERVIDOR (otimização: e-mail de chat só quando ausente).
+    void markDemandRead(currentId);
   }, [currentId, demands, markRead]);
 
   // Atualiza a lista (não-lidas + ordem por atividade) ao voltar o foco/visibilidade.
@@ -436,6 +442,9 @@ export default function DemandasPage() {
     [demands, needsYou],
   );
 
+  // Pastas (por projeto) recolhidas — chave do grupo no Set.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
   const filtered = useMemo(() => {
     let items = demands;
     if (projectFilter) items = items.filter((d) => d.project_id === projectFilter);
@@ -450,6 +459,22 @@ export default function DemandasPage() {
     }
     return items;
   }, [demands, filter, search, projectFilter, needsYou]);
+
+  // Agrupa as demandas filtradas em "pastas" por projeto (avulsas por último).
+  const groups = useMemo(() => {
+    const map = new Map<string, { key: string; title: string; items: Demand[] }>();
+    for (const d of filtered) {
+      const key = d.project_id || AVULSAS_KEY;
+      const title = d.project_id ? (d.project_title as string) || 'Projeto' : 'Demandas avulsas';
+      if (!map.has(key)) map.set(key, { key, title, items: [] });
+      map.get(key)!.items.push(d);
+    }
+    return [...map.values()].sort((a, b) => {
+      if (a.key === AVULSAS_KEY) return 1;
+      if (b.key === AVULSAS_KEY) return -1;
+      return a.title.localeCompare(b.title, 'pt-BR');
+    });
+  }, [filtered]);
 
   // Nome do projeto filtrado (de qualquer demanda dele) p/ o banner.
   const projectFilterName = useMemo(
@@ -702,6 +727,79 @@ export default function DemandasPage() {
 
   const rating = currentId ? ratings[currentId] : null;
 
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const n = new Set(prev);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+
+  // Item da lista (reusado no modo plano e dentro das pastas por projeto).
+  const renderDemandItem = (d: Demand) => {
+    const urg = dueUrgency(d);
+    const unread = isUnread(d);
+    return (
+      <button
+        key={d.id}
+        type="button"
+        className={`${styles.listItem} ${d.id === currentId ? styles.active : ''} ${d.status === 'review' ? styles.awaiting : ''}`}
+        onClick={() => setCurrentId(d.id)}
+      >
+        <span className={`${styles.listIcon} ${styles[iconKeyFor(d)]}`}>
+          <PenIcon />
+        </span>
+        <span className={styles.listBody}>
+          <span className={styles.listTitle} style={{ display: 'block', fontWeight: unread ? 700 : undefined }}>
+            {d.title || 'Sem título'}
+          </span>
+          <span className={styles.listMeta}>
+            {(() => {
+              const cat = categoryOf(members[d.id]);
+              return cat ? (
+                <>
+                  <span>{cat}</span>
+                  <span>•</span>
+                </>
+              ) : null;
+            })()}
+            <span
+              style={
+                urg === 'late'
+                  ? { color: 'var(--danger-strong)', fontWeight: 600 }
+                  : urg === 'soon'
+                    ? { color: 'var(--warning-strong)', fontWeight: 600 }
+                    : undefined
+              }
+            >
+              {dueLabel(d)}
+            </span>
+          </span>
+          {d.last_message_preview ? (
+            <span
+              className={styles.listMeta}
+              style={{ display: 'block', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: unread ? 1 : 0.9 }}
+            >
+              <span style={{ fontWeight: unread ? 600 : 500 }}>
+                {d.last_message_from === 'client' ? 'Você: ' : 'Equipe: '}
+              </span>
+              {(d.last_message_preview as string).replace(/\s+/g, ' ').slice(0, 80)}
+            </span>
+          ) : null}
+        </span>
+        {unread ? (
+          <span
+            aria-label="Mensagens novas"
+            title="Mensagens novas"
+            style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, alignSelf: 'center' }}
+          />
+        ) : (
+          <span />
+        )}
+      </button>
+    );
+  };
+
   return (
     <div className={styles.wrap}>
       <div className={styles.pageHead}>
@@ -796,68 +894,57 @@ export default function DemandasPage() {
                   </>
                 )}
               </div>
+            ) : projectFilter ? (
+              // Filtro de projeto ativo → lista plana (o chip acima já indica o projeto).
+              filtered.map((d) => renderDemandItem(d))
             ) : (
-              filtered.map((d) => {
-                const urg = dueUrgency(d);
-                const unread = isUnread(d);
+              // Organização em PASTAS por projeto (colapsáveis); avulsas por último.
+              groups.map((g) => {
+                const isCollapsed = collapsedGroups.has(g.key);
                 return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    className={`${styles.listItem} ${d.id === currentId ? styles.active : ''} ${d.status === 'review' ? styles.awaiting : ''}`}
-                    onClick={() => setCurrentId(d.id)}
-                  >
-                    <span className={`${styles.listIcon} ${styles[iconKeyFor(d)]}`}>
-                      <PenIcon />
-                    </span>
-                    <span className={styles.listBody}>
-                      <span className={styles.listTitle} style={{ display: 'block', fontWeight: unread ? 700 : undefined }}>
-                        {d.title || 'Sem título'}
+                  <div key={g.key}>
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(g.key)}
+                      aria-expanded={!isCollapsed}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        width: '100%',
+                        padding: '9px 12px',
+                        margin: '8px 0 2px',
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: '1px solid var(--border)',
+                        cursor: 'pointer',
+                        fontSize: '0.74rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.04em',
+                        textTransform: 'uppercase',
+                        color: 'var(--muted)',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.9rem' }}>{g.key === AVULSAS_KEY ? '⚡' : '📁'}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                        {g.title}
                       </span>
-                      <span className={styles.listMeta}>
-                        {(() => {
-                          const cat = categoryOf(members[d.id]);
-                          return cat ? (
-                            <>
-                              <span>{cat}</span>
-                              <span>•</span>
-                            </>
-                          ) : null;
-                        })()}
-                        <span
-                          style={
-                            urg === 'late'
-                              ? { color: 'var(--danger-strong)', fontWeight: 600 }
-                              : urg === 'soon'
-                                ? { color: 'var(--warning-strong)', fontWeight: 600 }
-                                : undefined
-                          }
-                        >
-                          {dueLabel(d)}
-                        </span>
-                      </span>
-                      {d.last_message_preview ? (
-                        <span
-                          className={styles.listMeta}
-                          style={{ display: 'block', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: unread ? 1 : 0.9 }}
-                        >
-                          <span style={{ fontWeight: unread ? 600 : 500 }}>
-                            {d.last_message_from === 'client' ? 'Você: ' : 'Equipe: '}
-                          </span>
-                          {(d.last_message_preview as string).replace(/\s+/g, ' ').slice(0, 80)}
-                        </span>
-                      ) : null}
-                    </span>
-                    {unread ? (
                       <span
-                        aria-label="Mensagens novas"
-                        title="Mensagens novas"
-                        style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, alignSelf: 'center' }}
-                      />
-                    ) : (
-                      <span />
-                    )}
-                  </button>
+                        style={{
+                          flexShrink: 0,
+                          background: 'var(--accent-soft)',
+                          color: 'var(--accent-strong)',
+                          borderRadius: 999,
+                          padding: '1px 8px',
+                          fontSize: '0.72rem',
+                        }}
+                      >
+                        {g.items.length}
+                      </span>
+                      <span style={{ flexShrink: 0, fontSize: '0.7rem' }}>{isCollapsed ? '▸' : '▾'}</span>
+                    </button>
+                    {!isCollapsed && g.items.map((d) => renderDemandItem(d))}
+                  </div>
                 );
               })
             )}
