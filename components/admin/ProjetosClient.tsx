@@ -224,7 +224,7 @@ export default function ProjetosClient() {
                     </td>
                     <td>
                       {st && st.demands_total > 0 ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 130 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 104 }}>
                           <div className={s.progressPill}>
                             <div className={s.bar}>
                               <div
@@ -257,7 +257,7 @@ export default function ProjetosClient() {
                     </td>
                     <td>{fmtDate(p.created_at)}</td>
                     <td>
-                      <div style={{ display: 'inline-flex', gap: 8 }}>
+                      <div className={s.projActions}>
                         <button
                           className={s.btnView}
                           style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
