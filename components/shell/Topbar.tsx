@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import Brand from '@/components/ui/Brand';
 import UserChip from '@/components/shell/UserChip';
 
-export type NavItem = { href: string; label: string };
+export type NavItem = { href: string; label: string; icon?: string };
 
 export default function Topbar({
   items,

@@ -593,11 +593,19 @@ a {
   padding: 8px 12px 4px;
 }
 .sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 12px;
   border-radius: 10px;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--muted);
+}
+.sidebar-item svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 .sidebar-item:hover {
   background: var(--hero-tint);

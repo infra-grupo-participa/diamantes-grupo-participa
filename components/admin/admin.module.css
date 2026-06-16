@@ -785,12 +785,17 @@
   white-space: nowrap;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-/* Coluna de ações: botões quebram linha em vez de estourar a largura da tabela. */
+/* Coluna de ações: botões empilhados e UNIFORMES (mesma largura). */
 .projActions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 140px;
+}
+.projActions .btnView {
+  width: 100%;
+  justify-content: center;
 }
 .btnView:hover {
   border-color: var(--accent);
