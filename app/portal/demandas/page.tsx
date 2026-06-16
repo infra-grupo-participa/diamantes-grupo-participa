@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   clientCompleteDemand,
+  clientRequestChanges,
   getDemand,
   getDemandMembers,
   getMe,
@@ -484,6 +485,35 @@ export default function DemandasPage() {
       if (updated) setDemands((prev) => prev.map((x) => (x.id === currentId ? updated : x)));
       toast('Demanda concluída! Obrigado. 🎉', 'success');
       setRatingFor(currentId); // abre a avaliação na hora
+    } catch (e) {
+      toast(errMessage(e), 'error');
+    }
+  }
+
+  // ── Pedir ajustes (cliente, só quando "Em revisão") → reabre a demanda ──
+  async function doRequestChanges() {
+    if (!currentId || !current || current.status !== 'review' || !me) return;
+    const note = window.prompt('O que precisa ser ajustado? Descreva para a equipe:');
+    if (note === null) return; // cancelou
+    const trimmed = note.trim();
+    if (!trimmed) {
+      toast('Descreva o que precisa ser ajustado.', 'warning');
+      return;
+    }
+    try {
+      await clientRequestChanges(currentId);
+      // Posta a nota como mensagem (reusa o sync de chat → ClickUp). Best-effort.
+      try {
+        const inserted = (await postMessage(currentId, `🔁 Ajustes solicitados: ${trimmed}`, [], me.id, me.client_slug || '')) as
+          | { id?: string | number }
+          | null;
+        if (inserted?.id != null) await appendMessage(currentId, String(inserted.id));
+      } catch {
+        /* a nota é best-effort; o status já voltou para "Em andamento" */
+      }
+      const updated = await getDemand(currentId);
+      if (updated) setDemands((prev) => prev.map((x) => (x.id === currentId ? updated : x)));
+      toast('Ajustes solicitados. A equipe foi avisada e o chat está aberto.', 'success');
     } catch (e) {
       toast(errMessage(e), 'error');
     }
@@ -1001,7 +1031,12 @@ export default function DemandasPage() {
                   <button type="button" className={styles.finalizeBtn} onClick={() => void doComplete()}>
                     Aprovar entrega e concluir
                   </button>
-                  <small className={styles.finalizeHint}>A equipe enviou para sua aprovação. Ao concluir, você poderá avaliar o atendimento.</small>
+                  <button type="button" className={styles.requestBtn} onClick={() => void doRequestChanges()}>
+                    Pedir ajustes
+                  </button>
+                  <small className={styles.finalizeHint}>
+                    A equipe enviou para sua aprovação. Aprove para concluir e avaliar, ou peça ajustes para reabrir o chat.
+                  </small>
                 </div>
               )}
             </>

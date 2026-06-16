@@ -294,6 +294,17 @@ export async function clientCompleteDemand(demandId: string): Promise<FinalizeRe
   return data as FinalizeResult;
 }
 
+/**
+ * Cliente pede ajustes na entrega (RPC client_request_changes). Só quando a demanda
+ * está "Em revisão": volta para `in_progress` e reabre o chat. A nota com o que
+ * falta é postada como mensagem normal pelo chamador (reusa o sync de chat→ClickUp).
+ */
+export async function clientRequestChanges(demandId: string): Promise<FinalizeResult> {
+  const { data, error } = await db().rpc('client_request_changes', { p_demand_id: demandId });
+  if (error) throw new Error(error.message || 'Não foi possível reabrir a demanda.');
+  return data as FinalizeResult;
+}
+
 /** Rating mais recente da demanda (pending ou submitted), ou null. */
 export async function getMyDemandRating(demandId: string): Promise<Rating | null> {
   const { data, error } = await db()
