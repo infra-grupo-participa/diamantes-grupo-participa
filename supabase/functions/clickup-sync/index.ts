@@ -1,6 +1,7 @@
-// clickup-sync v6 — mapping PT-BR + assignees via demand_operators.
+// clickup-sync v10 — hierarquia Pasta(aluno) → Lista(projeto/avulsas) → Tarefa(demanda).
 // portal.demands (INSERT/UPDATE) → trigger pg_net (portal._sync_demand_to_clickup)
 // → esta função cria/atualiza a task no ClickUp e grava demands.clickup_task_id.
+// Também aceita {action:"provision_structure"} para criar pastas/listas em lote.
 //
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
@@ -41,13 +42,6 @@ async function getDemand(supabase: any, demand_id: string) {
     .from("demands").select("*").eq("id", demand_id).maybeSingle();
   if (error) throw new Error("Demand: " + error.message);
   return data;
-}
-
-async function getProjectTitle(supabase: any, project_id: string | null): Promise<string> {
-  if (!project_id) return "";
-  const { data } = await supabase.schema("portal")
-    .from("projects").select("title").eq("id", project_id).maybeSingle();
-  return data?.title || "";
 }
 
 // Operadores atribuídos vivem em portal.demand_operators (NÃO demand_members,
@@ -113,12 +107,10 @@ function assigneesFor(members: any[]): number[] {
     .filter(n => !isNaN(n));
 }
 
-// Nome da task com prefixo do projeto p/ diferenciar no ClickUp: "[Projeto] título".
-// O webhook reverso remove esse prefixo ao ler o nome (não polui demands.title).
+// Nome da task = só o título da demanda. Na hierarquia v10 o PROJETO é a própria
+// LISTA (pasta do aluno → lista do projeto), então o prefixo "[Projeto]" é redundante.
 function taskName(demand: any): string {
-  const t = demand.title || "Demanda";
-  const proj = (demand._project_title || "").trim();
-  return proj ? `[${proj}] ${t}` : t;
+  return demand.title || "Demanda";
 }
 
 function buildCreatePayload(demand: any, assignees: number[]) {
@@ -162,18 +154,126 @@ async function setCustomFields(apiKey: string, task_id: string, cfg: any, demand
   }
 }
 
-// Lista de destino da demanda: a LISTA do cliente (clients.cu_list_id) p/ organizar
-// por aluno; se não tiver configurada, cai na lista global (clickup_config.list_id).
-async function getClientListId(supabase: any, client_slug: string, cfg: any): Promise<string> {
+// ── Hierarquia 3 camadas: Pasta(aluno) → Lista(projeto | "Avulsas") → Tarefa ──
+async function createFolder(apiKey: string, spaceId: string, name: string): Promise<string> {
+  const f = await clickupRequest(apiKey, `/space/${spaceId}/folder`, {
+    method: "POST", body: JSON.stringify({ name }),
+  });
+  return String(f.id);
+}
+async function createList(apiKey: string, folderId: string, name: string): Promise<string> {
+  const l = await clickupRequest(apiKey, `/folder/${folderId}/list`, {
+    method: "POST", body: JSON.stringify({ name }),
+  });
+  return String(l.id);
+}
+
+// Garante a PASTA do aluno (clients.cu_folder_id) — cria no espaço se faltar.
+async function ensureClientFolder(supabase: any, apiKey: string, cfg: any, client_slug: string): Promise<{ folderId: string; client: any } | null> {
+  if (!client_slug || !cfg.space_id) return null;
+  const { data: client } = await supabase.schema("portal")
+    .from("clients").select("slug, display_name, cu_folder_id, cu_inbox_list_id, cu_list_id").eq("slug", client_slug).maybeSingle();
+  if (!client) return null;
+  let folderId = String(client.cu_folder_id || "").trim();
+  if (!folderId) {
+    folderId = await createFolder(apiKey, cfg.space_id, (client.display_name || client.slug || "Aluno").trim());
+    await supabase.schema("portal").from("clients").update({ cu_folder_id: folderId }).eq("slug", client_slug);
+    client.cu_folder_id = folderId;
+  }
+  return { folderId, client };
+}
+
+// Cria uma lista com nome único na pasta: se o nome já existe ("List name taken",
+// p.ex. projetos com título duplicado), desambigua com sufixo " (2)", " (3)"...
+async function createListUnique(apiKey: string, folderId: string, baseName: string): Promise<string> {
+  for (let i = 0; i < 6; i++) {
+    const name = i === 0 ? baseName : `${baseName} (${i + 1})`;
+    try {
+      return await createList(apiKey, folderId, name);
+    } catch (e) {
+      const msg = String((e as any)?.message || e);
+      if (msg.includes("List name taken") || msg.includes("SUBCAT_016")) continue;
+      throw e;
+    }
+  }
+  throw new Error(`createListUnique: nomes esgotados para "${baseName}"`);
+}
+
+// Garante a LISTA do projeto (projects.cu_list_id) dentro da pasta do aluno.
+async function ensureProjectList(supabase: any, apiKey: string, folderId: string, project_id: string): Promise<string> {
+  const { data: project } = await supabase.schema("portal")
+    .from("projects").select("id, title, cu_list_id").eq("id", project_id).maybeSingle();
+  if (!project) return "";
+  let listId = String(project.cu_list_id || "").trim();
+  if (!listId) {
+    listId = await createListUnique(apiKey, folderId, (project.title || "Projeto").trim());
+    await supabase.schema("portal").from("projects").update({ cu_list_id: listId }).eq("id", project_id);
+  }
+  return listId;
+}
+
+// Garante a lista "Avulsas" do aluno (clients.cu_inbox_list_id) p/ demandas sem projeto.
+async function ensureInboxList(supabase: any, apiKey: string, folderId: string, client: any): Promise<string> {
+  let listId = String(client.cu_inbox_list_id || "").trim();
+  if (!listId) {
+    listId = await createList(apiKey, folderId, "Avulsas");
+    await supabase.schema("portal").from("clients").update({ cu_inbox_list_id: listId }).eq("slug", client.slug);
+    client.cu_inbox_list_id = listId;
+  }
+  return listId;
+}
+
+// Lista de destino da demanda na hierarquia nova. Fallback p/ lista legada/global.
+async function resolveDestinationList(supabase: any, apiKey: string, cfg: any, demand: any): Promise<string> {
+  const ensured = await ensureClientFolder(supabase, apiKey, cfg, demand.client_slug);
+  if (!ensured) return await legacyClientList(supabase, demand.client_slug, cfg);
+  const { folderId, client } = ensured;
+  if (demand.project_id) {
+    const lid = await ensureProjectList(supabase, apiKey, folderId, demand.project_id);
+    if (lid) return lid;
+  }
+  return await ensureInboxList(supabase, apiKey, folderId, client);
+}
+
+// Fallback legado: lista folderless do cliente (clients.cu_list_id) ou lista global.
+async function legacyClientList(supabase: any, client_slug: string, cfg: any): Promise<string> {
   if (!client_slug) return cfg.list_id;
   const { data } = await supabase.schema("portal")
     .from("clients").select("cu_list_id").eq("slug", client_slug).maybeSingle();
-  const listId = String(data?.cu_list_id || "").trim();
-  if (!listId) {
-    console.warn(`cliente ${client_slug} sem cu_list_id — usando lista global`);
-    return cfg.list_id;
+  return String(data?.cu_list_id || "").trim() || cfg.list_id;
+}
+
+// Provisiona a estrutura (pastas + listas) para TODOS os clientes/projetos. Não move
+// tarefas existentes (a API do ClickUp não move entre listas). Idempotente.
+async function provisionStructure(supabase: any, apiKey: string, cfg: any): Promise<Response> {
+  const out = { folders: 0, inbox_lists: 0, project_lists: 0, clients: 0, errors: [] as string[] };
+  const { data: clients } = await supabase.schema("portal").from("clients").select("slug");
+  for (const c of (clients || [])) {
+    out.clients++;
+    try {
+      const ensured = await ensureClientFolder(supabase, apiKey, cfg, c.slug);
+      if (!ensured) continue;
+      out.folders++;
+      await ensureInboxList(supabase, apiKey, ensured.folderId, ensured.client);
+      out.inbox_lists++;
+      const { data: projects } = await supabase.schema("portal")
+        .from("projects").select("id, cu_list_id").eq("client_slug", c.slug);
+      for (const p of (projects || [])) {
+        if (String(p.cu_list_id || "").trim()) continue;
+        try {
+          await ensureProjectList(supabase, apiKey, ensured.folderId, p.id);
+          out.project_lists++;
+        } catch (e) {
+          out.errors.push(`projeto ${p.id}: ${String((e as any)?.message || e)}`);
+        }
+        await new Promise((r) => setTimeout(r, 350)); // throttle ClickUp
+      }
+      await new Promise((r) => setTimeout(r, 350));
+    } catch (e) {
+      out.errors.push(`${c.slug}: ${String((e as any)?.message || e)}`);
+    }
   }
-  return listId;
+  return new Response(JSON.stringify({ ok: true, ...out }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
 async function createTask(apiKey: string, listId: string, cfg: any, demand: any, members: any[], requester: string) {
@@ -229,9 +329,6 @@ async function updateTask(apiKey: string, cfg: any, task_id: string, demand: any
 Deno.serve(async (req: Request) => {
   let body: any = {}; try { body = await req.json(); } catch (_) { body = {}; }
   const { demand_id, event } = body;
-  if (!demand_id) {
-    return new Response(JSON.stringify({ error: "demand_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
-  }
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
     const provided = req.headers.get("x-internal-key") || "";
@@ -247,21 +344,29 @@ Deno.serve(async (req: Request) => {
     const apiKey = await getSecret(supabase, "clickup_api_key");
     if (!apiKey) return new Response(JSON.stringify({ error: "clickup_api_key ausente" }), { status: 500, headers: { "Content-Type": "application/json" } });
 
-    const [cfg, demand] = await Promise.all([getConfig(supabase), getDemand(supabase, demand_id)]);
+    const cfg = await getConfig(supabase);
+
+    // Modo lote: cria a estrutura (pastas + listas) para todos os clientes/projetos.
+    if (body.action === "provision_structure") {
+      return await provisionStructure(supabase, apiKey, cfg);
+    }
+
+    if (!demand_id) {
+      return new Response(JSON.stringify({ error: "demand_id obrigatório" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const demand = await getDemand(supabase, demand_id);
     if (!demand) return new Response(JSON.stringify({ error: "demand não encontrada" }), { status: 404, headers: { "Content-Type": "application/json" } });
 
-    const [members, requester, projectTitle] = await Promise.all([
+    const [members, requester] = await Promise.all([
       getMembersInfo(supabase, demand_id),
       getRequesterEmail(supabase, demand.created_by),
-      getProjectTitle(supabase, demand.project_id),
     ]);
-    demand._project_title = projectTitle; // usado em taskName() p/ prefixar "[Projeto]"
 
     let task;
     if (demand.clickup_task_id) {
       task = await updateTask(apiKey, cfg, demand.clickup_task_id, demand, members, requester);
     } else {
-      const listId = await getClientListId(supabase, demand.client_slug, cfg);
+      const listId = await resolveDestinationList(supabase, apiKey, cfg, demand);
       task = await createTask(apiKey, listId, cfg, demand, members, requester);
       // Persistir o vínculo é crítico: se falhar, a próxima execução cria task
       // duplicada. Propaga o erro para o trigger pg_net poder reprocessar.
