@@ -487,6 +487,24 @@ export async function listProjects({
   return (data ?? []) as ProjectRow[];
 }
 
+// Agregados de demandas por projeto (andamento + SLA) — alimenta a coluna "Demandas".
+export type ProjectDemandStats = {
+  project_id: string;
+  demands_total: number;
+  demands_done: number;
+  demands_open: number;
+  demands_overdue: number;
+  next_due: string | null;
+};
+
+export async function listProjectDemandStats(): Promise<Record<string, ProjectDemandStats>> {
+  const { data, error } = await client().from('v_project_demand_stats').select('*');
+  if (error) throw error;
+  const map: Record<string, ProjectDemandStats> = {};
+  for (const r of (data ?? []) as ProjectDemandStats[]) map[r.project_id] = r;
+  return map;
+}
+
 // Conclui um projeto (status → completed). O banco dispara o convite de
 // avaliação do cliente (migration 036). Só admin (RLS/RPC bloqueia o resto).
 export async function completeProject(id: string): Promise<true> {

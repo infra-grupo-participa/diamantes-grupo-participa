@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import s from './admin.module.css';
-import { listProjects, completeProject, type ProjectRow } from '@/lib/api/admin';
+import {
+  listProjects,
+  completeProject,
+  listProjectDemandStats,
+  type ProjectRow,
+  type ProjectDemandStats,
+} from '@/lib/api/admin';
 import { toast } from '@/lib/toast';
 import {
   getGeneralFields,
@@ -42,6 +48,23 @@ function statusLabel(st: string): string {
   return ({ briefing: 'Briefing', active: 'Ativo', completed: 'Concluído', cancelled: 'Cancelado' } as Record<string, string>)[st] || st;
 }
 
+// SLA do projeto a partir das demandas em aberto: atrasadas (vermelho), vence em
+// breve (âmbar) ou no prazo (verde). Sem demandas abertas → neutro.
+function slaChip(st?: ProjectDemandStats): { label: string; color: string; bg: string } {
+  if (!st || st.demands_open === 0) return { label: 'sem pendências', color: '#6b6584', bg: '#f1eef8' };
+  if (st.demands_overdue > 0) {
+    const n = st.demands_overdue;
+    return { label: `${n} atrasada${n > 1 ? 's' : ''}`, color: '#b42318', bg: '#fee2e2' };
+  }
+  if (st.next_due) {
+    const days = Math.ceil((new Date(st.next_due).getTime() - Date.now()) / 86400000);
+    if (days <= 0) return { label: 'vence hoje', color: '#b45309', bg: '#fff4d6' };
+    if (days <= 3) return { label: `vence em ${days}d`, color: '#b45309', bg: '#fff4d6' };
+    return { label: `no prazo · ${days}d`, color: '#15803d', bg: '#e7f7ee' };
+  }
+  return { label: 'no prazo', color: '#15803d', bg: '#e7f7ee' };
+}
+
 function statusClass(status: string): string {
   return (
     {
@@ -78,12 +101,18 @@ export default function ProjetosClient() {
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<ProjectRow | null>(null);
   const [panorama, setPanorama] = useState<ProjectRow | null>(null);
+  const [stats, setStats] = useState<Record<string, ProjectDemandStats>>({});
 
   const load = useCallback(async () => {
     setRows(null);
     setError('');
     try {
-      setRows(await listProjects({ service, status, briefing }));
+      const [projs, st] = await Promise.all([
+        listProjects({ service, status, briefing }),
+        listProjectDemandStats().catch(() => ({}) as Record<string, ProjectDemandStats>),
+      ]);
+      setStats(st);
+      setRows(projs);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
       setRows([]);
@@ -144,6 +173,7 @@ export default function ProjetosClient() {
               <th>Cliente</th>
               <th>Serviço</th>
               <th>Briefing</th>
+              <th>Demandas</th>
               <th>Status</th>
               <th>Criado em</th>
               <th></th>
@@ -154,19 +184,22 @@ export default function ProjetosClient() {
               <ProjSkeletonRows />
             ) : error ? (
               <tr>
-                <td colSpan={7} className={s.emptyState}>
+                <td colSpan={8} className={s.emptyState}>
                   Erro ao carregar: {error}
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className={s.emptyState}>
+                <td colSpan={8} className={s.emptyState}>
                   Nenhum projeto encontrado.
                 </td>
               </tr>
             ) : (
               rows.map((p) => {
                 const progress = calcProgress(p);
+                const st = stats[p.id];
+                const donePct = st && st.demands_total > 0 ? Math.round((st.demands_done / st.demands_total) * 100) : 0;
+                const sla = slaChip(st);
                 const clientName = p.clients?.display_name || p.client_slug;
                 const svcList = (p.services || []).map((sv) => SERVICE_LABELS[sv] || sv).join(', ') || '—';
                 return (
@@ -188,6 +221,36 @@ export default function ProjetosClient() {
                         </div>
                         {progress}%
                       </div>
+                    </td>
+                    <td>
+                      {st && st.demands_total > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 130 }}>
+                          <div className={s.progressPill}>
+                            <div className={s.bar}>
+                              <div
+                                className={s.fill}
+                                style={{ width: `${donePct}%`, background: st.demands_overdue > 0 ? '#ef4444' : undefined }}
+                              />
+                            </div>
+                            {st.demands_done}/{st.demands_total}
+                          </div>
+                          <span
+                            style={{
+                              alignSelf: 'flex-start',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: 999,
+                              color: sla.color,
+                              background: sla.bg,
+                            }}
+                          >
+                            {sla.label}
+                          </span>
+                        </div>
+                      ) : (
+                        <span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>sem demandas</span>
+                      )}
                     </td>
                     <td>
                       <span className={`${s.bBadge} ${statusClass(p.status)}`}>{statusLabel(p.status)}</span>
