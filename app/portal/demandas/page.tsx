@@ -27,12 +27,13 @@ import { errMessage } from '@/lib/errors';
 import { listMyProjects, type Project } from '@/lib/api/projects';
 import { getClientBriefing } from '@/lib/api/briefing';
 import { BRIEFING_SERVICE_LABELS, type BriefingAnswers, type ProjectBriefing } from '@/lib/briefing-templates';
-import BriefingReadView, {
+import {
   buildGeneralSection,
   buildProjectSections,
   buildAccessSections,
   type BriefingViewSection,
 } from '@/components/briefing/BriefingReadView';
+import Link from 'next/link';
 import ChatComposer from '@/components/demandas/ChatComposer';
 import NewDemandModal from '@/components/demandas/NewDemandModal';
 import RatingModal from '@/components/demandas/RatingModal';
@@ -1231,11 +1232,25 @@ export default function DemandasPage() {
 
               {current.project_id && hasBriefing && (
                 <div className={styles.detailSection}>
-                  <h3>
-                    Briefing desta demanda{' '}
-                    {current.project_title ? <span className="small">📁 {current.project_title}</span> : null}
-                  </h3>
-                  <BriefingReadView sections={briefingSections} />
+                  <h3>Briefing do projeto</h3>
+                  <Link
+                    href={`/portal/briefing/${current.project_id}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 16px',
+                      borderRadius: 10,
+                      border: '1px solid var(--border)',
+                      background: 'var(--accent-soft)',
+                      color: 'var(--accent-strong)',
+                      fontWeight: 700,
+                      fontSize: '0.88rem',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    📁 {current.project_title || 'Abrir briefing completo'} →
+                  </Link>
                 </div>
               )}
 
