@@ -631,79 +631,139 @@ export default function AssinaturasClient() {
 }
 
 // ── Tabelas detalhadas usadas dentro do ExpandModal compartilhado ──
-const expTh: React.CSSProperties = { textAlign: 'left', padding: '8px 10px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#fff' };
-const expTd: React.CSSProperties = { padding: '8px 10px', fontSize: '0.84rem', borderTop: '1px solid var(--border)' };
+const expTh: React.CSSProperties = { textAlign: 'left', padding: '11px 14px', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', background: 'var(--table-head-bg, #faf8fd)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, whiteSpace: 'nowrap' };
+const expThRight: React.CSSProperties = { ...expTh, textAlign: 'right' };
+const expTd: React.CSSProperties = { padding: '11px 14px', fontSize: '0.85rem', borderTop: '1px solid var(--border)', verticalAlign: 'middle', color: 'var(--text)' };
+const expTdRight: React.CSSProperties = { ...expTd, textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' };
+const expWrap: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' };
+const expTable: React.CSSProperties = { width: '100%', borderCollapse: 'collapse' };
+
+function pill(text: string, bg: string, color: string) {
+  return (
+    <span style={{ display: 'inline-block', background: bg, color, borderRadius: 999, padding: '3px 10px', fontSize: '0.74rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
+      {text}
+    </span>
+  );
+}
+
+function expAvatar(name: string) {
+  return (
+    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: '0.72rem', fontWeight: 700, color: '#fff', background: 'linear-gradient(135deg, var(--accent), var(--accent-strong))' }}>
+      {initials(name)}
+    </span>
+  );
+}
+
+function ExpSummary({ left, right }: { left: string; right: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, fontSize: '0.82rem', color: 'var(--muted)' }}>
+      <span>{left}</span>
+      <span style={{ fontWeight: 700, color: 'var(--text)' }}>{right}</span>
+    </div>
+  );
+}
 
 function RenewalsTable({ renewals }: { renewals: ServiceRenewal[] }) {
-  if (renewals.length === 0) return <p style={{ color: 'var(--muted)' }}>Nenhum vencimento próximo.</p>;
+  if (renewals.length === 0) return <p style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>Nenhum vencimento próximo.</p>;
+  const total = renewals.reduce((sum, r) => sum + (Number(r.monthly_value) || 0), 0);
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          <th style={expTh}>Cliente</th>
-          <th style={expTh}>Serviço</th>
-          <th style={expTh}>Vencimento</th>
-          <th style={expTh}>Prazo</th>
-          <th style={expTh}>Valor</th>
-        </tr>
-      </thead>
-      <tbody>
-        {renewals.map((r, i) => {
-          const dl = Number.isFinite(r.days_left as number) ? (r.days_left as number) : null;
-          const prazo = dl == null ? '—' : dl < 0 ? `Atraso ${Math.abs(dl)}d` : dl === 0 ? 'Hoje' : `${dl}d`;
-          const color = dl != null && dl <= 0 ? '#b42318' : dl != null && dl <= 5 ? '#b45309' : 'var(--text)';
-          return (
-            <tr key={i}>
-              <td style={expTd}>{r.client_display_name || r.client_slug}</td>
-              <td style={expTd}>{r.service_type || '—'}</td>
-              <td style={expTd}>{r.access_until ? fmtDate(r.access_until) : '—'}</td>
-              <td style={{ ...expTd, color, fontWeight: 600 }}>{prazo}</td>
-              <td style={expTd}>{r.monthly_value != null ? fmtBRL(Number(r.monthly_value)) : '—'}</td>
+    <>
+      <style>{`.expRow{transition:background .12s}.expRow:hover{background:var(--table-row-hover,#faf8fd)}`}</style>
+      <ExpSummary left={`${renewals.length} vencimento${renewals.length === 1 ? '' : 's'} próximo${renewals.length === 1 ? '' : 's'}`} right={`Total ${fmtBRL(total)}/mês`} />
+      <div style={expWrap}>
+        <table style={expTable}>
+          <thead>
+            <tr>
+              <th style={expTh}>Cliente</th>
+              <th style={expTh}>Serviço</th>
+              <th style={expTh}>Vencimento</th>
+              <th style={expTh}>Prazo</th>
+              <th style={expThRight}>Valor</th>
             </tr>
-          );
-        })}
-      </tbody>
-    </table>
+          </thead>
+          <tbody>
+            {renewals.map((r, i) => {
+              const dl = Number.isFinite(r.days_left as number) ? (r.days_left as number) : null;
+              const p =
+                dl == null
+                  ? { t: '—', bg: '#f1eef8', c: '#6b6584' }
+                  : dl < 0
+                    ? { t: `Atraso ${Math.abs(dl)}d`, bg: '#fee2e2', c: '#b42318' }
+                    : dl === 0
+                      ? { t: 'Hoje', bg: '#fee2e2', c: '#b42318' }
+                      : dl <= 5
+                        ? { t: `Em ${dl}d`, bg: '#fff4d6', c: '#b45309' }
+                        : { t: `Em ${dl}d`, bg: '#e7f7ee', c: '#15803d' };
+              return (
+                <tr key={i} className="expRow">
+                  <td style={expTd}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {expAvatar(r.client_display_name || r.client_slug)}
+                      <span style={{ fontWeight: 600 }}>{r.client_display_name || r.client_slug}</span>
+                    </span>
+                  </td>
+                  <td style={{ ...expTd, color: 'var(--muted)' }}>{r.service_type || '—'}</td>
+                  <td style={expTd}>{r.access_until ? fmtDate(r.access_until) : '—'}</td>
+                  <td style={expTd}>{pill(p.t, p.bg, p.c)}</td>
+                  <td style={expTdRight}>{r.monthly_value != null ? fmtBRL(Number(r.monthly_value)) : '—'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
 function PurchasesTable({ data }: { data: PurchaseRow[] | null }) {
-  if (data == null) return <p style={{ color: 'var(--muted)' }}>Carregando…</p>;
-  if (data.length === 0) return <p style={{ color: 'var(--muted)' }}>Nenhuma cobrança encontrada.</p>;
+  if (data == null) return <p style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>Carregando…</p>;
+  if (data.length === 0) return <p style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>Nenhuma cobrança encontrada.</p>;
+  const total = data
+    .filter((p) => p.status === 'approved' || p.status === 'complete')
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          <th style={expTh}>Data</th>
-          <th style={expTh}>Comprador</th>
-          <th style={expTh}>Serviço</th>
-          <th style={expTh}>Valor</th>
-          <th style={expTh}>Parcela</th>
-          <th style={expTh}>Forma</th>
-          <th style={expTh}>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((p, i) => {
-          const st = purchaseStatusStyle(p.status);
-          const pm = pmLabel(p.payment_type);
-          const inst = (p.installments_total ?? 0) > 1 ? `${p.installment_number || 1}/${p.installments_total}x` : '—';
-          return (
-            <tr key={p.transaction_code + i}>
-              <td style={expTd}>{fmtDate(p.charged_at)}</td>
-              <td style={expTd}>{p.buyer_email}</td>
-              <td style={expTd}>{canonicalSector(p.service_name || '') || p.service_name || '—'}</td>
-              <td style={expTd}>{fmtBRL(Number(p.amount || 0))}</td>
-              <td style={expTd}>{inst}</td>
-              <td style={expTd}>{pm.icon} {pm.label}</td>
-              <td style={expTd}>
-                <span style={{ background: st.bg, color: st.color, borderRadius: 999, padding: '2px 8px', fontSize: '0.74rem', fontWeight: 600 }}>{st.txt}</span>
-              </td>
+    <>
+      <style>{`.expRow{transition:background .12s}.expRow:hover{background:var(--table-row-hover,#faf8fd)}`}</style>
+      <ExpSummary left={`${data.length} cobrança${data.length === 1 ? '' : 's'}`} right={`Aprovado ${fmtBRL(total)}`} />
+      <div style={expWrap}>
+        <table style={expTable}>
+          <thead>
+            <tr>
+              <th style={expTh}>Data</th>
+              <th style={expTh}>Comprador</th>
+              <th style={expTh}>Serviço</th>
+              <th style={expThRight}>Valor</th>
+              <th style={expTh}>Parcela</th>
+              <th style={expTh}>Forma</th>
+              <th style={expTh}>Status</th>
             </tr>
-          );
-        })}
-      </tbody>
-    </table>
+          </thead>
+          <tbody>
+            {data.map((p, i) => {
+              const st = purchaseStatusStyle(p.status);
+              const pm = pmLabel(p.payment_type);
+              const inst = (p.installments_total ?? 0) > 1 ? `${p.installment_number || 1}/${p.installments_total}x` : '—';
+              return (
+                <tr key={p.transaction_code + i} className="expRow">
+                  <td style={{ ...expTd, whiteSpace: 'nowrap' }}>{fmtDate(p.charged_at)}</td>
+                  <td style={{ ...expTd, maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={p.buyer_email}>
+                    {p.buyer_email}
+                  </td>
+                  <td style={{ ...expTd, color: 'var(--muted)' }}>{canonicalSector(p.service_name || '') || p.service_name || '—'}</td>
+                  <td style={expTdRight}>{fmtBRL(Number(p.amount || 0))}</td>
+                  <td style={{ ...expTd, color: 'var(--muted)' }}>{inst}</td>
+                  <td style={{ ...expTd, whiteSpace: 'nowrap' }}>
+                    {pm.icon} {pm.label}
+                  </td>
+                  <td style={expTd}>{pill(st.txt, st.bg, st.color)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
