@@ -23,10 +23,9 @@ import {
 import { initials, fmtDateTime } from '@/lib/format';
 import { toast } from '@/lib/toast';
 import Pagination from './Pagination';
-import { Stars, StatusCell, OpStatusCell, PositionPill } from './cells';
+import { StatusCell, OpStatusCell, PositionPill } from './cells';
 import EmployeeModal from './EmployeeModal';
 import OperatorModal from './OperatorModal';
-import OperatorPerformanceDrawer from './OperatorPerformanceDrawer';
 import {
   IconSearch,
   IconEdit,
@@ -37,8 +36,6 @@ import {
   IconDownload,
   IconUsers,
   IconGem,
-  IconChat,
-  IconStar,
   IconClock,
 } from './icons';
 
@@ -73,7 +70,6 @@ export default function EquipeClient() {
   // ── Modals ──
   const [empModal, setEmpModal] = useState<{ open: boolean; editing: EmployeeRow | null }>({ open: false, editing: null });
   const [opModal, setOpModal] = useState<{ open: boolean; editing: OperatorRow | null }>({ open: false, editing: null });
-  const [perfFor, setPerfFor] = useState<OperatorRow | null>(null);
 
   const aSearchInput = useRef('');
   const oSearchInput = useRef('');
@@ -276,8 +272,6 @@ export default function EquipeClient() {
       <div className={s.kpiGrid}>
         <Kpi icon={<IconUsers />} bg="#eaf2ff" color="#3b82f6" label="Admins / Operadores" value={stats ? `${stats.admins} / ${stats.operators}` : '—'} />
         <Kpi icon={<IconGem />} bg="#f1ecff" color="#8b5cf6" label="Alunos diamantes" value={stats ? <CountUp value={stats.students} /> : '—'} />
-        <Kpi icon={<IconChat />} bg="#e7f7ee" color="#16a34a" label="Avaliações recebidas" value={stats ? <CountUp value={stats.ratings} /> : '—'} />
-        <Kpi icon={<IconStar />} bg="#fff4d6" color="#eab308" label="Média geral" value={stats ? <CountUp value={stats.ratingAvg} format={(n) => n.toFixed(2).replace('.', ',')} /> : '—'} />
         <Kpi icon={<IconClock />} bg="#ffe9ee" color="#ec4899" label="Admins ativos hoje" value={stats ? <CountUp value={stats.activeToday} /> : '—'} />
       </div>
 
@@ -437,7 +431,6 @@ export default function EquipeClient() {
                   <th>Email</th>
                   <th>Cargo</th>
                   <th>ClickUp ID</th>
-                  <th>Avaliação</th>
                   <th style={{ textAlign: 'center' }}>Alunos</th>
                   <th>Status</th>
                   <th style={{ textAlign: 'right' }}>Ações</th>
@@ -479,11 +472,6 @@ export default function EquipeClient() {
                       <td data-label="ClickUp ID">
                         <code className={s.mono}>{o.clickup_user_id || '—'}</code>
                       </td>
-                      <td data-label="Avaliação">
-                        <button className={s.linkBtn} title="Ver performance" onClick={() => setPerfFor(o)}>
-                          <Stars rating={o.rating_avg} />
-                        </button>
-                      </td>
                       <td data-label="Alunos" style={{ textAlign: 'center' }}>
                         <span className={`${s.countPill} ${(o.students_count ?? 0) === 0 ? s.zero : ''}`}>{o.students_count ?? 0}</span>
                       </td>
@@ -492,9 +480,6 @@ export default function EquipeClient() {
                       </td>
                       <td className={s.cardActions} data-label="Ações">
                         <div className={s.rowActions}>
-                          <button className={s.iconBtn} title="Ver performance" onClick={() => setPerfFor(o)}>
-                            <IconStar />
-                          </button>
                           <button className={s.iconBtn} title="Editar" onClick={() => setOpModal({ open: true, editing: o })}>
                             <IconEdit />
                           </button>
@@ -541,15 +526,6 @@ export default function EquipeClient() {
         }}
       />
 
-      {perfFor && (
-        <OperatorPerformanceDrawer
-          operatorId={perfFor.id}
-          operatorName={perfFor.name}
-          positionName={perfFor.position_name}
-          positionColor={perfFor.position_color}
-          onClose={() => setPerfFor(null)}
-        />
-      )}
     </div>
   );
 }
