@@ -8,6 +8,7 @@ import {
   type ProjectBriefing,
 } from '@/lib/briefing-templates';
 import ProjectRatingBanner from '@/components/projetos/ProjectRatingBanner';
+import AnimatedBar from '@/components/ui/AnimatedBar';
 import styles from './page.module.css';
 
 export const metadata = { title: 'Meus Projetos — Portal Diamantes' };
@@ -159,9 +160,7 @@ export default async function ProjetosPage() {
                   <div className={styles.right}>
                     {!submitted && (
                       <div className={styles.progressWrap}>
-                        <div className={styles.progressBar}>
-                          <div className={styles.progressFill} style={{ width: `${pct}%` }} />
-                        </div>
+                        <AnimatedBar pct={pct} trackClassName={styles.progressBar} fillClassName={styles.progressFill} />
                         <span className={styles.progressPct}>{pct}%</span>
                       </div>
                     )}

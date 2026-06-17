@@ -17,6 +17,7 @@ import {
 } from '@/lib/briefing-templates';
 import { fmtDate } from '@/lib/format';
 import ProjectPanoramaModal from './ProjectPanoramaModal';
+import AnimatedBar from '@/components/ui/AnimatedBar';
 
 // Rótulos espelhados do legado admin/projetos.html (com emoji)
 const SERVICE_LABELS: Record<string, string> = {
@@ -224,12 +225,12 @@ export default function ProjetosClient() {
                       {st && st.demands_total > 0 ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 104 }}>
                           <div className={s.progressPill}>
-                            <div className={s.bar}>
-                              <div
-                                className={s.fill}
-                                style={{ width: `${donePct}%`, background: st.demands_overdue > 0 ? '#ef4444' : undefined }}
-                              />
-                            </div>
+                            <AnimatedBar
+                              pct={donePct}
+                              trackClassName={s.bar}
+                              fillClassName={s.fill}
+                              color={st.demands_overdue > 0 ? '#ef4444' : undefined}
+                            />
                             {st.demands_done}/{st.demands_total}
                           </div>
                           <span

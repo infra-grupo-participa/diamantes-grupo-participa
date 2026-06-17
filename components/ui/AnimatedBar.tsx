@@ -46,7 +46,7 @@ export default function AnimatedBar({
     ? {}
     : { width: '100%', height, background: track || 'var(--border-strong)', borderRadius: rounded ? 999 : 0, overflow: 'hidden' };
   const fillStyle: React.CSSProperties = fillClassName
-    ? { width: `${target}%` }
+    ? { width: `${target}%`, ...(color ? { background: color } : {}) }
     : { width: `${target}%`, height: '100%', background: color || 'var(--accent)', borderRadius: rounded ? 999 : 0 };
 
   return (

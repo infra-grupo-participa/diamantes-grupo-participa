@@ -7,6 +7,7 @@ import {
   type DashboardData,
 } from '@/lib/api/portal';
 import { firstName, fmtRelative, initials, serviceMeta } from '@/lib/format';
+import CountUp from '@/components/ui/CountUp';
 
 export const metadata = { title: 'Início — Portal Diamantes' };
 
@@ -274,28 +275,28 @@ export default async function Dashboard() {
             <div className="dash-stat">
               <span className="dash-stat-ico ico-violet">{IcoUsers}</span>
               <div>
-                <strong>{team.length}</strong>
+                <strong><CountUp value={team.length} /></strong>
                 <span>{team.length === 1 ? 'Integrante' : 'Integrantes'}</span>
               </div>
             </div>
             <div className="dash-stat">
               <span className="dash-stat-ico ico-accent">{IcoChat}</span>
               <div>
-                <strong>{openDemands}</strong>
+                <strong><CountUp value={openDemands} /></strong>
                 <span>{openDemands === 1 ? 'Demanda em aberto' : 'Demandas em aberto'}</span>
               </div>
             </div>
             <div className="dash-stat">
               <span className="dash-stat-ico ico-violet">{IcoLayers}</span>
               <div>
-                <strong>{activeProjects}</strong>
+                <strong><CountUp value={activeProjects} /></strong>
                 <span>{activeProjects === 1 ? 'Projeto ativo' : 'Projetos ativos'}</span>
               </div>
             </div>
             <div className="dash-stat">
               <span className="dash-stat-ico ico-accent">{IcoRocket}</span>
               <div>
-                <strong>{activeServices.length}</strong>
+                <strong><CountUp value={activeServices.length} /></strong>
                 <span>{activeServices.length === 1 ? 'Serviço ativo' : 'Serviços ativos'}</span>
               </div>
             </div>
