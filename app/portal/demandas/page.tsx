@@ -10,7 +10,6 @@ import {
   getDemand,
   getDemandMembers,
   getMe,
-  getMyDemandRating,
   isBaseReady,
   listMyDemands,
   markDemandRead,
@@ -18,7 +17,6 @@ import {
   type DemandMember,
   type DemandStatus,
   type Me,
-  type Rating,
 } from '@/lib/api/demandas';
 import { getMessage, hydrateAttachments, isImage, listMessages, postMessage, subscribe, type Attachment, type ChatMessage } from '@/lib/chat';
 import { fmtDate, initials } from '@/lib/format';
@@ -36,7 +34,6 @@ import {
 import Link from 'next/link';
 import ChatComposer from '@/components/demandas/ChatComposer';
 import NewDemandModal from '@/components/demandas/NewDemandModal';
-import RatingModal from '@/components/demandas/RatingModal';
 import styles from './page.module.css';
 
 // Normaliza o briefing de um projeto para o shape { general, services } —
@@ -155,7 +152,6 @@ function iconKeyFor(d: Demand): 'done' | 'review' | 'in_progress' {
 export default function DemandasPage() {
   const [demands, setDemands] = useState<Demand[]>([]);
   const [members, setMembers] = useState<Record<string, DemandMember[]>>({});
-  const [ratings, setRatings] = useState<Record<string, Rating | null>>({});
   const [messages, setMessages] = useState<Record<string, ChatMessage[]>>({});
   const [me, setMe] = useState<Me | null>(null);
   // Briefing (F1): projetos do cliente indexados por id (1 query em lote) +
@@ -195,7 +191,6 @@ export default function DemandasPage() {
   const [loading, setLoading] = useState(true);
 
   const [showNew, setShowNew] = useState(false);
-  const [ratingFor, setRatingFor] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ url: string; alt: string } | null>(null);
   const [showDetail, setShowDetail] = useState(false); // sheet de detalhes no mobile
 
@@ -210,8 +205,6 @@ export default function DemandasPage() {
   // Caches LAZY (refs p/ não re-buscar nem re-subscrever): ids carregados + em voo.
   const membersLoaded = useRef<Set<string>>(new Set());
   const membersInflight = useRef<Set<string>>(new Set());
-  const ratingsLoaded = useRef<Set<string>>(new Set());
-  const ratingsInflight = useRef<Set<string>>(new Set());
 
   // ── Carga inicial (LEVE: só a lista; membros/rating carregam sob demanda) ──
   const loadAll = useCallback(async () => {
@@ -241,21 +234,6 @@ export default function DemandasPage() {
       console.error('ensureMembers', e);
     } finally {
       membersInflight.current.delete(demandId);
-    }
-  }, []);
-
-  // Carrega rating de UMA demanda concluída (cache por id).
-  const ensureRating = useCallback(async (demandId: string) => {
-    if (ratingsInflight.current.has(demandId) || ratingsLoaded.current.has(demandId)) return;
-    ratingsInflight.current.add(demandId);
-    try {
-      const r = await getMyDemandRating(demandId);
-      ratingsLoaded.current.add(demandId);
-      setRatings((prev) => ({ ...prev, [demandId]: r }));
-    } catch {
-      setRatings((prev) => ({ ...prev, [demandId]: null }));
-    } finally {
-      ratingsInflight.current.delete(demandId);
     }
   }, []);
 
@@ -408,11 +386,6 @@ export default function DemandasPage() {
     };
   }, [currentId, loadMessages, appendMessage, ensureMembers, syncMessages]);
 
-  // Lazy: carrega o rating da demanda aberta assim que ela estiver concluída.
-  const currentStatus = currentId ? demands.find((d) => d.id === currentId)?.status : null;
-  useEffect(() => {
-    if (currentId && currentStatus === 'done') void ensureRating(currentId);
-  }, [currentId, currentStatus, ensureRating]);
 
   // Auto-scroll do chat ao receber/atualizar mensagens.
   useEffect(() => {
@@ -570,13 +543,12 @@ export default function DemandasPage() {
 
   async function doComplete() {
     if (!currentId || !current || current.status !== 'review') return;
-    if (!window.confirm('Aprovar a entrega e concluir esta demanda?\n\nVocê poderá avaliar o atendimento em seguida.')) return;
+    if (!window.confirm('Aprovar a entrega e concluir esta demanda?')) return;
     try {
       await clientCompleteDemand(currentId);
       const updated = await getDemand(currentId);
       if (updated) setDemands((prev) => prev.map((x) => (x.id === currentId ? updated : x)));
       toast('Demanda concluída! Obrigado. 🎉', 'success');
-      setRatingFor(currentId); // abre a avaliação na hora
     } catch (e) {
       toast(errMessage(e), 'error');
     }
@@ -726,7 +698,6 @@ export default function DemandasPage() {
     );
   }
 
-  const rating = currentId ? ratings[currentId] : null;
 
   const toggleGroup = (key: string) =>
     setCollapsedGroups((prev) => {
@@ -1172,29 +1143,6 @@ export default function DemandasPage() {
                 {renderSteps()}
               </div>
 
-              {current.status === 'done' && rating && rating.status === 'pending' && (
-                <div className={styles.detailSection}>
-                  <div className={styles.ratingPending}>
-                    <div className="t">Como foi essa entrega?</div>
-                    <div className="s">Sua avaliação ajuda a equipe a crescer.</div>
-                    <button type="button" className={styles.rateBtn} onClick={() => setRatingFor(current.id)}>
-                      Avaliar agora
-                    </button>
-                  </div>
-                </div>
-              )}
-              {current.status === 'done' && rating && rating.status === 'submitted' && (
-                <div className={styles.detailSection}>
-                  <div className={styles.ratingDone}>
-                    <div className="t">
-                      Você avaliou: {'★'.repeat(rating.score)}
-                      <span style={{ opacity: 0.35 }}>{'★'.repeat(Math.max(0, 5 - rating.score))}</span> ({rating.score}/5)
-                    </div>
-                    {rating.comment && <div className="c">&ldquo;{rating.comment}&rdquo;</div>}
-                  </div>
-                </div>
-              )}
-
               <div className={styles.detailSection}>
                 <h3>
                   Pessoas envolvidas{' '}
@@ -1263,7 +1211,7 @@ export default function DemandasPage() {
                     Pedir ajustes
                   </button>
                   <small className={styles.finalizeHint}>
-                    A equipe enviou para sua aprovação. Aprove para concluir e avaliar, ou peça ajustes para reabrir o chat.
+                    A equipe enviou para sua aprovação. Aprove para concluir, ou peça ajustes para reabrir o chat.
                   </small>
                 </div>
               )}
@@ -1273,19 +1221,6 @@ export default function DemandasPage() {
       </div>
 
       {showNew && <NewDemandModal onClose={() => setShowNew(false)} onCreated={(d) => void onDemandCreated(d)} />}
-      {ratingFor && current && (
-        <RatingModal
-          demandId={ratingFor}
-          demandTitle={current.title || 'Demanda'}
-          onClose={() => setRatingFor(null)}
-          onSubmitted={async () => {
-            const r = await getMyDemandRating(ratingFor);
-            ratingsLoaded.current.add(ratingFor);
-            setRatings((prev) => ({ ...prev, [ratingFor]: r }));
-            setRatingFor(null);
-          }}
-        />
-      )}
 
       {lightbox && (
         <div className={styles.lightbox} onClick={() => setLightbox(null)}>
