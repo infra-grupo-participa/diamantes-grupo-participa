@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { gsap } from 'gsap';
 import { toast } from '@/lib/toast';
 import { initials, fmtBRL, fmtDate, canonicalSector } from '@/lib/format';
 import {
@@ -106,6 +107,20 @@ export default function AssinaturasClient() {
 
   const [modal, setModal] = useState<null | { editing: SubscriptionRow | null }>(null);
   const [financeClient, setFinanceClient] = useState<null | { slug: string; name: string }>(null);
+  // Modais "expandir" (detalhes em tela cheia) do histórico e dos vencimentos.
+  const [expand, setExpand] = useState<null | 'renewals' | 'history'>(null);
+  const [histAll, setHistAll] = useState<PurchaseRow[] | null>(null);
+
+  const openHistoryExpand = useCallback(async () => {
+    setExpand('history');
+    setHistAll(null);
+    try {
+      const { data } = await listPurchasesHistory({ limit: 300, offset: 0, month: histMonth, clientSlug: histClient });
+      setHistAll(data);
+    } catch {
+      setHistAll([]);
+    }
+  }, [histMonth, histClient]);
 
   // ── Tabela ──
   const load = useCallback(async () => {
@@ -495,7 +510,18 @@ export default function AssinaturasClient() {
             <h3 className={s.panelTitle} style={{ margin: 0 }}>
               Próximos vencimentos por serviço
             </h3>
-            <span className={s.meta}>{renewals == null ? '—' : renewals.length === 0 ? 'Nenhum' : `${renewals.length} próximos`}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className={s.meta}>{renewals == null ? '—' : renewals.length === 0 ? 'Nenhum' : `${renewals.length} próximos`}</span>
+              {renewals && renewals.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setExpand('renewals')}
+                  style={{ border: '1px solid var(--border)', background: 'none', borderRadius: 8, padding: '4px 10px', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', color: 'var(--accent-strong)', whiteSpace: 'nowrap' }}
+                >
+                  Expandir ↗
+                </button>
+              )}
+            </div>
           </div>
           <div className={s.scrollBox}>
             <RenewalsList renewals={renewals} />
@@ -538,6 +564,13 @@ export default function AssinaturasClient() {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                onClick={() => void openHistoryExpand()}
+                style={{ border: '1px solid var(--border)', background: 'none', borderRadius: 8, padding: '4px 10px', fontSize: '0.76rem', fontWeight: 600, cursor: 'pointer', color: 'var(--accent-strong)', whiteSpace: 'nowrap' }}
+              >
+                Expandir ↗
+              </button>
             </div>
           </div>
           <div className={s.scrollBoxTall}>
@@ -579,7 +612,118 @@ export default function AssinaturasClient() {
           }}
         />
       )}
+      {expand === 'renewals' && (
+        <ExpandModal title="Próximos vencimentos por serviço" onClose={() => setExpand(null)}>
+          <RenewalsTable renewals={renewals || []} />
+        </ExpandModal>
+      )}
+      {expand === 'history' && (
+        <ExpandModal title="Histórico de cobranças" onClose={() => setExpand(null)}>
+          <PurchasesTable data={histAll} />
+        </ExpandModal>
+      )}
     </div>
+  );
+}
+
+// ── Modal "expandir" genérico + tabelas detalhadas ──
+function ExpandModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(20,16,40,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}
+    >
+      <div style={{ background: '#fff', borderRadius: 16, width: 'min(860px, 100%)', maxHeight: '88vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#fff' }}>
+          <h3 style={{ margin: 0, fontSize: '1.02rem' }}>{title}</h3>
+          <button type="button" onClick={onClose} aria-label="Fechar" style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--muted)' }}>
+            ×
+          </button>
+        </div>
+        <div style={{ padding: 18 }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+const expTh: React.CSSProperties = { textAlign: 'left', padding: '8px 10px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#fff' };
+const expTd: React.CSSProperties = { padding: '8px 10px', fontSize: '0.84rem', borderTop: '1px solid var(--border)' };
+
+function RenewalsTable({ renewals }: { renewals: ServiceRenewal[] }) {
+  if (renewals.length === 0) return <p style={{ color: 'var(--muted)' }}>Nenhum vencimento próximo.</p>;
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead>
+        <tr>
+          <th style={expTh}>Cliente</th>
+          <th style={expTh}>Serviço</th>
+          <th style={expTh}>Vencimento</th>
+          <th style={expTh}>Prazo</th>
+          <th style={expTh}>Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {renewals.map((r, i) => {
+          const dl = Number.isFinite(r.days_left as number) ? (r.days_left as number) : null;
+          const prazo = dl == null ? '—' : dl < 0 ? `Atraso ${Math.abs(dl)}d` : dl === 0 ? 'Hoje' : `${dl}d`;
+          const color = dl != null && dl <= 0 ? '#b42318' : dl != null && dl <= 5 ? '#b45309' : 'var(--text)';
+          return (
+            <tr key={i}>
+              <td style={expTd}>{r.client_display_name || r.client_slug}</td>
+              <td style={expTd}>{r.service_type || '—'}</td>
+              <td style={expTd}>{r.access_until ? fmtDate(r.access_until) : '—'}</td>
+              <td style={{ ...expTd, color, fontWeight: 600 }}>{prazo}</td>
+              <td style={expTd}>{r.monthly_value != null ? fmtBRL(Number(r.monthly_value)) : '—'}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function PurchasesTable({ data }: { data: PurchaseRow[] | null }) {
+  if (data == null) return <p style={{ color: 'var(--muted)' }}>Carregando…</p>;
+  if (data.length === 0) return <p style={{ color: 'var(--muted)' }}>Nenhuma cobrança encontrada.</p>;
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <thead>
+        <tr>
+          <th style={expTh}>Data</th>
+          <th style={expTh}>Comprador</th>
+          <th style={expTh}>Serviço</th>
+          <th style={expTh}>Valor</th>
+          <th style={expTh}>Parcela</th>
+          <th style={expTh}>Forma</th>
+          <th style={expTh}>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.map((p, i) => {
+          const st = purchaseStatusStyle(p.status);
+          const pm = pmLabel(p.payment_type);
+          const inst = (p.installments_total ?? 0) > 1 ? `${p.installment_number || 1}/${p.installments_total}x` : '—';
+          return (
+            <tr key={p.transaction_code + i}>
+              <td style={expTd}>{fmtDate(p.charged_at)}</td>
+              <td style={expTd}>{p.buyer_email}</td>
+              <td style={expTd}>{canonicalSector(p.service_name || '') || p.service_name || '—'}</td>
+              <td style={expTd}>{fmtBRL(Number(p.amount || 0))}</td>
+              <td style={expTd}>{inst}</td>
+              <td style={expTd}>{pm.icon} {pm.label}</td>
+              <td style={expTd}>
+                <span style={{ background: st.bg, color: st.color, borderRadius: 999, padding: '2px 8px', fontSize: '0.74rem', fontWeight: 600 }}>{st.txt}</span>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
@@ -716,34 +860,124 @@ function MrrChart({ mrr, months }: { mrr: number; months: SparkPoint[] }) {
       ? linePath + ` L${points[points.length - 1][0].toFixed(1)},${h} L${points[0][0].toFixed(1)},${h} Z`
       : '';
 
+  const lineRef = useRef<SVGPathElement>(null);
+  const areaRef = useRef<SVGPathElement>(null);
+  const dotsRef = useRef<SVGGElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [hover, setHover] = useState<number | null>(null);
+
+  // GSAP: a linha "desenha" (dashoffset), a área surge e os pontos pulam (stagger).
+  useEffect(() => {
+    const line = lineRef.current;
+    if (!line) return;
+    const len = line.getTotalLength();
+    const ctx = gsap.context(() => {
+      gsap.set(line, { strokeDasharray: len, strokeDashoffset: len });
+      const tl = gsap.timeline();
+      tl.to(line, { strokeDashoffset: 0, duration: 1.1, ease: 'power2.out' });
+      if (areaRef.current) tl.fromTo(areaRef.current, { opacity: 0 }, { opacity: 1, duration: 0.6 }, '-=0.5');
+      if (dotsRef.current)
+        tl.fromTo(
+          dotsRef.current.children,
+          { scale: 0, transformOrigin: 'center' },
+          { scale: 1, duration: 0.4, ease: 'back.out(2)', stagger: 0.07 },
+          '-=0.4',
+        );
+    });
+    return () => ctx.revert();
+  }, [linePath]);
+
+  function onMove(e: React.MouseEvent) {
+    const el = wrapRef.current;
+    if (!el || points.length === 0) return;
+    const rect = el.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * w;
+    let best = 0;
+    let bestD = Infinity;
+    points.forEach(([px], i) => {
+      const d = Math.abs(px - relX);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    setHover(best);
+  }
+
+  const fmtShort = (v: number) => 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+
   return (
     <>
       <div className={s.mrrCurrent}>{fmtBRL(mrr)}</div>
       <div className={s.mrrDelta}>{deltaText}</div>
-      <svg className={s.mrrChart} viewBox="0 0 340 110" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#F29725" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#F29725" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <line x1="0" y1="30" x2="340" y2="30" stroke="#eef0f4" strokeWidth="1" />
-        <line x1="0" y1="60" x2="340" y2="60" stroke="#eef0f4" strokeWidth="1" />
-        <line x1="0" y1="90" x2="340" y2="90" stroke="#eef0f4" strokeWidth="1" />
-        {areaPath && <path d={areaPath} fill="url(#mrrGrad)" />}
-        {linePath && <path d={linePath} fill="none" stroke="#F29725" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
-        {points.map(([x, y], i) => (
-          <circle
-            key={i}
-            cx={x.toFixed(1)}
-            cy={y.toFixed(1)}
-            r={i === points.length - 1 ? 4 : 3}
-            fill="#F29725"
-            stroke={i === points.length - 1 ? '#fff' : undefined}
-            strokeWidth={i === points.length - 1 ? 2 : undefined}
-          />
-        ))}
-      </svg>
+      <div ref={wrapRef} style={{ position: 'relative' }} onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
+        <svg className={s.mrrChart} viewBox="0 0 340 110" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#F29725" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#F29725" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="30" x2="340" y2="30" stroke="#eef0f4" strokeWidth="1" />
+          <line x1="0" y1="60" x2="340" y2="60" stroke="#eef0f4" strokeWidth="1" />
+          <line x1="0" y1="90" x2="340" y2="90" stroke="#eef0f4" strokeWidth="1" />
+          {areaPath && <path ref={areaRef} d={areaPath} fill="url(#mrrGrad)" />}
+          {linePath && (
+            <path ref={lineRef} d={linePath} fill="none" stroke="#F29725" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          )}
+          {hover != null && points[hover] && (
+            <line
+              x1={points[hover][0].toFixed(1)}
+              y1="4"
+              x2={points[hover][0].toFixed(1)}
+              y2={h}
+              stroke="#F29725"
+              strokeWidth="1"
+              strokeDasharray="3 3"
+              opacity="0.5"
+            />
+          )}
+          <g ref={dotsRef}>
+            {points.map(([x, y], i) => (
+              <circle
+                key={i}
+                cx={x.toFixed(1)}
+                cy={y.toFixed(1)}
+                r={hover === i ? 5 : i === points.length - 1 ? 4 : 3}
+                fill="#F29725"
+                stroke={hover === i || i === points.length - 1 ? '#fff' : undefined}
+                strokeWidth={hover === i || i === points.length - 1 ? 2 : undefined}
+              />
+            ))}
+          </g>
+        </svg>
+        {hover != null && points[hover] && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${(points[hover][0] / w) * 100}%`,
+              top: `${(points[hover][1] / h) * 100}%`,
+              transform: 'translate(-50%, calc(-100% - 10px))',
+              background: '#1a1430',
+              color: '#fff',
+              borderRadius: 8,
+              padding: '4px 9px',
+              fontSize: '0.72rem',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 1,
+              boxShadow: '0 6px 16px rgba(0,0,0,.22)',
+              zIndex: 2,
+            }}
+          >
+            <strong>{fmtShort(months[hover].value)}</strong>
+            <span style={{ opacity: 0.7, fontSize: '0.66rem', textTransform: 'capitalize' }}>{months[hover].label}</span>
+          </div>
+        )}
+      </div>
       <div className={s.mrrLabels}>
         {months.map((m, i) => (
           <span key={i}>{m.label}</span>
