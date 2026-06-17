@@ -51,6 +51,21 @@ function serviceChipMeta(rawType?: string | null) {
   return SERVICE_COLOR_MAP[canonical] || { cls: 'estrategia', label: canonical };
 }
 
+// Normaliza setor/cargo p/ comparar serviço × operador (sem acento, hífen, espaço, caixa).
+function normSector(str?: string | null): string {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+// Serviços que NÃO exigem operador (não entram no alerta "sem operador").
+function serviceNeedsOperator(serviceType?: string | null): boolean {
+  const c = normSector(canonicalServiceName(serviceType));
+  const raw = normSector(serviceType);
+  return c !== 'hospedagem' && raw !== 'host' && raw !== 'hospedagem';
+}
+
 function billingBadge(status?: string | null): { cls: string; txt: string } {
   const map: Record<string, { cls: string; txt: string }> = {
     paid: { cls: s.badgeGreen, txt: 'Em dia' },
@@ -525,7 +540,7 @@ export default function AlunosClient() {
 
           <div className={s.section}>
             <h4 className={s.sectionTitle}>Serviços contratados</h4>
-            {detailLoading ? <DetailSkeleton /> : <ServiceGrid services={services} />}
+            {detailLoading ? <DetailSkeleton /> : <ServiceGrid services={services} team={team} />}
           </div>
 
           <div className={s.section}>
@@ -805,7 +820,7 @@ function StudentRowView({
   );
 }
 
-function ServiceGrid({ services }: { services: ServiceRow[] }) {
+function ServiceGrid({ services, team }: { services: ServiceRow[]; team?: TeamMember[] }) {
   const active = services.filter((sv) => sv.status === 'active');
   const delinquent = services.filter((sv) => sv.status === 'delinquent');
   if (active.length === 0 && delinquent.length === 0) {
@@ -813,6 +828,14 @@ function ServiceGrid({ services }: { services: ServiceRow[] }) {
   }
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+
+  // Setores cobertos pela equipe atual do aluno (cargo de cada operador).
+  const coveredSectors = new Set((team || []).map((m) => normSector(m.position_name)));
+  function lacksOperator(sv: ServiceRow): boolean {
+    if (!serviceNeedsOperator(sv.service_type)) return false; // ex.: Hospedagem não exige operador
+    return !coveredSectors.has(normSector(canonicalServiceName(sv.service_type)));
+  }
+  const uncoveredCount = active.filter(lacksOperator).length;
 
   function sortByDue(list: ServiceRow[]) {
     return [...list].sort((a, b) => {
@@ -832,17 +855,31 @@ function ServiceGrid({ services }: { services: ServiceRow[] }) {
       else if (diff <= 7) due = <span className={`${s.dueTag} ${s.soon}`}>Vence em {diff}d</span>;
       else if (diff <= 18) due = <span className={`${s.dueTag} ${s.future}`}>até {d.toLocaleDateString('pt-BR')}</span>;
     }
+    const noOp = !delinquentCls && lacksOperator(sv);
     return (
       <div className={`${s.serviceChip} ${(s as Record<string, string>)[meta.cls]} ${delinquentCls ? s.delinquent : ''}`}>
         <span className={s.dot} />
         {meta.label}
         {due}
+        {noOp && (
+          <span
+            className={`${s.dueTag} ${s.late}`}
+            title="Serviço renovado sem operador atribuído"
+          >
+            sem operador
+          </span>
+        )}
       </div>
     );
   }
 
   return (
     <div className={s.serviceGrid}>
+      {uncoveredCount > 0 && (
+        <div className={`${s.serviceLabel} ${s.late}`}>
+          ⚠ {uncoveredCount} serviço{uncoveredCount === 1 ? '' : 's'} sem operador atribuído
+        </div>
+      )}
       {active.length > 0 && (
         <>
           {delinquent.length > 0 && <div className={s.serviceLabel}>Ativos</div>}
