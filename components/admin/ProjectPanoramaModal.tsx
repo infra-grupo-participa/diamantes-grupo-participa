@@ -27,6 +27,7 @@ import BriefingReadView, {
   type BriefingViewSection,
 } from '@/components/briefing/BriefingReadView';
 import DemandDetailModal from './DemandDetailModal';
+import AnimatedBar from '@/components/ui/AnimatedBar';
 
 type Tab = 'geral' | 'briefings' | 'operadores' | 'demandas';
 
@@ -201,8 +202,8 @@ export default function ProjectPanoramaModal({
                     <div style={card}>
                       <div style={cardLabel}>Andamento das demandas</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, height: 6, background: 'var(--border-strong)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ width: `${donePct}%`, height: '100%', background: stats && stats.demands_overdue > 0 ? '#ef4444' : 'var(--accent)' }} />
+                        <div style={{ flex: 1 }}>
+                          <AnimatedBar pct={donePct} height={6} color={stats && stats.demands_overdue > 0 ? '#ef4444' : 'var(--accent)'} />
                         </div>
                         <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{done}/{total}</span>
                       </div>
@@ -210,8 +211,8 @@ export default function ProjectPanoramaModal({
                     <div style={card}>
                       <div style={cardLabel}>Briefing</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ flex: 1, height: 6, background: 'var(--border-strong)', borderRadius: 3, overflow: 'hidden' }}>
-                          <div style={{ width: `${briefingProgress ?? 0}%`, height: '100%', background: 'var(--accent)' }} />
+                        <div style={{ flex: 1 }}>
+                          <AnimatedBar pct={briefingProgress ?? 0} height={6} />
                         </div>
                         <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{briefingProgress ?? 0}%</span>
                       </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/lib/toast';
 import { initials, fmtDate } from '@/lib/format';
+import CountUp from '@/components/ui/CountUp';
 import {
   listStudents,
   getStudent,
@@ -344,10 +345,10 @@ export default function AlunosClient() {
       {/* Coluna 1: KPIs + tabela */}
       <div className={s.col}>
         <div className={s.kpiGrid}>
-          <Kpi label="Total de alunos" value={stats?.total} bg="#eaf2ff" color="#3b82f6" icon="users" />
-          <Kpi label="Em dia" value={stats?.active} bg="#e7f7ee" color="#16a34a" icon="check" />
-          <Kpi label="Com atraso" value={(stats?.overdue ?? 0) + (stats?.partial ?? 0)} bg="#fee2e2" color="#b91c1c" icon="alert" />
-          <Kpi label="Com equipe atribuída" value={stats?.withTeam} bg="#f1ecff" color="#8b5cf6" icon="team" />
+          <Kpi label="Total de alunos" value={stats ? <CountUp value={stats.total} /> : '—'} bg="#eaf2ff" color="#3b82f6" icon="users" />
+          <Kpi label="Em dia" value={stats ? <CountUp value={stats.active} /> : '—'} bg="#e7f7ee" color="#16a34a" icon="check" />
+          <Kpi label="Com atraso" value={stats ? <CountUp value={(stats.overdue ?? 0) + (stats.partial ?? 0)} /> : '—'} bg="#fee2e2" color="#b91c1c" icon="alert" />
+          <Kpi label="Com equipe atribuída" value={stats ? <CountUp value={stats.withTeam} /> : '—'} bg="#f1ecff" color="#8b5cf6" icon="team" />
         </div>
 
         <div className={s.tableCard}>
@@ -702,7 +703,7 @@ function DetailSkeleton() {
   );
 }
 
-function Kpi({ label, value, bg, color, icon }: { label: string; value?: number; bg: string; color: string; icon: string }) {
+function Kpi({ label, value, bg, color, icon }: { label: string; value?: React.ReactNode; bg: string; color: string; icon: string }) {
   return (
     <div className={s.kpiCard}>
       <div className={s.kpiHead}>

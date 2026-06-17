@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import s from './admin.module.css';
+import CountUp from '@/components/ui/CountUp';
 import {
   listEmployees,
   listOperatorsAdmin,
@@ -274,10 +275,10 @@ export default function EquipeClient() {
       {/* ── KPIs ── */}
       <div className={s.kpiGrid}>
         <Kpi icon={<IconUsers />} bg="#eaf2ff" color="#3b82f6" label="Admins / Operadores" value={stats ? `${stats.admins} / ${stats.operators}` : '—'} />
-        <Kpi icon={<IconGem />} bg="#f1ecff" color="#8b5cf6" label="Alunos diamantes" value={stats ? String(stats.students) : '—'} />
-        <Kpi icon={<IconChat />} bg="#e7f7ee" color="#16a34a" label="Avaliações recebidas" value={stats ? stats.ratings.toLocaleString('pt-BR') : '—'} />
-        <Kpi icon={<IconStar />} bg="#fff4d6" color="#eab308" label="Média geral" value={stats ? stats.ratingAvg.toFixed(2).replace('.', ',') : '—'} />
-        <Kpi icon={<IconClock />} bg="#ffe9ee" color="#ec4899" label="Admins ativos hoje" value={stats ? String(stats.activeToday) : '—'} />
+        <Kpi icon={<IconGem />} bg="#f1ecff" color="#8b5cf6" label="Alunos diamantes" value={stats ? <CountUp value={stats.students} /> : '—'} />
+        <Kpi icon={<IconChat />} bg="#e7f7ee" color="#16a34a" label="Avaliações recebidas" value={stats ? <CountUp value={stats.ratings} /> : '—'} />
+        <Kpi icon={<IconStar />} bg="#fff4d6" color="#eab308" label="Média geral" value={stats ? <CountUp value={stats.ratingAvg} format={(n) => n.toFixed(2).replace('.', ',')} /> : '—'} />
+        <Kpi icon={<IconClock />} bg="#ffe9ee" color="#ec4899" label="Admins ativos hoje" value={stats ? <CountUp value={stats.activeToday} /> : '—'} />
       </div>
 
       {/* ── Tabs ── */}
@@ -577,7 +578,7 @@ function SkeletonRows({ cols, withUser }: { cols: number; withUser?: boolean }) 
   );
 }
 
-function Kpi({ icon, bg, color, label, value }: { icon: React.ReactNode; bg: string; color: string; label: string; value: string }) {
+function Kpi({ icon, bg, color, label, value }: { icon: React.ReactNode; bg: string; color: string; label: string; value: React.ReactNode }) {
   return (
     <div className={s.kpiCard}>
       <div className={s.kpiIcon} style={{ background: bg, color }}>

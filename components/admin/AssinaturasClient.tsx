@@ -31,6 +31,9 @@ import {
   type SubscriptionPayload,
 } from '@/lib/api/admin-assinaturas';
 import FinanceClientModal from './FinanceClientModal';
+import ExpandModal from '@/components/ui/ExpandModal';
+import CountUp from '@/components/ui/CountUp';
+import AnimatedBar from '@/components/ui/AnimatedBar';
 import s from './assinaturas.module.css';
 
 // Mapa por setor (saída de canonicalSector)
@@ -310,11 +313,11 @@ export default function AssinaturasClient() {
 
       {/* KPIs — faixa de largura total */}
       <div className={s.kpiGrid}>
-        <Kpi label="Receita" value={stats ? fmtBRL(stats.mrr) : '—'} bg="#eaf2ff" color="#3b82f6" icon="dollar" />
-        <Kpi label="Assinantes ativos" value={stats?.active ?? '—'} bg="#f1ecff" color="#8b5cf6" icon="users" />
-        <Kpi label="Inadimplentes" value={summary ? summary.clientsOverdue : '—'} bg="#fee2e2" color="#ef4444" icon="alert" />
-        <Kpi label="Em atraso" value={summary ? fmtBRL(summary.late) : '—'} bg="#fff4d6" color="#eab308" icon="clock" />
-        <Kpi label="Retenção (não cancelados)" value={stats ? stats.retention + '%' : '—'} bg="#e7f7ee" color="#16a34a" icon="trend" />
+        <Kpi label="Receita" value={stats ? <CountUp value={stats.mrr} format={fmtBRL} /> : '—'} bg="#eaf2ff" color="#3b82f6" icon="dollar" />
+        <Kpi label="Assinantes ativos" value={stats ? <CountUp value={stats.active} /> : '—'} bg="#f1ecff" color="#8b5cf6" icon="users" />
+        <Kpi label="Inadimplentes" value={summary ? <CountUp value={summary.clientsOverdue} /> : '—'} bg="#fee2e2" color="#ef4444" icon="alert" />
+        <Kpi label="Em atraso" value={summary ? <CountUp value={summary.late} format={fmtBRL} /> : '—'} bg="#fff4d6" color="#eab308" icon="clock" />
+        <Kpi label="Retenção (não cancelados)" value={stats ? <CountUp value={stats.retention} format={(n) => Math.round(n) + '%'} /> : '—'} bg="#e7f7ee" color="#16a34a" icon="trend" />
       </div>
 
       {/* Coluna 1: tabela */}
@@ -467,9 +470,12 @@ export default function AssinaturasClient() {
                     <span className={s.serviceBarName}>{svc.type}</span>
                     <span className={s.serviceBarCount}>{svc.count} contratos</span>
                   </div>
-                  <div className={s.serviceBar}>
-                    <div className={`${s.serviceBarFill} ${(s as Record<string, string>)[color]}`} style={{ width: `${pct}%` }} />
-                  </div>
+                  <AnimatedBar
+                    pct={pct}
+                    delay={0.04 * Math.min(servicesByType.indexOf(svc), 8)}
+                    trackClassName={s.serviceBar}
+                    fillClassName={`${s.serviceBarFill} ${(s as Record<string, string>)[color]}`}
+                  />
                 </div>
               );
             })
@@ -496,9 +502,7 @@ export default function AssinaturasClient() {
                       {fmtBRL(m.total)} · {m.count} cobr.
                     </span>
                   </div>
-                  <div className={s.serviceBar}>
-                    <div className={`${s.serviceBarFill} ${s.orange}`} style={{ width: `${pct}%` }} />
-                  </div>
+                  <AnimatedBar pct={pct} trackClassName={s.serviceBar} fillClassName={`${s.serviceBarFill} ${s.orange}`} />
                 </div>
               );
             })
@@ -626,31 +630,7 @@ export default function AssinaturasClient() {
   );
 }
 
-// ── Modal "expandir" genérico + tabelas detalhadas ──
-function ExpandModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-  return (
-    <div
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(20,16,40,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 }}
-    >
-      <div style={{ background: '#fff', borderRadius: 16, width: 'min(860px, 100%)', maxHeight: '88vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 22px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#fff' }}>
-          <h3 style={{ margin: 0, fontSize: '1.02rem' }}>{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Fechar" style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--muted)' }}>
-            ×
-          </button>
-        </div>
-        <div style={{ padding: 18 }}>{children}</div>
-      </div>
-    </div>
-  );
-}
-
+// ── Tabelas detalhadas usadas dentro do ExpandModal compartilhado ──
 const expTh: React.CSSProperties = { textAlign: 'left', padding: '8px 10px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--muted)', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#fff' };
 const expTd: React.CSSProperties = { padding: '8px 10px', fontSize: '0.84rem', borderTop: '1px solid var(--border)' };
 
