@@ -65,24 +65,6 @@ function billingBadge(status?: string | null): { cls: string; txt: string } {
   return map[status ?? ''] || { cls: s.badgeYellow, txt: status || 'Sem status' };
 }
 
-function fmtRating(v?: number | string | null): string {
-  return (parseFloat(String(v)) || 0).toFixed(2).replace('.', ',');
-}
-
-function StarRow({ rating }: { rating?: number | string | null }) {
-  const r = parseFloat(String(rating)) || 0;
-  const full = Math.round(r);
-  return (
-    <span className={s.stars}>
-      {[1, 2, 3, 4, 5].map((i) => (
-        <svg key={i} viewBox="0 0 24 24" fill={i <= full ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.4">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      ))}
-    </span>
-  );
-}
-
 function nearestDueService(services: ServiceRow[]): ServiceRow | null {
   const candidates = (services || []).filter((sv) => sv.status === 'active' && sv.access_until);
   if (!candidates.length) return null;
@@ -311,10 +293,8 @@ export default function AlunosClient() {
 
   // ── Métricas do detalhe ──
   // Tetos explícitos p/ normalizar as barras (referência visual, não limite de negócio).
-  const RATINGS_CAP = 20; // avaliações: barra cheia em 20+
   const SERVICES_CAP = 8; // serviços ativos: barra cheia em 8+
   const TEAM_CAP = 6; // integrantes: barra cheia em 6+
-  const ratingAvg = parseFloat(String(current?.rating_avg)) || 0;
 
   return (
     <div className={s.wrap}>
@@ -488,12 +468,8 @@ export default function AlunosClient() {
               </div>
             </div>
             <div className={s.detailRatingRow}>
-              <div>
-                <StarRow rating={current.rating_avg} />
-                <span className={s.ratingValue}>{fmtRating(current.rating_avg)}</span>
-              </div>
               <span>
-                {current.contract_started_at ? `Desde ${fmtDate(current.contract_started_at)}` : current.billing_status || '—'}
+                {current.contract_started_at ? `Cliente desde ${fmtDate(current.contract_started_at)}` : current.billing_status || '—'}
               </span>
             </div>
           </div>
@@ -501,7 +477,6 @@ export default function AlunosClient() {
           <div className={s.detailStats}>
             <Stat value={current.team_count ?? 0} label="Equipe" />
             <Stat value={current.services_count ?? 0} label="Serviços" />
-            <Stat value={current.ratings_count ?? 0} label="Avaliações" />
             <Stat value={current.contract_started_at ? fmtDate(current.contract_started_at) : '—'} label="Contrato" />
           </div>
 
@@ -519,8 +494,6 @@ export default function AlunosClient() {
             ) : (
               <div className={s.teamList}>
                 {team.map((m) => {
-                  const ravg = parseFloat(String(m.rating_avg)) || 0;
-                  const rcnt = parseInt(String(m.rating_count), 10) || 0;
                   return (
                     <div className={s.teamItem} key={m.assignment_id}>
                       <div className={s.avatar}>{initials(m.user_name)}</div>
@@ -529,18 +502,6 @@ export default function AlunosClient() {
                         <div className={s.teamRole} style={{ color: m.position_color || 'var(--muted)' }}>
                           {m.position_name}
                         </div>
-                        {rcnt > 0 ? (
-                          <span className={s.teamRating} title={`${rcnt} avalia${rcnt === 1 ? 'ção' : 'ções'} deste aluno`}>
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12 2l2.39 7.36H22l-6.18 4.49L18.18 22 12 17.27 5.82 22l2.36-8.15L2 9.36h7.61z" />
-                            </svg>
-                            {ravg.toFixed(2).replace('.', ',')} <span style={{ color: 'var(--muted)', fontWeight: 500 }}>({rcnt})</span>
-                          </span>
-                        ) : (
-                          <span className={`${s.teamRating} ${s.empty}`} title="Sem avaliações ainda">
-                            — sem avaliações
-                          </span>
-                        )}
                       </div>
                       <button className={s.iconBtn} title="Remover" onClick={() => onRemoveTeam(m.assignment_id)}>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -619,12 +580,6 @@ export default function AlunosClient() {
           <div className={s.section}>
             <h4 className={s.sectionTitle}>Métricas</h4>
             <div className={s.metrics}>
-              <Metric label="Avaliação média" value={fmtRating(current.rating_avg)} pct={(ratingAvg / 5) * 100} green />
-              <Metric
-                label="Avaliações totais"
-                value={current.ratings_count ?? 0}
-                pct={Math.min(100, ((current.ratings_count || 0) / RATINGS_CAP) * 100)}
-              />
               <Metric
                 label="Serviços ativos"
                 value={current.services_count ?? 0}
