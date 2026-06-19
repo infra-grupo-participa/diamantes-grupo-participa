@@ -126,8 +126,15 @@ export default function ProjectPanoramaModal({
   }
 
   return (
-    <div className={s.briefingOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={s.briefingCard}>
+    <div
+      className={s.briefingOverlay}
+      // Com uma demanda aberta, o DemandDetailModal (renderizado abaixo) já provê seu
+      // próprio backdrop. Neutralizamos o fundo deste overlay para não empilhar dois
+      // escurecimentos e escondemos o card do projeto para não vazar atrás da demanda.
+      style={openDemand ? { background: 'transparent' } : undefined}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className={s.briefingCard} hidden={!!openDemand}>
         <div className={s.briefingHead}>
           <div>
             <div className={s.briefingTitle}>{project.title}</div>
