@@ -363,6 +363,34 @@ export async function listUnlinkedPurchases(): Promise<UnlinkedPurchase[]> {
   return (data ?? []) as UnlinkedPurchase[];
 }
 
+/** Todos os alunos (slug + nome) — para o seletor de vínculo de compra. */
+export async function listAllClientOptions(): Promise<ClientOption[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from('clients').select('slug, display_name').order('display_name');
+  if (error) throw error;
+  return (data ?? []) as ClientOption[];
+}
+
+/**
+ * Vincula uma compra Hotmart órfã a um aluno e, opcionalmente, renova o plano
+ * (estende access_until = data da compra + 30, mesma régua da Hotmart). RPC is_admin.
+ */
+export async function linkHotmartPurchase(
+  transactionCode: string,
+  clientSlug: string,
+  renew: boolean,
+): Promise<{ services_updated: number; new_access_until: string | null }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc('admin_link_hotmart_purchase', {
+    p_transaction_code: transactionCode,
+    p_client_slug: clientSlug,
+    p_renew: renew,
+  });
+  if (error) throw new Error(error.message || 'Não foi possível vincular a compra.');
+  const row = (data ?? {}) as { services_updated?: number; new_access_until?: string | null };
+  return { services_updated: Number(row.services_updated || 0), new_access_until: row.new_access_until ?? null };
+}
+
 export async function getServiceRenewals(): Promise<ServiceRenewal[]> {
   const supabase = createClient();
   const { data, error } = await supabase

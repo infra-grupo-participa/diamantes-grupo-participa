@@ -13,6 +13,8 @@ import {
   getPurchaseMonthlyStats,
   getServiceRenewals,
   listUnlinkedPurchases,
+  listAllClientOptions,
+  linkHotmartPurchase,
   listPurchasesHistory,
   createSubscription,
   updateSubscription,
@@ -101,6 +103,8 @@ export default function AssinaturasClient() {
   const [monthly, setMonthly] = useState<MonthlyStat[]>([]);
   const [renewals, setRenewals] = useState<ServiceRenewal[] | null>(null);
   const [unlinked, setUnlinked] = useState<UnlinkedPurchase[]>([]);
+  const [allClients, setAllClients] = useState<ClientOption[]>([]);
+  const [linkTarget, setLinkTarget] = useState<UnlinkedPurchase | null>(null);
 
   // Histórico Hotmart
   const [histData, setHistData] = useState<PurchaseRow[]>([]);
@@ -167,9 +171,14 @@ export default function AssinaturasClient() {
 
   const loadRenewals = useCallback(async () => {
     try {
-      const [rnw, unl] = await Promise.all([getServiceRenewals(), listUnlinkedPurchases().catch(() => [])]);
+      const [rnw, unl, cli] = await Promise.all([
+        getServiceRenewals(),
+        listUnlinkedPurchases().catch(() => []),
+        listAllClientOptions().catch(() => []),
+      ]);
       setRenewals(rnw);
       setUnlinked(unl);
+      setAllClients(cli);
     } catch (e) {
       console.error('loadServiceRenewals', e);
       setRenewals([]);
@@ -567,7 +576,16 @@ export default function AssinaturasClient() {
                     </div>
                     <div className={s.histDate}>{p.charged_at ? fmtDate(p.charged_at) : '—'}</div>
                   </div>
-                  <div className={s.histAmount}>{fmtBRL(Number(p.amount || 0))}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+                    <div className={s.histAmount}>{fmtBRL(Number(p.amount || 0))}</div>
+                    <button
+                      type="button"
+                      onClick={() => setLinkTarget(p)}
+                      style={{ border: 'none', background: '#b42318', color: '#fff', borderRadius: 8, padding: '5px 12px', fontSize: '0.76rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    >
+                      Vincular a aluno
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -655,6 +673,17 @@ export default function AssinaturasClient() {
           onClose={() => setFinanceClient(null)}
           onChanged={() => {
             void Promise.all([load(), loadStats()]);
+          }}
+        />
+      )}
+      {linkTarget && (
+        <LinkPurchaseModal
+          purchase={linkTarget}
+          clients={allClients}
+          onClose={() => setLinkTarget(null)}
+          onDone={async () => {
+            setLinkTarget(null);
+            await Promise.all([loadRenewals(), loadStats(), loadHist()]);
           }}
         />
       )}
@@ -1447,6 +1476,141 @@ function SubModal({
             </button>
             <button type="submit" className={`${s.btn} ${s.btnPrimary}`} disabled={saving}>
               {saving ? 'Salvando…' : 'Salvar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal: vincular compra Hotmart órfã a um aluno (+ renovar plano) ──
+function LinkPurchaseModal({
+  purchase,
+  clients,
+  onClose,
+  onDone,
+}: {
+  purchase: UnlinkedPurchase;
+  clients: ClientOption[];
+  onClose: () => void;
+  onDone: () => void | Promise<void>;
+}) {
+  const [clientSlug, setClientSlug] = useState('');
+  const [renew, setRenew] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  // Régua Hotmart: novo acesso = data da compra + 30 dias.
+  const newAccess = useMemo(() => {
+    if (!purchase.charged_at) return null;
+    const d = new Date(purchase.charged_at);
+    d.setDate(d.getDate() + 30);
+    return d;
+  }, [purchase.charged_at]);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!clientSlug) {
+      setError('Selecione o aluno.');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      const res = await linkHotmartPurchase(purchase.transaction_code, clientSlug, renew);
+      const name = clients.find((c) => c.slug === clientSlug)?.display_name || clientSlug;
+      if (renew && res.services_updated > 0) {
+        toast(
+          `Compra vinculada a ${name}. ${res.services_updated} serviço(s) renovado(s)${res.new_access_until ? ` até ${fmtDate(res.new_access_until)}` : ''}.`,
+        );
+      } else if (renew) {
+        toast(
+          `Compra vinculada a ${name}, mas nenhum serviço ativo foi encontrado para renovar. Use o Financeiro do aluno para estender o acesso.`,
+          'warning',
+        );
+      } else {
+        toast(`Compra vinculada a ${name}.`);
+      }
+      await onDone();
+    } catch (ex) {
+      setError((ex as Error).message || String(ex));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={s.modalOverlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={s.modalCard}>
+        <div className={s.modalHead}>
+          <h3>Vincular compra a um aluno</h3>
+          <button type="button" className={s.modalClose} onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <form className={s.modalBody} onSubmit={onSubmit}>
+          {/* Resumo da compra */}
+          <div
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: 12,
+              background: '#faf9fc',
+              marginBottom: 14,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
+              <strong style={{ fontSize: '0.92rem', wordBreak: 'break-all' }}>{purchase.buyer_email}</strong>
+              <strong style={{ fontSize: '1.05rem', color: '#15803d', whiteSpace: 'nowrap' }}>
+                {fmtBRL(Number(purchase.amount || 0))}
+              </strong>
+            </div>
+            <div style={{ marginTop: 4, fontSize: '0.8rem', color: 'var(--muted)' }}>
+              {canonicalSector(purchase.service_name || '') || purchase.offer_code || 'Serviço não identificado'}
+              {purchase.charged_at ? ` · ${fmtDate(purchase.charged_at)}` : ''}
+            </div>
+          </div>
+
+          <div className={s.formGroup}>
+            <div>
+              <label className={s.label}>Qual aluno fez esta compra?</label>
+              <select
+                className={s.modalInput}
+                required
+                value={clientSlug}
+                onChange={(e) => setClientSlug(e.target.value)}
+                autoFocus
+              >
+                <option value="">— selecione o aluno —</option>
+                {clients.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.display_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', marginTop: 4 }}>
+              <input type="checkbox" checked={renew} onChange={(e) => setRenew(e.target.checked)} style={{ marginTop: 3 }} />
+              <span style={{ fontSize: '0.86rem' }}>
+                <strong>Renovar o plano do aluno</strong>
+                <br />
+                <span style={{ color: 'var(--muted)' }}>
+                  Estende o acesso dos serviços ativos
+                  {newAccess ? ` até ${newAccess.toLocaleDateString('pt-BR')}` : ''} (data da compra + 30 dias).
+                </span>
+              </span>
+            </label>
+          </div>
+
+          {error && <div className={s.formError}>{error}</div>}
+          <div className={s.modalFoot}>
+            <button type="button" className={`${s.btn} ${s.btnGhost}`} onClick={onClose}>
+              Cancelar
+            </button>
+            <button type="submit" className={`${s.btn} ${s.btnPrimary}`} disabled={busy || !clientSlug}>
+              {busy ? 'Vinculando…' : renew ? 'Vincular e renovar' : 'Vincular'}
             </button>
           </div>
         </form>
