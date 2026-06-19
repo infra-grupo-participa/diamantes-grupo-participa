@@ -6,8 +6,7 @@ import {
   dueLabel,
   clickupTaskUrl,
   type Demand,
-  type DemandMemberLite,
-  type OperatorUser,
+  type DemandOperatorLite,
 } from '@/lib/api/admin-demandas';
 import styles from '@/app/admin/demandas/demandas.module.css';
 
@@ -24,26 +23,16 @@ const ChatIcon = () => (
   </svg>
 );
 
-function Avatars({
-  members,
-  usersById,
-  max,
-}: {
-  members: DemandMemberLite[];
-  usersById: Record<string, OperatorUser>;
-  max: number;
-}) {
-  const ops = members.filter((m) => m.role === 'operator');
-  const visible = ops.slice(0, max);
-  const moreCount = ops.length - visible.length;
-  if (ops.length === 0) return <span className={styles.noTeam}>sem equipe</span>;
+function Avatars({ operators, max }: { operators: DemandOperatorLite[]; max: number }) {
+  const visible = operators.slice(0, max);
+  const moreCount = operators.length - visible.length;
+  if (operators.length === 0) return <span className={styles.noTeam}>sem equipe</span>;
   return (
     <div className={styles.avatars}>
-      {visible.map((m) => {
-        const u = usersById[m.user_id];
-        const name = u?.name || '—';
+      {visible.map((o) => {
+        const name = o.name || '—';
         return (
-          <div key={m.user_id} className={styles.avatar} title={name}>
+          <div key={o.operator_id} className={styles.avatar} title={name}>
             {initials(name)}
           </div>
         );
@@ -56,13 +45,11 @@ function Avatars({
 /** Card padrão do Kanban (por status). */
 export function DemandCard({
   demand,
-  members,
-  usersById,
+  operators,
   onOpen,
 }: {
   demand: Demand;
-  members: DemandMemberLite[];
-  usersById: Record<string, OperatorUser>;
+  operators: DemandOperatorLite[];
   onOpen: (id: string) => void;
 }) {
   const due = dueLabel(demand);
@@ -79,7 +66,7 @@ export function DemandCard({
         </div>
       </div>
       <div className={styles.metaRow}>
-        <Avatars members={members} usersById={usersById} max={4} />
+        <Avatars operators={operators} max={4} />
         <span className={dueCls}>{due.text}</span>
       </div>
       {(Number(demand.messages_count) > 0 || demand.clickup_task_id) && (
@@ -112,13 +99,11 @@ export function DemandCard({
 /** Card compacto da view por aluno (badge de status + título + prazo). */
 export function StudentDemandCard({
   demand,
-  members,
-  usersById,
+  operators,
   onOpen,
 }: {
   demand: Demand;
-  members: DemandMemberLite[];
-  usersById: Record<string, OperatorUser>;
+  operators: DemandOperatorLite[];
   onOpen: (id: string) => void;
 }) {
   const due = dueLabel(demand);
@@ -146,7 +131,7 @@ export function StudentDemandCard({
       <span className={`${styles.badgeMini} ${miniCls}`}>{label}</span>
       <div className={styles.cardTitle}>{demand.title || 'Sem título'}</div>
       <div className={styles.metaRow}>
-        <Avatars members={members} usersById={usersById} max={3} />
+        <Avatars operators={operators} max={3} />
         <span className={dueCls}>{due.text}</span>
       </div>
     </div>

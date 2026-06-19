@@ -8,13 +8,11 @@ import {
   listAllDemands,
   adminDemandStats,
   listClientsSimple,
-  loadMembersByDemand,
-  loadOperatorUsers,
+  loadOperatorsByDemand,
   type Demand,
   type DemandStats,
   type DemandFilter,
-  type DemandMemberLite,
-  type OperatorUser,
+  type DemandOperatorLite,
   type ClientSimple,
 } from '@/lib/api/admin-demandas';
 import { DemandCard, StudentDemandCard } from '@/components/admin/DemandCard';
@@ -47,8 +45,7 @@ function readCollapsed(): Set<string> {
 export default function AdminDemandasPage() {
   const [stats, setStats] = useState<DemandStats>(EMPTY_STATS);
   const [demands, setDemands] = useState<Demand[]>([]);
-  const [membersById, setMembersById] = useState<Record<string, DemandMemberLite[]>>({});
-  const [usersById, setUsersById] = useState<Record<string, OperatorUser>>({});
+  const [operatorsById, setOperatorsById] = useState<Record<string, DemandOperatorLite[]>>({});
   const [clients, setClients] = useState<ClientSimple[]>([]);
 
   const [search, setSearch] = useState('');
@@ -74,18 +71,8 @@ export default function AdminDemandasPage() {
       setStats(s);
       setDemands(list);
 
-      const membersMap = await loadMembersByDemand(list.map((d) => d.id));
-      setMembersById(membersMap);
-
-      const opIds = [
-        ...new Set(
-          Object.values(membersMap)
-            .flat()
-            .filter((m) => m.role === 'operator')
-            .map((m) => m.user_id),
-        ),
-      ];
-      setUsersById(await loadOperatorUsers(opIds));
+      // Avatares dos cards vêm de demand_operators (fonte real dos responsáveis).
+      setOperatorsById(await loadOperatorsByDemand(list.map((d) => d.id)));
     } catch (e) {
       console.error(e);
       toast('Erro ao carregar demandas: ' + ((e as Error).message || e), 'error');
@@ -122,7 +109,7 @@ export default function AdminDemandasPage() {
       .on('postgres_changes', { event: '*', schema: 'portal', table: 'demands' }, () => scheduleReload())
       .on(
         'postgres_changes',
-        { event: '*', schema: 'portal', table: 'demand_members' },
+        { event: '*', schema: 'portal', table: 'demand_operators' },
         () => scheduleReload(),
       )
       .subscribe();
@@ -496,8 +483,7 @@ export default function AdminDemandasPage() {
                         <StudentDemandCard
                           key={d.id}
                           demand={d}
-                          members={membersById[d.id] || []}
-                          usersById={usersById}
+                          operators={operatorsById[d.id] || []}
                           onOpen={setDetailId}
                         />
                       ))
@@ -540,8 +526,7 @@ export default function AdminDemandasPage() {
                       <DemandCard
                         key={d.id}
                         demand={d}
-                        members={membersById[d.id] || []}
-                        usersById={usersById}
+                        operators={operatorsById[d.id] || []}
                         onOpen={setDetailId}
                       />
                     ))

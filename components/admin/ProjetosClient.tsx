@@ -62,7 +62,8 @@ function slaChip(st?: ProjectDemandStats): { label: string; color: string; bg: s
     if (days <= 3) return { label: `vence em ${days}d`, color: '#b45309', bg: '#fff4d6' };
     return { label: `no prazo · ${days}d`, color: '#15803d', bg: '#e7f7ee' };
   }
-  return { label: 'no prazo', color: '#15803d', bg: '#e7f7ee' };
+  // Demandas abertas mas SEM prazo definido: ponto cego de SLA — não pintar de verde.
+  return { label: `${st.demands_open} sem prazo`, color: '#b45309', bg: '#fff4d6' };
 }
 
 function statusClass(status: string): string {
@@ -123,10 +124,16 @@ export default function ProjetosClient() {
   }, [load]);
 
   async function onComplete(p: ProjectRow) {
-    if (!confirm(`Concluir o projeto "${p.title}"?\n\nO cliente receberá o convite para avaliar.`)) return;
+    // Guard espelhado da RPC: não dá para concluir projeto com demandas em aberto.
+    const open = stats[p.id]?.demands_open ?? 0;
+    if (open > 0) {
+      toast(`Este projeto tem ${open} demanda(s) em aberto. Conclua ou cancele antes de concluir o projeto.`, 'error');
+      return;
+    }
+    if (!confirm(`Concluir o projeto "${p.title}"?`)) return;
     try {
       await completeProject(p.id);
-      toast('Projeto concluído. Avaliação solicitada ao cliente.');
+      toast('Projeto concluído.');
       await load();
     } catch (e: unknown) {
       toast('Erro ao concluir: ' + (e instanceof Error ? e.message : String(e)), 'error');

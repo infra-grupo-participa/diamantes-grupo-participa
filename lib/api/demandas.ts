@@ -220,7 +220,12 @@ async function enrichOperators(
   }));
 }
 
-/** Operadores disponíveis: via team_assignments do cliente; se vazio, todos ativos. */
+/**
+ * Operadores disponíveis para o cliente: SOMENTE os de team_assignments.
+ * Se o cliente não tem equipe montada, retorna lista vazia — NÃO "todos os ativos".
+ * (O fallback antigo pré-selecionava operadores que a RPC create_demand rejeita,
+ *  travando a criação de demanda para clientes sem team_assignments.)
+ */
 export async function listOperatorsForClient(): Promise<Operator[]> {
   const supabase = db();
   const me = await getMe();
@@ -234,16 +239,7 @@ export async function listOperatorsForClient(): Promise<Operator[]> {
   if (error) throw error;
 
   const opIds = (assignments || []).map((t) => t.operator_id).filter(Boolean);
-  if (opIds.length === 0) {
-    const { data: all, error: allErr } = await supabase
-      .from('operators')
-      .select('id, name, email, position_id, metadata')
-      .eq('status', 'active')
-      .eq('contract_active', true)
-      .order('name');
-    if (allErr) throw allErr;
-    return enrichOperators(all || []);
-  }
+  if (opIds.length === 0) return [];
   const { data: ops, error: opsErr } = await supabase
     .from('operators')
     .select('id, name, email, position_id, metadata')

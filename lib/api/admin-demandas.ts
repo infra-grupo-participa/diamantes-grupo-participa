@@ -24,7 +24,6 @@ export type Demand = {
   messages_count: number | null;
   clickup_task_id: string | null;
   operators_total: number | null;
-  operators_approved: number | null;
   [key: string]: unknown;
 };
 
@@ -118,6 +117,42 @@ export async function loadMembersByDemand(
       role: row.role,
       approved_finish: row.approved_finish,
     });
+  }
+  return out;
+}
+
+/** Operador "lite" para os avatares dos cards (Kanban / por aluno). */
+export type DemandOperatorLite = { operator_id: string; name: string | null };
+
+/**
+ * Operadores REAIS atribuídos a várias demandas, indexados por demand_id.
+ * Fonte: demand_operators → operators (mesma do detalhe e do panorama do projeto).
+ * Substitui o caminho antigo via demand_members (onde operadores nunca existem).
+ */
+export async function loadOperatorsByDemand(
+  demandIds: string[],
+): Promise<Record<string, DemandOperatorLite[]>> {
+  const out: Record<string, DemandOperatorLite[]> = {};
+  const ids = [...new Set((demandIds || []).filter(Boolean))];
+  if (ids.length === 0) return out;
+  const supabase = createClient();
+  const { data: links, error } = await supabase
+    .from('demand_operators')
+    .select('demand_id, operator_id')
+    .in('demand_id', ids);
+  if (error) throw error;
+  const rows = (links ?? []) as Array<{ demand_id: string; operator_id: string }>;
+  const opIds = [...new Set(rows.map((r) => r.operator_id))];
+  let nameById: Record<string, string | null> = {};
+  if (opIds.length) {
+    const { data: ops, error: e2 } = await supabase.from('operators').select('id, name').in('id', opIds);
+    if (e2) throw e2;
+    nameById = Object.fromEntries(
+      ((ops ?? []) as Array<{ id: string; name: string | null }>).map((o) => [o.id, o.name]),
+    );
+  }
+  for (const r of rows) {
+    (out[r.demand_id] ||= []).push({ operator_id: r.operator_id, name: nameById[r.operator_id] ?? null });
   }
   return out;
 }
