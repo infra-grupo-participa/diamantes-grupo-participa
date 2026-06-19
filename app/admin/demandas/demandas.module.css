@@ -615,6 +615,19 @@
   justify-content: center;
   padding: 24px;
   backdrop-filter: blur(2px);
+  /* Tokens locais replicados aqui (além de .wrap) para o modal renderizar com
+     fundo/cores corretos mesmo quando reusado fora da página de demandas —
+     ex.: DemandDetailModal aberto dentro do panorama de projetos, onde o
+     ancestral .wrap não existe e as vars --d-* ficariam indefinidas. */
+  --d-success: var(--success);
+  --d-warning: var(--warning);
+  --d-bg: var(--surface-sunken);
+  --d-surface: var(--surface);
+  --d-border: var(--border);
+  --d-border-strong: var(--border-strong);
+  --d-text: var(--text);
+  --d-text-secondary: var(--muted);
+  --d-muted: var(--muted);
 }
 .modal {
   background: var(--d-surface);
