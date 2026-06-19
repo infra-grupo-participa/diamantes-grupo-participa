@@ -343,6 +343,9 @@ export default function AdminDemandasPage() {
               </div>
             ))}
       </div>
+      <p className={styles.subtitle} style={{ marginTop: -4, marginBottom: 12 }}>
+        Totais gerais de todas as demandas — não mudam com os filtros e a busca abaixo.
+      </p>
 
       {/* Filtros + toggle */}
       <div className={styles.filters}>

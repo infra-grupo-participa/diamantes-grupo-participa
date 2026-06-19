@@ -93,9 +93,6 @@ const IcoPlus = (
 const IcoUser = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
 );
-const IcoStar = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
-);
 const IcoCheck = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
 );
@@ -200,7 +197,6 @@ export default async function Dashboard() {
   const openDemands = extras ? extras.demands.open + extras.demands.in_progress + extras.demands.review : 0;
   const activeProjects = extras?.projects.active ?? 0;
   const attention = extras?.attention ?? [];
-  const pendingRatings = extras?.pendingRatings ?? 0;
 
   // Passos do onboarding (só enquanto o Briefing Básico não foi enviado).
   const steps = [
@@ -229,21 +225,6 @@ export default async function Dashboard() {
             Continuar briefing →
           </Link>
         </div>
-      )}
-
-      {pendingRatings > 0 && (
-        <Link className="rating-banner" href="/portal/projetos">
-          <span className="rating-banner-ico">{IcoStar}</span>
-          <div>
-            <strong>
-              {pendingRatings === 1
-                ? 'Você tem 1 projeto aguardando avaliação'
-                : `Você tem ${pendingRatings} projetos aguardando avaliação`}
-            </strong>
-            <span>Sua opinião ajuda a equipe a melhorar — leva menos de 1 minuto.</span>
-          </div>
-          <span className="rating-banner-go" aria-hidden>Avaliar →</span>
-        </Link>
       )}
 
       {/* ── HERO ── */}

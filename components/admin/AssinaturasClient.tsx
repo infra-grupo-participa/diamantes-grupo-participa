@@ -12,6 +12,7 @@ import {
   getServicesByType,
   getPurchaseMonthlyStats,
   getServiceRenewals,
+  listUnlinkedPurchases,
   listPurchasesHistory,
   createSubscription,
   updateSubscription,
@@ -29,6 +30,7 @@ import {
   type PurchaseRow,
   type ClientOption,
   type SubscriptionPayload,
+  type UnlinkedPurchase,
 } from '@/lib/api/admin-assinaturas';
 import FinanceClientModal from './FinanceClientModal';
 import ExpandModal from '@/components/ui/ExpandModal';
@@ -98,6 +100,7 @@ export default function AssinaturasClient() {
   const [servicesByType, setServicesByType] = useState<ServiceByType[]>([]);
   const [monthly, setMonthly] = useState<MonthlyStat[]>([]);
   const [renewals, setRenewals] = useState<ServiceRenewal[] | null>(null);
+  const [unlinked, setUnlinked] = useState<UnlinkedPurchase[]>([]);
 
   // Histórico Hotmart
   const [histData, setHistData] = useState<PurchaseRow[]>([]);
@@ -164,7 +167,9 @@ export default function AssinaturasClient() {
 
   const loadRenewals = useCallback(async () => {
     try {
-      setRenewals(await getServiceRenewals());
+      const [rnw, unl] = await Promise.all([getServiceRenewals(), listUnlinkedPurchases().catch(() => [])]);
+      setRenewals(rnw);
+      setUnlinked(unl);
     } catch (e) {
       console.error('loadServiceRenewals', e);
       setRenewals([]);
@@ -531,6 +536,43 @@ export default function AssinaturasClient() {
             <RenewalsList renewals={renewals} />
           </div>
         </div>
+
+        {unlinked.length > 0 && (
+          <div
+            className={s.panelCard}
+            style={{ border: '1px solid #f5c2c0', background: '#fff6f5' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <h3 className={s.panelTitle} style={{ margin: 0, color: '#b42318' }}>
+                ⚠ {unlinked.length} compra{unlinked.length > 1 ? 's' : ''} sem aluno vinculado
+              </h3>
+            </div>
+            <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: 'var(--muted)' }}>
+              Pagamentos Hotmart aprovados cujo e-mail não casou com nenhum aluno — o serviço{' '}
+              <strong>não foi renovado automaticamente</strong>. Identifique o aluno e renove pelo
+              Financeiro manual (registrar pagamento / estender acesso).
+            </p>
+            <div className={s.scrollBox}>
+              {unlinked.map((p) => (
+                <div className={s.histItem} key={p.transaction_code}>
+                  <div className={s.histIcon}>⚠</div>
+                  <div className={s.histBody}>
+                    <div className={s.histRow}>
+                      <span className={s.histEmail}>{p.buyer_email}</span>
+                    </div>
+                    <div className={s.histRow} style={{ marginTop: 3 }}>
+                      <span className={s.histSetor}>
+                        {canonicalSector(p.service_name || '') || p.offer_code || '—'}
+                      </span>
+                    </div>
+                    <div className={s.histDate}>{p.charged_at ? fmtDate(p.charged_at) : '—'}</div>
+                  </div>
+                  <div className={s.histAmount}>{fmtBRL(Number(p.amount || 0))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className={s.panelCard}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>

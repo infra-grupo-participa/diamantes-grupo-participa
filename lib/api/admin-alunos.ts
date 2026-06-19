@@ -163,18 +163,22 @@ export async function getServicesBySlugs(slugs: string[]): Promise<Record<string
 
 export async function getStudentStats(): Promise<StudentStats> {
   const supabase = createClient();
-  const [total, paid, partial, overdue, withTeam] = await Promise.all([
+  const [total, partial, overdue, withTeam] = await Promise.all([
     supabase.from('v_students').select('slug', { count: 'exact', head: true }),
-    supabase.from('v_students').select('slug', { count: 'exact', head: true }).in('billing_status', ['paid', 'current']),
     supabase.from('v_students').select('slug', { count: 'exact', head: true }).eq('billing_status', 'partial'),
     supabase.from('v_students').select('slug', { count: 'exact', head: true }).eq('billing_status', 'overdue'),
     supabase.from('v_students').select('slug', { count: 'exact', head: true }).gt('team_count', 0),
   ]);
+  const totalCount = total.count ?? 0;
+  const partialCount = partial.count ?? 0;
+  const overdueCount = overdue.count ?? 0;
+  // "Em dia" é exaustivo: todo aluno sem atraso (inclui paid/current e quem ainda não
+  // tem billing_status definido). Garante que em dia + atraso = total (sem aluno "sumido").
   return {
-    total: total.count ?? 0,
-    active: paid.count ?? 0,
-    partial: partial.count ?? 0,
-    overdue: overdue.count ?? 0,
+    total: totalCount,
+    active: Math.max(0, totalCount - partialCount - overdueCount),
+    partial: partialCount,
+    overdue: overdueCount,
     withTeam: withTeam.count ?? 0,
   };
 }

@@ -60,7 +60,6 @@ export type DashAttentionItem = {
 export type DashboardExtras = {
   demands: { total: number; open: number; in_progress: number; review: number; done: number };
   projects: { total: number; active: number; completed: number };
-  pendingRatings: number;
   attention: DashAttentionItem[];
 };
 
@@ -74,14 +73,12 @@ export async function getDashboardExtras(): Promise<DashboardExtras> {
   const empty: DashboardExtras = {
     demands: { total: 0, open: 0, in_progress: 0, review: 0, done: 0 },
     projects: { total: 0, active: 0, completed: 0 },
-    pendingRatings: 0,
     attention: [],
   };
 
-  const [demRes, projRes, ratRes] = await Promise.all([
+  const [demRes, projRes] = await Promise.all([
     supabase.from('v_demands').select('id, title, status, ends_at, project_title, last_message_from'),
     supabase.from('projects').select('id, status'),
-    supabase.rpc('get_my_pending_project_ratings'),
   ]);
 
   const demands = (demRes.data ?? []) as Array<{
@@ -102,8 +99,6 @@ export async function getDashboardExtras(): Promise<DashboardExtras> {
     if (p.status === 'completed') empty.projects.completed++;
     else if (p.status !== 'cancelled' && p.status !== 'canceled') empty.projects.active++;
   }
-  empty.pendingRatings = Array.isArray(ratRes.data) ? ratRes.data.length : 0;
-
   const now = Date.now();
   const SOON = 3 * 24 * 60 * 60 * 1000; // 3 dias
   const open = (s: string | null) => s !== 'done' && s !== 'canceled';

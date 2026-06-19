@@ -335,6 +335,34 @@ export async function getPurchaseMonthlyStats(): Promise<MonthlyStat[]> {
   return Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
 }
 
+export type UnlinkedPurchase = {
+  transaction_code: string;
+  buyer_email: string;
+  service_name?: string | null;
+  offer_code?: string | null;
+  amount: number;
+  status: string;
+  charged_at?: string | null;
+};
+
+/**
+ * Compras Hotmart aprovadas/completas que NÃO casaram com nenhum aluno (client_slug NULL).
+ * O webhook responde ok mas pula a renovação — o financeiro precisa identificar o aluno
+ * e renovar o serviço manualmente (Financeiro manual → registrar pagamento / estender acesso).
+ */
+export async function listUnlinkedPurchases(): Promise<UnlinkedPurchase[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .schema('portal')
+    .from('hotmart_purchases')
+    .select('transaction_code, buyer_email, service_name, offer_code, amount, status, charged_at')
+    .is('client_slug', null)
+    .in('status', ['approved', 'complete'])
+    .order('charged_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as UnlinkedPurchase[];
+}
+
 export async function getServiceRenewals(): Promise<ServiceRenewal[]> {
   const supabase = createClient();
   const { data, error } = await supabase

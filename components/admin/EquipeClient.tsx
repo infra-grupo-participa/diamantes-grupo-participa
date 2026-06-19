@@ -206,7 +206,12 @@ export default function EquipeClient() {
   async function toggleOp(o: OperatorRow) {
     const next = o.status === 'inactive' ? 'active' : 'inactive';
     const action = next === 'active' ? 'ativar' : 'inativar';
-    if (!confirm(`Tem certeza que deseja ${action} ${o.name}?`)) return;
+    // Inativar NÃO desvincula automaticamente das demandas já abertas (nem do ClickUp).
+    const warn =
+      next === 'inactive'
+        ? `\n\nAtenção: as demandas em aberto deste operador continuam atribuídas a ele (inclusive no ClickUp). Para removê-lo, faça isso no Painel de cada demanda.`
+        : '';
+    if (!confirm(`Tem certeza que deseja ${action} ${o.name}?${warn}`)) return;
     try {
       await setOperatorStatus(o.id, next);
       toast(next === 'active' ? 'Operador ativado.' : 'Operador inativado.');
