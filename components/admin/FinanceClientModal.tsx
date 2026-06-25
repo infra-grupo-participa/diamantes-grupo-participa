@@ -9,6 +9,7 @@ import {
   listClientServices,
   listClientPayments,
   listClientAgreements,
+  listClientHotmartCharges,
   registerManualPayment,
   createAgreement,
   settleInstallment,
@@ -17,6 +18,7 @@ import {
   type PaymentRow,
   type AgreementRow,
   type AgreementInstallmentInput,
+  type HotmartChargeRow,
 } from '@/lib/api/admin-assinaturas';
 import { toast } from '@/lib/toast';
 
@@ -37,24 +39,27 @@ export default function FinanceClientModal({
   onClose: () => void;
   onChanged?: () => void;
 }) {
-  const [tab, setTab] = useState<'pagamento' | 'acordos' | 'servicos' | 'historico'>('pagamento');
+  const [tab, setTab] = useState<'mes-a-mes' | 'pagamento' | 'acordos' | 'servicos' | 'historico'>('mes-a-mes');
   const [services, setServices] = useState<ClientServiceRow[]>([]);
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [agreements, setAgreements] = useState<AgreementRow[]>([]);
+  const [charges, setCharges] = useState<HotmartChargeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, p, a] = await Promise.all([
+      const [s, p, a, c] = await Promise.all([
         listClientServices(clientSlug),
         listClientPayments(clientSlug),
         listClientAgreements(clientSlug),
+        listClientHotmartCharges(clientSlug),
       ]);
       setServices(s);
       setPayments(p);
       setAgreements(a);
+      setCharges(c);
     } catch (e) {
       toast('Erro ao carregar financeiro: ' + (e instanceof Error ? e.message : String(e)), 'error');
     } finally {
@@ -199,6 +204,7 @@ export default function FinanceClientModal({
         </div>
 
         <div style={{ display: 'flex', gap: 4, padding: '0 22px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 64, background: '#fff', zIndex: 1 }}>
+          <button style={tabBtn(tab === 'mes-a-mes')} onClick={() => setTab('mes-a-mes')}>Mês a mês</button>
           <button style={tabBtn(tab === 'pagamento')} onClick={() => setTab('pagamento')}>Registrar pagamento</button>
           <button style={tabBtn(tab === 'acordos')} onClick={() => setTab('acordos')}>Acordos</button>
           <button style={tabBtn(tab === 'servicos')} onClick={() => setTab('servicos')}>Serviços</button>
@@ -208,6 +214,8 @@ export default function FinanceClientModal({
         <div style={body}>
           {loading ? (
             <p style={{ color: 'var(--muted)' }}>Carregando…</p>
+          ) : tab === 'mes-a-mes' ? (
+            <MonthlyGrid charges={charges} />
           ) : tab === 'pagamento' ? (
             <form onSubmit={submitPayment}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -350,3 +358,101 @@ export default function FinanceClientModal({
     </div>
   );
 }
+
+// ── Grade "Mês a mês por serviço" ──
+// Lê as cobranças Hotmart (portal.hotmart_purchases) do aluno e monta uma matriz
+// serviço × mês: cada célula mostra se aquele mês foi pago, ficou vencido, ou foi
+// estornado/cancelado. Soma o total em aberto (status 'overdue').
+const PAID = new Set(['approved', 'complete']);
+const MONTH_LABELS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const cellFor = (st: string | undefined): { bg: string; mark: string; title: string } => {
+  if (st === 'overdue') return { bg: '#fee2e2', mark: '✕', title: 'Vencido / não pago' };
+  if (st && PAID.has(st)) return { bg: '#dcfce7', mark: '✓', title: 'Pago' };
+  if (st === 'refunded') return { bg: '#fef3c7', mark: '↩', title: 'Reembolsado' };
+  if (st === 'canceled') return { bg: '#f1f5f9', mark: '–', title: 'Cancelado' };
+  if (st === 'chargeback') return { bg: '#fee2e2', mark: '⚠', title: 'Chargeback' };
+  return { bg: 'transparent', mark: '', title: 'Sem cobrança' };
+};
+
+function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
+  if (charges.length === 0) {
+    return <p style={{ color: 'var(--muted)', fontSize: '.86rem' }}>Nenhuma cobrança Hotmart registrada para este aluno.</p>;
+  }
+
+  // serviço (chave) -> { label, byMonth: { 'YYYY-MM': status }, overdueTotal }
+  const svcMap = new Map<string, { label: string; byMonth: Record<string, string>; overdue: number; paid: number }>();
+  const monthsSet = new Set<string>();
+  for (const c of charges) {
+    const key = c.offer_code || c.service_name || '—';
+    const label = (c.service_name || c.offer_code || '—').replace(/\s+\d{4}$/, '').trim();
+    const ym = (c.charged_at || '').slice(0, 7);
+    if (!ym) continue;
+    monthsSet.add(ym);
+    if (!svcMap.has(key)) svcMap.set(key, { label, byMonth: {}, overdue: 0, paid: 0 });
+    const row = svcMap.get(key)!;
+    // se já houver um 'pago' no mês, ele prevalece sobre um 'overdue' anterior (retentativa paga)
+    const prev = row.byMonth[ym];
+    if (!prev || (c.status && PAID.has(c.status))) row.byMonth[ym] = c.status;
+    if (c.status === 'overdue') row.overdue += Number(c.amount || 0);
+    if (c.status && PAID.has(c.status)) row.paid += Number(c.amount || 0);
+  }
+  const months = Array.from(monthsSet).sort();
+  const rows = Array.from(svcMap.values()).sort((a, b) => b.overdue - a.overdue);
+  const totalOverdue = rows.reduce((s, r) => s + r.overdue, 0);
+  const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
+  const monthHdr = (ym: string) => {
+    const [y, m] = ym.split('-');
+    return `${MONTH_LABELS[Number(m) - 1]}/${y.slice(2)}`;
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
+        <SummaryPill label="Total pago" value={fmtBRL(totalPaid)} bg="#dcfce7" color="#15803d" />
+        <SummaryPill label="Total em aberto" value={fmtBRL(totalOverdue)} bg="#fee2e2" color="#b91c1c" />
+        <SummaryPill label="Serviços" value={String(rows.length)} bg="#eef2ff" color="#4338ca" />
+      </div>
+      <div style={{ fontSize: '.74rem', color: 'var(--muted)', marginBottom: 8 }}>
+        <span style={{ color: '#15803d' }}>✓ pago</span> &nbsp;·&nbsp;
+        <span style={{ color: '#b91c1c' }}>✕ vencido</span> &nbsp;·&nbsp;
+        <span style={{ color: '#92400e' }}>↩ reembolsado</span> &nbsp;·&nbsp;
+        <span>– cancelado</span> &nbsp;·&nbsp; (vazio = sem cobrança no mês)
+      </div>
+      <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: '.78rem', width: '100%' }}>
+          <thead>
+            <tr style={{ background: '#fafbfc' }}>
+              <th style={{ ...gridTh, position: 'sticky', left: 0, background: '#fafbfc', textAlign: 'left', minWidth: 130 }}>Serviço</th>
+              {months.map((m) => <th key={m} style={gridTh}>{monthHdr(m)}</th>)}
+              <th style={{ ...gridTh, minWidth: 86 }}>Em aberto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.label} style={{ borderTop: '1px solid var(--border)' }}>
+                <td style={{ ...gridTd, position: 'sticky', left: 0, background: '#fff', textAlign: 'left', fontWeight: 600 }}>{r.label}</td>
+                {months.map((m) => {
+                  const c = cellFor(r.byMonth[m]);
+                  return <td key={m} style={{ ...gridTd, background: c.bg }} title={`${r.label} · ${monthHdr(m)} · ${c.title}`}>{c.mark}</td>;
+                })}
+                <td style={{ ...gridTd, fontWeight: 700, color: r.overdue > 0 ? '#b91c1c' : 'var(--muted)' }}>{r.overdue > 0 ? fmtBRL(r.overdue) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SummaryPill({ label, value, bg, color }: { label: string; value: string; bg: string; color: string }) {
+  return (
+    <div style={{ background: bg, borderRadius: 10, padding: '8px 14px', minWidth: 120 }}>
+      <div style={{ fontSize: '.7rem', color, opacity: 0.8, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontSize: '1.05rem', fontWeight: 800, color }}>{value}</div>
+    </div>
+  );
+}
+
+const gridTh: React.CSSProperties = { padding: '8px 6px', fontSize: '.7rem', fontWeight: 700, color: 'var(--muted)', textAlign: 'center', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' };
+const gridTd: React.CSSProperties = { padding: '7px 6px', textAlign: 'center', whiteSpace: 'nowrap' };

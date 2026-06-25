@@ -514,6 +514,30 @@ export async function listClientServices(clientSlug: string): Promise<ClientServ
   return (data ?? []) as ClientServiceRow[];
 }
 
+// Compras/cobranças Hotmart de um aluno (histórico bruto, todas as parcelas e status).
+// Alimenta a grade "Mês a mês por serviço" no card financeiro.
+export type HotmartChargeRow = {
+  transaction_code: string;
+  offer_code: string | null;
+  service_name: string | null;
+  amount: number;
+  status: string; // approved | complete | overdue | canceled | refunded | chargeback
+  charged_at: string;
+  installment_number: number | null;
+};
+
+export async function listClientHotmartCharges(clientSlug: string): Promise<HotmartChargeRow[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .schema('portal')
+    .from('hotmart_purchases')
+    .select('transaction_code, offer_code, service_name, amount, status, charged_at, installment_number')
+    .eq('client_slug', clientSlug)
+    .order('charged_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as HotmartChargeRow[];
+}
+
 export async function registerManualPayment(p: {
   client_slug: string;
   amount: number;
