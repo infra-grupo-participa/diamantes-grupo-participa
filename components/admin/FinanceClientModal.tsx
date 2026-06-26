@@ -184,7 +184,7 @@ export default function FinanceClientModal({
   }
 
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(20,16,40,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 };
-  const dialog: React.CSSProperties = { background: '#fff', borderRadius: 16, width: 'min(680px, 100%)', maxHeight: '90vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)' };
+  const dialog: React.CSSProperties = { background: '#fff', borderRadius: 16, width: 'min(1080px, 100%)', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)' };
   const head: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#fff' };
   const body: React.CSSProperties = { padding: 22 };
   const tabBtn = (active: boolean): React.CSSProperties => ({ padding: '8px 12px', border: 'none', borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent', background: 'none', cursor: 'pointer', fontWeight: active ? 700 : 500, color: active ? 'var(--accent-strong)' : 'var(--muted)', fontSize: '.86rem' });
@@ -212,6 +212,7 @@ export default function FinanceClientModal({
         </div>
 
         <div style={body}>
+          {!loading && <ExecSummary charges={charges} services={services} />}
           {loading ? (
             <p style={{ color: 'var(--muted)' }}>Carregando…</p>
           ) : tab === 'mes-a-mes' ? (
@@ -398,8 +399,6 @@ function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
   }
   const months = Array.from(monthsSet).sort();
   const rows = Array.from(svcMap.values()).sort((a, b) => b.overdue - a.overdue);
-  const totalOverdue = rows.reduce((s, r) => s + r.overdue, 0);
-  const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
   const monthHdr = (ym: string) => {
     const [y, m] = ym.split('-');
     return `${MONTH_LABELS[Number(m) - 1]}/${y.slice(2)}`;
@@ -407,11 +406,6 @@ function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
-        <SummaryPill label="Total pago" value={fmtBRL(totalPaid)} bg="#dcfce7" color="#15803d" />
-        <SummaryPill label="Total em aberto" value={fmtBRL(totalOverdue)} bg="#fee2e2" color="#b91c1c" />
-        <SummaryPill label="Serviços" value={String(rows.length)} bg="#eef2ff" color="#4338ca" />
-      </div>
       <div style={{ fontSize: '.74rem', color: 'var(--muted)', marginBottom: 8 }}>
         <span style={{ color: '#15803d' }}>✓ pago</span> &nbsp;·&nbsp;
         <span style={{ color: '#b91c1c' }}>✕ vencido</span> &nbsp;·&nbsp;
@@ -445,11 +439,64 @@ function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
   );
 }
 
-function SummaryPill({ label, value, bg, color }: { label: string; value: string; bg: string; color: string }) {
+// ── Resumo executivo: visão consolidada da situação financeira do aluno ──
+// Derivado das cobranças Hotmart (charges) + serviços ativos. Fica no topo do modal,
+// visível em qualquer aba, para leitura rápida da situação de pagamento.
+function ExecSummary({ charges, services }: { charges: HotmartChargeRow[]; services: ClientServiceRow[] }) {
+  let paid = 0;
+  let overdue = 0;
+  let overdueCount = 0;
+  let paidCount = 0;
+  const months = new Set<string>();
+  for (const c of charges) {
+    const amt = Number(c.amount || 0);
+    const ym = (c.charged_at || '').slice(0, 7);
+    if (ym) months.add(ym);
+    if (c.status && PAID.has(c.status)) {
+      paid += amt;
+      paidCount++;
+    } else if (c.status === 'overdue') {
+      overdue += amt;
+      overdueCount++;
+    }
+  }
+  const ativos = services.length;
+  const ticket = services.reduce((s, x) => s + Number(x.monthly_value || 0), 0);
+  const inadPct = paid + overdue > 0 ? Math.round((overdue / (paid + overdue)) * 100) : 0;
+  const accessDates = services.map((s) => s.access_until).filter(Boolean) as string[];
+  const accessUntil = accessDates.sort().slice(-1)[0] || null;
+  const vencido = accessUntil ? accessUntil < todayStr() : false;
+  const semDados = charges.length === 0;
+
+  const situ = semDados
+    ? { txt: 'Sem cobranças', bg: '#f1f5f9', color: '#475569', sub: 'Nenhum registro Hotmart' }
+    : overdue > 0
+      ? { txt: 'Inadimplente', bg: '#fee2e2', color: '#b91c1c', sub: `${overdueCount} cobrança${overdueCount > 1 ? 's' : ''} vencida${overdueCount > 1 ? 's' : ''}` }
+      : { txt: 'Em dia', bg: '#dcfce7', color: '#15803d', sub: 'Sem cobranças vencidas' };
+
   return (
-    <div style={{ background: bg, borderRadius: 10, padding: '8px 14px', minWidth: 120 }}>
-      <div style={{ fontSize: '.7rem', color, opacity: 0.8, fontWeight: 600 }}>{label}</div>
-      <div style={{ fontSize: '1.05rem', fontWeight: 800, color }}>{value}</div>
+    <div style={{ marginBottom: 18, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
+      <div style={{ background: situ.bg, borderRadius: 14, padding: '14px 16px' }}>
+        <div style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color: situ.color, opacity: 0.85 }}>Situação</div>
+        <div style={{ fontSize: '1.35rem', fontWeight: 800, color: situ.color, lineHeight: 1.1, marginTop: 4 }}>{situ.txt}</div>
+        <div style={{ fontSize: '.74rem', color: situ.color, opacity: 0.8, marginTop: 2 }}>{situ.sub}</div>
+      </div>
+      <StatCard label="Recebido (total)" value={fmtBRL(paid)} sub={`${paidCount} pagamentos · ${months.size} meses`} bg="#ecfdf3" color="#15803d" />
+      <StatCard label="Em aberto" value={fmtBRL(overdue)} sub={inadPct > 0 ? `${inadPct}% de inadimplência` : 'tudo pago'} bg="#fef2f2" color="#b91c1c" />
+      <StatCard label="Serviços ativos" value={String(ativos)} sub={ticket > 0 ? `${fmtBRL(ticket)}/mês` : '—'} bg="#eef2ff" color="#4338ca" />
+      {accessUntil && (
+        <StatCard label="Acesso até" value={fmtDate(accessUntil)} sub={vencido ? 'vencido — renovar' : 'em vigência'} bg={vencido ? '#fef2f2' : '#f5f3ff'} color={vencido ? '#b91c1c' : '#6d28d9'} />
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, bg, color }: { label: string; value: string; sub?: string; bg: string; color: string }) {
+  return (
+    <div style={{ background: bg, borderRadius: 14, padding: '14px 16px', border: '1px solid rgba(0,0,0,.04)' }}>
+      <div style={{ fontSize: '.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', color, opacity: 0.8 }}>{label}</div>
+      <div style={{ fontSize: '1.35rem', fontWeight: 800, color, lineHeight: 1.1, marginTop: 4 }}>{value}</div>
+      {sub && <div style={{ fontSize: '.74rem', color, opacity: 0.75, marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }

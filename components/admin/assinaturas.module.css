@@ -2,8 +2,8 @@
 
 .wrap {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
   align-items: start;
 }
 
@@ -175,15 +175,15 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.88rem;
-  min-width: 680px;
+  font-size: 0.82rem;
+  min-width: 560px;
 }
 .table thead th {
   text-align: left;
-  padding: 13px 20px;
-  font-size: 0.7rem;
+  padding: 10px 14px;
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   font-weight: 700;
   color: var(--muted);
   background: var(--table-head-bg);
@@ -191,9 +191,31 @@
   white-space: nowrap;
 }
 .table tbody td {
-  padding: 14px 20px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+}
+
+/* Coluna "Ação" fixada à direita: os botões ficam sempre visíveis,
+   mesmo se a tabela rolar horizontalmente em telas mais estreitas. */
+.table thead th:last-child,
+.table tbody td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+}
+.table thead th:last-child {
+  background: var(--table-head-bg);
+}
+.table tbody td:last-child {
+  background: var(--surface);
+  box-shadow: -8px 0 8px -8px rgba(15, 23, 42, 0.12);
+}
+.table tbody tr:hover td:last-child {
+  background: var(--table-row-hover);
+}
+.rowOverdue td:last-child {
+  background: var(--danger-soft);
 }
 .table tbody tr:last-child td {
   border-bottom: none;
@@ -224,7 +246,7 @@
 .userCell {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 .userName {
   font-weight: 600;
@@ -234,8 +256,8 @@
   color: var(--muted);
 }
 .avatar {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--avatar-radius);
   background: var(--avatar-gradient);
   display: grid;
