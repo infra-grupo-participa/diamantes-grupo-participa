@@ -183,11 +183,15 @@ export default function FinanceClientModal({
     }
   }
 
+  const initials = clientName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '·';
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(20,16,40,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 };
-  const dialog: React.CSSProperties = { background: '#fff', borderRadius: 16, width: 'min(1080px, 100%)', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,.25)' };
-  const head: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 0, background: '#fff' };
-  const body: React.CSSProperties = { padding: 22 };
-  const tabBtn = (active: boolean): React.CSSProperties => ({ padding: '8px 12px', border: 'none', borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent', background: 'none', cursor: 'pointer', fontWeight: active ? 700 : 500, color: active ? 'var(--accent-strong)' : 'var(--muted)', fontSize: '.86rem' });
+  const dialog: React.CSSProperties = { background: '#fff', borderRadius: 18, width: 'min(1080px, 100%)', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(20,16,40,.28)' };
+  const headWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 2, background: '#fff' };
+  const head: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '18px 24px 14px', background: 'linear-gradient(180deg, rgba(242,151,37,.10), rgba(242,151,37,0))' };
+  const avatarLg: React.CSSProperties = { width: 44, height: 44, borderRadius: 12, background: 'var(--avatar-gradient, linear-gradient(135deg,#f29725,#d97706))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '.95rem', flexShrink: 0, boxShadow: '0 2px 8px rgba(242,151,37,.3)' };
+  const tabsBar: React.CSSProperties = { display: 'flex', gap: 6, padding: '4px 24px 12px', borderBottom: '1px solid var(--border)', overflowX: 'auto' };
+  const body: React.CSSProperties = { padding: 24 };
+  const tabBtn = (active: boolean): React.CSSProperties => ({ padding: '7px 14px', border: '1px solid', borderColor: active ? 'transparent' : 'var(--border)', borderRadius: 999, background: active ? 'var(--accent)' : '#fff', cursor: 'pointer', fontWeight: active ? 700 : 600, color: active ? '#fff' : 'var(--muted)', fontSize: '.82rem', whiteSpace: 'nowrap' });
   const label: React.CSSProperties = { display: 'block', fontSize: '.78rem', fontWeight: 600, color: 'var(--muted)', margin: '10px 0 4px' };
   const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '.9rem' };
   const primary: React.CSSProperties = { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontWeight: 700, cursor: 'pointer' };
@@ -195,20 +199,24 @@ export default function FinanceClientModal({
   return (
     <div style={overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={dialog} role="dialog" aria-modal="true" aria-label={`Financeiro de ${clientName}`}>
-        <div style={head}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem' }}>💰 Financeiro — {clientName}</h3>
-            <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>Pagamentos manuais, adiantamentos e acordos (fora da Hotmart)</div>
+        <div style={headWrap}>
+          <div style={head}>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'center', minWidth: 0 }}>
+              <div style={avatarLg}>{initials}</div>
+              <div style={{ minWidth: 0 }}>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-.01em' }}>{clientName}</h3>
+                <div style={{ fontSize: '.78rem', color: 'var(--muted)' }}>Financeiro do aluno · situação de cobrança, pagamentos e acordos</div>
+              </div>
+            </div>
+            <button type="button" onClick={onClose} aria-label="Fechar" style={{ background: 'var(--bg, #f4f4f5)', border: '1px solid var(--border)', borderRadius: 10, width: 34, height: 34, fontSize: 20, lineHeight: 1, cursor: 'pointer', color: 'var(--muted)', flexShrink: 0 }}>×</button>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fechar" style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: 'var(--muted)' }}>×</button>
-        </div>
-
-        <div style={{ display: 'flex', gap: 4, padding: '0 22px', borderBottom: '1px solid var(--border)', position: 'sticky', top: 64, background: '#fff', zIndex: 1 }}>
-          <button style={tabBtn(tab === 'mes-a-mes')} onClick={() => setTab('mes-a-mes')}>Mês a mês</button>
-          <button style={tabBtn(tab === 'pagamento')} onClick={() => setTab('pagamento')}>Registrar pagamento</button>
-          <button style={tabBtn(tab === 'acordos')} onClick={() => setTab('acordos')}>Acordos</button>
-          <button style={tabBtn(tab === 'servicos')} onClick={() => setTab('servicos')}>Serviços</button>
-          <button style={tabBtn(tab === 'historico')} onClick={() => setTab('historico')}>Histórico</button>
+          <div style={tabsBar}>
+            <button style={tabBtn(tab === 'mes-a-mes')} onClick={() => setTab('mes-a-mes')}>Mês a mês</button>
+            <button style={tabBtn(tab === 'pagamento')} onClick={() => setTab('pagamento')}>Registrar pagamento</button>
+            <button style={tabBtn(tab === 'acordos')} onClick={() => setTab('acordos')}>Acordos</button>
+            <button style={tabBtn(tab === 'servicos')} onClick={() => setTab('servicos')}>Serviços</button>
+            <button style={tabBtn(tab === 'historico')} onClick={() => setTab('historico')}>Histórico</button>
+          </div>
         </div>
 
         <div style={body}>
@@ -460,19 +468,22 @@ function ExecSummary({ charges, services }: { charges: HotmartChargeRow[]; servi
       overdueCount++;
     }
   }
+  const hoje = todayStr();
   const ativos = services.length;
   const ticket = services.reduce((s, x) => s + Number(x.monthly_value || 0), 0);
   const inadPct = paid + overdue > 0 ? Math.round((overdue / (paid + overdue)) * 100) : 0;
+  // Situação = régua de acesso ATUAL (serviços vencidos hoje), mesma base da KPI
+  // "Em atraso" da tela — não o histórico de cobranças.
+  const svcVencidos = services.filter((s) => s.access_until && s.access_until < hoje).length;
   const accessDates = services.map((s) => s.access_until).filter(Boolean) as string[];
   const accessUntil = accessDates.sort().slice(-1)[0] || null;
-  const vencido = accessUntil ? accessUntil < todayStr() : false;
-  const semDados = charges.length === 0;
+  const vencido = accessUntil ? accessUntil < hoje : false;
 
-  const situ = semDados
-    ? { txt: 'Sem cobranças', bg: '#f1f5f9', color: '#475569', sub: 'Nenhum registro Hotmart' }
-    : overdue > 0
-      ? { txt: 'Inadimplente', bg: '#fee2e2', color: '#b91c1c', sub: `${overdueCount} cobrança${overdueCount > 1 ? 's' : ''} vencida${overdueCount > 1 ? 's' : ''}` }
-      : { txt: 'Em dia', bg: '#dcfce7', color: '#15803d', sub: 'Sem cobranças vencidas' };
+  const situ = ativos === 0 && charges.length === 0
+    ? { txt: 'Sem dados', bg: '#f1f5f9', color: '#475569', sub: 'Nenhum serviço ou cobrança' }
+    : svcVencidos > 0
+      ? { txt: 'Inadimplente', bg: '#fee2e2', color: '#b91c1c', sub: `${svcVencidos} serviço${svcVencidos > 1 ? 's' : ''} vencido${svcVencidos > 1 ? 's' : ''}` }
+      : { txt: 'Em dia', bg: '#dcfce7', color: '#15803d', sub: 'Acesso em vigência' };
 
   return (
     <div style={{ marginBottom: 18, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
