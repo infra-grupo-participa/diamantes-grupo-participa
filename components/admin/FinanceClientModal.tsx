@@ -20,6 +20,7 @@ import {
   type AgreementInstallmentInput,
   type HotmartChargeRow,
 } from '@/lib/api/admin-assinaturas';
+import { canonicalServiceName } from '@/lib/api/admin-alunos';
 import { toast } from '@/lib/toast';
 
 const METHODS = ['pix', 'boleto', 'transferencia', 'dinheiro', 'cartao', 'outro'];
@@ -392,8 +393,11 @@ function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
   const svcMap = new Map<string, { label: string; byMonth: Record<string, string>; overdue: number; paid: number }>();
   const monthsSet = new Set<string>();
   for (const c of charges) {
-    const key = c.offer_code || c.service_name || '—';
-    const label = (c.service_name || c.offer_code || '—').replace(/\s+\d{4}$/, '').trim();
+    // Agrupa pelo nome CANÔNICO do serviço (mesma normalização das demais telas):
+    // unifica variações da Hotmart ("Web Design"/"Web Designer", "Tráfego"/"Gestão de
+    // Tráfego") e sufixos como "… Vencido" numa única linha, evitando duplicatas.
+    const key = canonicalServiceName(c.service_name || c.offer_code || '');
+    const label = key;
     const ym = (c.charged_at || '').slice(0, 7);
     if (!ym) continue;
     monthsSet.add(ym);
