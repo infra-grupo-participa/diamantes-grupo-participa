@@ -888,7 +888,7 @@ function ExportIcon() {
 
 function Kpi({ label, value, bg, color, icon }: { label: string; value: React.ReactNode; bg: string; color: string; icon: string }) {
   return (
-    <div className={s.kpiCard}>
+    <div className={s.kpiCard} style={{ borderTop: `3px solid ${color}` }}>
       <div className={s.kpiHead}>
         <span className={s.kpiLabel}>{label}</span>
         <span className={s.kpiIcon} style={{ background: bg, color }}>
