@@ -104,6 +104,7 @@
   letter-spacing: -0.03em;
   line-height: 1;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Filtros + toggle ───────────────────────────────────────── */

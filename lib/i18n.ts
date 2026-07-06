@@ -69,6 +69,7 @@ export function translateAuthError(err: SupabaseishError): string {
   if (/email.*invalid|invalid.*email/.test(msg)) return 'E-mail inválido.';
   if (/rate limit|too many/.test(msg)) return BY_CODE.over_request_rate_limit;
   if (/already (registered|exists)/.test(msg)) return BY_CODE.user_already_exists;
+  if (/signups? not allowed|signup.*disabled|not allowed for this instance/.test(msg)) return BY_CODE.signup_disabled;
   if (/password/.test(msg) && /weak|short|least/.test(msg)) return BY_CODE.weak_password;
   if (/network|fetch|failed to/.test(msg)) return 'Falha de conexão. Verifique sua internet.';
   return 'Não foi possível concluir. Tente novamente.';

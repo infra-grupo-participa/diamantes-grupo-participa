@@ -55,6 +55,27 @@ function pick(obj: unknown, ...keys: string[]): unknown {
   return cur;
 }
 
+// Valor monetário resiliente: aceita number puro OU string, inclusive pt-BR
+// ("1.300,00") e en-US ("1,300.00"). Antes um Number() cru sobre string pt-BR
+// virava NaN->0, zerando silenciosamente o monthly_value/MRR do serviço.
+function asAmount(v: unknown): number {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  if (typeof v !== 'string') return 0;
+  let s = v.trim().replace(/[^\d.,-]/g, '');
+  if (!s) return 0;
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if (lastComma > lastDot) {
+    // vírgula é o decimal (pt-BR): remove pontos de milhar, troca vírgula por ponto
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else {
+    // ponto é o decimal (en-US) ou inteiro: remove vírgulas de milhar
+    s = s.replace(/,/g, '');
+  }
+  const n = Number(s);
+  return isFinite(n) ? n : 0;
+}
+
 export async function POST(req: Request) {
   if (getHottokSecret() === '') {
     return jsonOut({ ok: false, error: 'HOTMART_HOTTOK não configurado.' }, 503);
@@ -100,7 +121,7 @@ export async function POST(req: Request) {
   const buyerEmail = asString(pick(data, 'buyer', 'email')).trim().toLowerCase();
   const offerCode = asString(pick(data, 'purchase', 'offer', 'code'));
   const serviceName = asString(pick(data, 'purchase', 'offer', 'name'));
-  const amount = Number(pick(data, 'purchase', 'price', 'value') ?? 0) || 0;
+  const amount = asAmount(pick(data, 'purchase', 'price', 'value'));
   const paymentType = asString(pick(data, 'purchase', 'payment', 'type'));
   const installTotal = Number(pick(data, 'purchase', 'payment', 'installments_number') ?? 1) || 1;
   // Índice da recorrência da assinatura (1ª, 2ª cobrança…). A Hotmart envia em

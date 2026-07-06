@@ -96,6 +96,7 @@
   line-height: 1;
   color: var(--text);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Tabela */

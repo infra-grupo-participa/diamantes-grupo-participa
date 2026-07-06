@@ -10,6 +10,7 @@ import {
   listClientPayments,
   listClientAgreements,
   listClientHotmartCharges,
+  getHotmartOffersMap,
   registerManualPayment,
   createAgreement,
   settleInstallment,
@@ -45,22 +46,25 @@ export default function FinanceClientModal({
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [agreements, setAgreements] = useState<AgreementRow[]>([]);
   const [charges, setCharges] = useState<HotmartChargeRow[]>([]);
+  const [offersMap, setOffersMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, p, a, c] = await Promise.all([
+      const [s, p, a, c, om] = await Promise.all([
         listClientServices(clientSlug),
         listClientPayments(clientSlug),
         listClientAgreements(clientSlug),
         listClientHotmartCharges(clientSlug),
+        getHotmartOffersMap(),
       ]);
       setServices(s);
       setPayments(p);
       setAgreements(a);
       setCharges(c);
+      setOffersMap(om);
     } catch (e) {
       toast('Erro ao carregar financeiro: ' + (e instanceof Error ? e.message : String(e)), 'error');
     } finally {
@@ -186,15 +190,15 @@ export default function FinanceClientModal({
 
   const initials = clientName.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '·';
   const overlay: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(20,16,40,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, zIndex: 1000 };
-  const dialog: React.CSSProperties = { background: '#fff', borderRadius: 18, width: 'min(1080px, 100%)', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(20,16,40,.28)' };
-  const headWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 2, background: '#fff' };
+  const dialog: React.CSSProperties = { background: 'var(--surface-raised)', color: 'var(--text)', borderRadius: 18, width: 'min(1080px, 100%)', maxHeight: '92vh', overflow: 'auto', boxShadow: '0 24px 64px rgba(20,16,40,.28)' };
+  const headWrap: React.CSSProperties = { position: 'sticky', top: 0, zIndex: 2, background: 'var(--surface-raised)' };
   const head: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '18px 24px 14px', background: 'linear-gradient(180deg, rgba(242,151,37,.10), rgba(242,151,37,0))' };
   const avatarLg: React.CSSProperties = { width: 44, height: 44, borderRadius: 12, background: 'var(--avatar-gradient, linear-gradient(135deg,#f29725,#d97706))', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '.95rem', flexShrink: 0, boxShadow: '0 2px 8px rgba(242,151,37,.3)' };
   const tabsBar: React.CSSProperties = { display: 'flex', gap: 6, padding: '4px 24px 12px', borderBottom: '1px solid var(--border)', overflowX: 'auto' };
   const body: React.CSSProperties = { padding: 24 };
-  const tabBtn = (active: boolean): React.CSSProperties => ({ padding: '7px 14px', border: '1px solid', borderColor: active ? 'transparent' : 'var(--border)', borderRadius: 999, background: active ? 'var(--accent)' : '#fff', cursor: 'pointer', fontWeight: active ? 700 : 600, color: active ? '#fff' : 'var(--muted)', fontSize: '.82rem', whiteSpace: 'nowrap' });
+  const tabBtn = (active: boolean): React.CSSProperties => ({ padding: '7px 14px', border: '1px solid', borderColor: active ? 'transparent' : 'var(--border)', borderRadius: 999, background: active ? 'var(--accent)' : 'var(--surface-input)', cursor: 'pointer', fontWeight: active ? 700 : 600, color: active ? '#fff' : 'var(--muted)', fontSize: '.82rem', whiteSpace: 'nowrap' });
   const label: React.CSSProperties = { display: 'block', fontSize: '.78rem', fontWeight: 600, color: 'var(--muted)', margin: '10px 0 4px' };
-  const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '.9rem' };
+  const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 8, fontSize: '.9rem', background: 'var(--surface-input)', color: 'var(--text)' };
   const primary: React.CSSProperties = { background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 18px', fontWeight: 700, cursor: 'pointer' };
 
   return (
@@ -225,7 +229,7 @@ export default function FinanceClientModal({
           {loading ? (
             <p style={{ color: 'var(--muted)' }}>Carregando…</p>
           ) : tab === 'mes-a-mes' ? (
-            <MonthlyGrid charges={charges} />
+            <MonthlyGrid charges={charges} offersMap={offersMap} />
           ) : tab === 'pagamento' ? (
             <form onSubmit={submitPayment}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -374,6 +378,21 @@ export default function FinanceClientModal({
 // serviço × mês: cada célula mostra se aquele mês foi pago, ficou vencido, ou foi
 // estornado/cancelado. Soma o total em aberto (status 'overdue').
 const PAID = new Set(['approved', 'complete']);
+// Fallback estático offer_code → nome do serviço, para cobranças Hotmart que
+// chegam só com offer_code (sem service_name). Espelha portal.hotmart_offers +
+// ofertas legadas/2025 já vistas no histórico. Os nomes passam por
+// canonicalServiceName depois, então variações ("2025") colapsam na mesma linha.
+// É um fallback embutido (não depende de query) — getHotmartOffersMap() ainda
+// cobre ofertas novas cadastradas depois.
+const OFFER_FALLBACK: Record<string, string> = {
+  bbs6f4qn: 'Gestor de Disparos', n6o84uq5: 'Gestor de Disparos', kkl8wty9: 'Gestor de Disparos',
+  ihbplci2: 'Copywriter', g9w7txad: 'Copywriter',
+  lbjzicmm: 'Design Gráfico', ua9qomou: 'Design Gráfico',
+  c07ieg22: 'Edição de Vídeo', hqhbhqhd: 'Edição de Vídeo', dz345zj4: 'Edição de Vídeo', az6i68mg: 'Edição de Vídeo',
+  iaafjy8m: 'Gestão de Redes Sociais', vc6hmeig: 'Gestão de Redes Sociais', '33oyqi0b': 'Gestão de Redes Sociais',
+  '52pqh4nd': 'Tráfego', td9xav44: 'Tráfego',
+  oo578cny: 'Web Designer', mrt15ap7: 'Web Designer', gj3dommw: 'Web Designer',
+};
 const MONTH_LABELS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
 const cellFor = (st: string | undefined): { bg: string; mark: string; title: string } => {
   if (st === 'overdue') return { bg: '#fee2e2', mark: '✕', title: 'Vencido / não pago' };
@@ -384,7 +403,7 @@ const cellFor = (st: string | undefined): { bg: string; mark: string; title: str
   return { bg: 'transparent', mark: '', title: 'Sem cobrança' };
 };
 
-function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
+function MonthlyGrid({ charges, offersMap }: { charges: HotmartChargeRow[]; offersMap: Record<string, string> }) {
   if (charges.length === 0) {
     return <p style={{ color: 'var(--muted)', fontSize: '.86rem' }}>Nenhuma cobrança Hotmart registrada para este aluno.</p>;
   }
@@ -393,10 +412,14 @@ function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
   const svcMap = new Map<string, { label: string; byMonth: Record<string, string>; overdue: number; paid: number }>();
   const monthsSet = new Set<string>();
   for (const c of charges) {
+    // Resolve o nome do serviço em cascata: service_name → mapa dinâmico
+    // (hotmart_offers) → fallback estático embutido → offer_code cru (último caso).
+    const code = c.offer_code || '';
+    const rawName = c.service_name || offersMap[code] || OFFER_FALLBACK[code] || code || '';
     // Agrupa pelo nome CANÔNICO do serviço (mesma normalização das demais telas):
     // unifica variações da Hotmart ("Web Design"/"Web Designer", "Tráfego"/"Gestão de
     // Tráfego") e sufixos como "… Vencido" numa única linha, evitando duplicatas.
-    const key = canonicalServiceName(c.service_name || c.offer_code || '');
+    const key = canonicalServiceName(rawName);
     const label = key;
     const ym = (c.charged_at || '').slice(0, 7);
     if (!ym) continue;
@@ -427,8 +450,8 @@ function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
       <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 10 }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '.78rem', width: '100%' }}>
           <thead>
-            <tr style={{ background: '#fafbfc' }}>
-              <th style={{ ...gridTh, position: 'sticky', left: 0, background: '#fafbfc', textAlign: 'left', minWidth: 130 }}>Serviço</th>
+            <tr style={{ background: 'var(--table-head-bg)' }}>
+              <th style={{ ...gridTh, position: 'sticky', left: 0, background: 'var(--table-head-bg)', textAlign: 'left', minWidth: 130 }}>Serviço</th>
               {months.map((m) => <th key={m} style={gridTh}>{monthHdr(m)}</th>)}
               <th style={{ ...gridTh, minWidth: 86 }}>Em aberto</th>
             </tr>
@@ -436,7 +459,7 @@ function MonthlyGrid({ charges }: { charges: HotmartChargeRow[] }) {
           <tbody>
             {rows.map((r) => (
               <tr key={r.label} style={{ borderTop: '1px solid var(--border)' }}>
-                <td style={{ ...gridTd, position: 'sticky', left: 0, background: '#fff', textAlign: 'left', fontWeight: 600 }}>{r.label}</td>
+                <td style={{ ...gridTd, position: 'sticky', left: 0, background: 'var(--surface-raised)', textAlign: 'left', fontWeight: 600 }}>{r.label}</td>
                 {months.map((m) => {
                   const c = cellFor(r.byMonth[m]);
                   return <td key={m} style={{ ...gridTd, background: c.bg }} title={`${r.label} · ${monthHdr(m)} · ${c.title}`}>{c.mark}</td>;

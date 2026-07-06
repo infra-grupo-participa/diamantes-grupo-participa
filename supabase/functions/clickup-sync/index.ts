@@ -286,12 +286,23 @@ async function createTask(apiKey: string, listId: string, cfg: any, demand: any,
       body: JSON.stringify(buildCreatePayload(demand, assignees)),
     });
   } catch (e) {
+    const msg = String((e as any)?.message || e);
     // Espaço sem o ClickApp de múltiplos assignees (ITEM_417): recria com 1 só.
-    if (assignees.length > 1 && String((e as any)?.message || e).includes("ITEM_417")) {
+    if (assignees.length > 1 && msg.includes("ITEM_417")) {
       console.warn("espaço single-assignee — recriando com 1 responsável");
       task = await clickupRequest(apiKey, `/list/${listId}/task`, {
         method: "POST",
         body: JSON.stringify(buildCreatePayload(demand, assignees.slice(0, 1))),
+      });
+    } else if (assignees.length && (msg.includes("ITEM_087") || msg.includes("ITEM_417"))) {
+      // Responsáveis sem acesso à pasta (ITEM_087, pasta recém-criada/privada) ou
+      // single-assignee sem nenhum válido: cria a task SEM responsáveis. Melhor uma
+      // task sem assignee do que nenhuma — o vínculo se resolve quando a pasta for
+      // compartilhada (a próxima atualização reconcilia os assignees).
+      console.warn("assignees barrados (" + msg + ") — criando sem responsáveis");
+      task = await clickupRequest(apiKey, `/list/${listId}/task`, {
+        method: "POST",
+        body: JSON.stringify(buildCreatePayload(demand, [])),
       });
     } else {
       throw e;
@@ -313,11 +324,20 @@ async function updateTask(apiKey: string, cfg: any, task_id: string, demand: any
       body: JSON.stringify(buildUpdatePayload(demand, add, rem)),
     });
   } catch (e) {
+    const msg = String((e as any)?.message || e);
     // Espaço single-assignee (ITEM_417): adiciona só 1 responsável.
-    if (add.length > 1 && String((e as any)?.message || e).includes("ITEM_417")) {
+    if (add.length > 1 && msg.includes("ITEM_417")) {
       task = await clickupRequest(apiKey, `/task/${task_id}`, {
         method: "PUT",
         body: JSON.stringify(buildUpdatePayload(demand, add.slice(0, 1), rem)),
+      });
+    } else if (msg.includes("ITEM_087") || msg.includes("ITEM_417")) {
+      // Responsáveis sem acesso à pasta (ITEM_087): atualiza status/título/datas SEM
+      // mexer nos assignees, pra não travar a propagação do resto da demanda.
+      console.warn("assignees barrados (" + msg + ") — atualizando sem assignees");
+      task = await clickupRequest(apiKey, `/task/${task_id}`, {
+        method: "PUT",
+        body: JSON.stringify(buildUpdatePayload(demand, [], [])),
       });
     } else {
       throw e;

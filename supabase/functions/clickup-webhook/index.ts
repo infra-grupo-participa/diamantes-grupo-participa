@@ -125,6 +125,12 @@ async function handleCommentEvent(supabase: any, apiKey: string, payload: any, d
 
   const { error } = await supabase.schema("portal")
     .from("demand_messages").insert(toInsert);
+  // 23505 = unique_violation no índice demand_messages_clickup_comment_id_key:
+  // uma corrida (clickup-comment-sync ainda persistindo o cid) já inseriu este
+  // comentário. Não é erro — ignora para não gerar 500/retry e sem duplicar.
+  if (error && (error as { code?: string }).code === "23505") {
+    return { deduped: toInsert.length };
+  }
   if (error) throw new Error("insert err: " + error.message);
   return { inserted: toInsert.length };
 }

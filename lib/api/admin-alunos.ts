@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
+import { translateAuthError } from '@/lib/i18n';
 
 /**
  * admin-alunos.ts — camada de dados de Alunos Diamantes.
@@ -260,7 +261,9 @@ export async function createClientAccess({
     password,
     options: { data: { name: name || slug, role: 'user', status: 'approved' } },
   });
-  if (signUpError) throw new Error(signUpError.message);
+  // Traduz o erro do Auth (ex.: signup desabilitado → "Cadastro desabilitado.")
+  // em vez de vazar a mensagem crua em inglês do Supabase.
+  if (signUpError) throw new Error(translateAuthError(signUpError));
   if (!signUpData?.user) throw new Error('Falha ao criar usuário no Auth.');
   const newUserId = signUpData.user.id;
 

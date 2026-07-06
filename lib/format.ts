@@ -25,15 +25,22 @@ export function firstName(name?: string | null): string {
   return (name ?? '').trim().split(/\s+/)[0] ?? '';
 }
 
+// Strings "date-only" (YYYY-MM-DD) representam um dia de calendário, não um
+// instante. new Date('2026-07-04') vira meia-noite UTC; formatar em América/SP
+// (UTC-3) imprimiria 03/07. Para esses valores fixamos timeZone UTC, preservando
+// o dia. Timestamps completos seguem no fuso do usuário.
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
 export function fmtDate(value?: string | Date | null, timeZone?: string): string {
   if (!value) return '—';
+  const dateOnly = typeof value === 'string' && DATE_ONLY.test(value.trim());
   const d = new Date(value);
   if (isNaN(d.getTime())) return '—';
   return d.toLocaleDateString(loc(), {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
-    timeZone: tz(timeZone),
+    timeZone: dateOnly ? 'UTC' : tz(timeZone),
   });
 }
 

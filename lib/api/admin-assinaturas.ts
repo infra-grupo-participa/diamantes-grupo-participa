@@ -8,6 +8,14 @@ import { canonicalServiceName } from '@/lib/api/admin-alunos';
  * Espelha admin/assets/admin-api.js (seção ASSINATURAS) fielmente.
  */
 
+/**
+ * Clientes fictícios (demo / testes E2E) que NÃO podem entrar nos números de
+ * negócio — inflam MRR, "ativos" e a grade "Mês a mês". Continuam visíveis na
+ * listagem para gestão; só são excluídos das agregações financeiras.
+ */
+export const DEMO_CLIENT_SLUGS = ['cliente-demo', 'teste-acesso', 'teste-e2e'] as const;
+const DEMO_SLUGS_PG = `(${DEMO_CLIENT_SLUGS.join(',')})`; // formato PostgREST p/ .not('col','in',…)
+
 export type SubscriptionRow = {
   id: string;
   client_slug: string;
@@ -97,14 +105,17 @@ export async function listSubscriptions({
 
 export async function getSubscriptionStats(): Promise<SubscriptionStats> {
   const supabase = createClient();
+  // Exclui clientes fictícios de TODAS as contagens/somatórios (KPIs coerentes).
+  const noDemo = () =>
+    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).not('client_slug', 'in', DEMO_SLUGS_PG);
   const [paid, partial, overdue, pending, canceled, all, sumActive] = await Promise.all([
-    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'paid'),
-    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'partial'),
-    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).in('status', ['overdue', 'late']),
-    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('status', 'canceled'),
-    supabase.from('subscriptions').select('id', { count: 'exact', head: true }),
-    supabase.from('subscriptions').select('monthly_value').neq('status', 'canceled'),
+    noDemo().eq('status', 'paid'),
+    noDemo().eq('status', 'partial'),
+    noDemo().in('status', ['overdue', 'late']),
+    noDemo().eq('status', 'pending'),
+    noDemo().eq('status', 'canceled'),
+    noDemo(),
+    supabase.from('subscriptions').select('monthly_value').not('client_slug', 'in', DEMO_SLUGS_PG).neq('status', 'canceled'),
   ]);
   for (const r of [paid, partial, overdue, pending, canceled, all, sumActive]) {
     if (r.error) throw r.error;
@@ -168,7 +179,10 @@ export async function getSubscriptionMoneySummary(): Promise<{
 
 export async function getMrrSparkline(): Promise<SparkPoint[]> {
   const supabase = createClient();
-  const { data } = await supabase.from('subscriptions').select('monthly_value, started_at, created_at, status');
+  const { data } = await supabase
+    .from('subscriptions')
+    .select('monthly_value, started_at, created_at, status')
+    .not('client_slug', 'in', DEMO_SLUGS_PG);
   if (!data) return [];
   const now = new Date();
   const months: SparkPoint[] = [];
@@ -314,14 +328,37 @@ export async function listPurchasesHistory({
   return { data: (data ?? []) as PurchaseRow[], count: count ?? 0 };
 }
 
-export async function getPurchaseMonthlyStats(): Promise<MonthlyStat[]> {
+/**
+ * Busca TODAS as linhas de portal.hotmart_purchases em páginas de 1000, driblando
+ * o teto padrão do PostgREST. Sem isso, o backfill (2500+ linhas) era truncado
+ * silenciosamente e a grade "Mês a mês" subcontava os meses antigos.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PurchaseQuery = any;
+async function fetchAllHotmartPurchases(
+  columns: string,
+  apply?: (q: PurchaseQuery) => PurchaseQuery,
+): Promise<Record<string, unknown>[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .schema('portal')
-    .from('hotmart_purchases')
-    .select('charged_at, amount, status, payment_type, service_name, client_slug')
-    .in('status', ['approved', 'complete']);
-  if (error) throw error;
+  const PAGE = 1000;
+  const rows: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += PAGE) {
+    let q: PurchaseQuery = supabase.schema('portal').from('hotmart_purchases').select(columns);
+    if (apply) q = apply(q);
+    const { data, error } = await q.order('charged_at', { ascending: false }).range(offset, offset + PAGE - 1);
+    if (error) throw error;
+    const batch = (data ?? []) as Record<string, unknown>[];
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return rows;
+}
+
+export async function getPurchaseMonthlyStats(): Promise<MonthlyStat[]> {
+  const data = (await fetchAllHotmartPurchases(
+    'charged_at, amount, status, payment_type, service_name, client_slug',
+    (q) => q.in('status', ['approved', 'complete']),
+  )) as unknown as PurchaseRow[];
   const byMonth: Record<string, MonthlyStat> = {};
   ((data ?? []) as PurchaseRow[]).forEach((p) => {
     const m = (p.charged_at || '').slice(0, 7);
@@ -428,16 +465,11 @@ export async function exportSubscriptionsCsv(): Promise<Blob> {
 }
 
 export async function exportPurchasesCsv(): Promise<Blob> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .schema('portal')
-    .from('hotmart_purchases')
-    .select(
-      'transaction_code, buyer_email, offer_code, service_name, amount, status, payment_type, installments_total, installment_number, charged_at, client_slug',
-    )
-    .order('charged_at', { ascending: false })
-    .limit(2000);
-  if (error) throw error;
+  // Histórico completo (backfill 2500+), sem o teto de 2000 que descartava as
+  // compras mais antigas.
+  const data = (await fetchAllHotmartPurchases(
+    'transaction_code, buyer_email, offer_code, service_name, amount, status, payment_type, installments_total, installment_number, charged_at, client_slug',
+  )) as unknown as PurchaseRow[];
 
   const header = [
     'Código Transação',
@@ -456,7 +488,9 @@ export async function exportPurchasesCsv(): Promise<Blob> {
 
   const rows = ((data ?? []) as PurchaseRow[]).map((p) => {
     const charged = p.charged_at ? new Date(p.charged_at) : null;
-    const accessUntil = charged ? new Date(charged.getFullYear(), charged.getMonth() + 1, 18) : null;
+    // Régua real do sistema: acesso vale até a cobrança + 30 dias (mesma de
+    // linkHotmartPurchase e das RPCs). Antes usava dia 18 fixo, que divergia.
+    const accessUntil = charged ? new Date(charged.getTime() + 30 * 24 * 60 * 60 * 1000) : null;
     return [
       p.transaction_code,
       p.buyer_email,
@@ -536,6 +570,26 @@ export async function listClientHotmartCharges(clientSlug: string): Promise<Hotm
     .order('charged_at', { ascending: true });
   if (error) throw error;
   return (data ?? []) as HotmartChargeRow[];
+}
+
+// Mapa offer_code → service_name (portal.hotmart_offers). Usado como fallback
+// quando uma cobrança Hotmart chega só com offer_code e sem service_name.
+export async function getHotmartOffersMap(): Promise<Record<string, string>> {
+  const map: Record<string, string> = {};
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .schema('portal')
+      .from('hotmart_offers')
+      .select('offer_code, service_name');
+    if (error) throw error;
+    for (const o of (data ?? []) as Array<{ offer_code: string | null; service_name: string | null }>) {
+      if (o.offer_code && o.service_name) map[o.offer_code] = o.service_name;
+    }
+  } catch {
+    // Não-fatal: a grade tem fallback estático de offer_code → nome.
+  }
+  return map;
 }
 
 export async function registerManualPayment(p: {
