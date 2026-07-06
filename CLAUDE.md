@@ -8,7 +8,7 @@ Portal cliente do programa Diamantes (Grupo Participa). **Webapp Next.js** (migr
 - **Backend:** Supabase (Auth + Postgres `portal` + Storage + RLS). Não muda — o app só **chama** RPCs/views/tabelas.
   Projeto: `npqyvjhvtfahuxfmuhie`.
 - **Auth/sessão:** `@supabase/ssr` (cookies SSR) + middleware. 2 áreas por role: cliente (`user`) e `admin`. (Operadores são membros de equipe geridos no admin — não têm login próprio.)
-- **Deploy:** Hostinger **Node App** (hPanel). Startup `server.js` (lê `process.env.PORT`). Build no deploy.
+- **Deploy:** Hostinger **Node App** (hPanel) com **auto-deploy no push da `main`** (integração Git). Startup `server.js` (lê `process.env.PORT`). Build roda no deploy.
 
 ## Estrutura
 
@@ -46,6 +46,7 @@ npm run dev                  # http://localhost:3000/login
 
 ## Deploy — Hostinger Node App
 
+- **Auto-deploy:** `git push origin main` dispara build + restart automaticamente (Git integration da Node App). Não é manual.
 - **Application root:** raiz do repo · **Startup file:** `server.js` · **Node:** 20 LTS+
 - **Build:** `npm ci && npm run build`
 - **Env vars** (no painel, não em `.htaccess`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
@@ -54,6 +55,6 @@ npm run dev                  # http://localhost:3000/login
 
 ## Notas
 
-- **Sem GitHub Actions** (removidos para não consumir plano). Deploy é manual no Node App.
+- **Sem GitHub Actions** (removidos para não consumir plano). O deploy do app roda pelo auto-deploy da Node App no push da `main` — migrations (Supabase) e edge functions são deploy à parte.
 - Backend Supabase é a fonte da verdade; vários RPCs/views vivem só no banco remoto (ver `docs/.../PARITY.md`).
 - Schema `portal` em todas as chamadas (configurado no client/server Supabase).
