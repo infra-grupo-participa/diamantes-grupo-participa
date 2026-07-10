@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client';
  */
 
 // ── Tipos ──────────────────────────────────────────────────────────────
+export type AccessStatus = 'none' | 'active' | 'disabled';
+
 export type StudentRow = {
   slug: string;
   name: string | null;
@@ -21,6 +23,9 @@ export type StudentRow = {
   services_count?: number | null;
   team_count?: number | null;
   primary_color?: string | null;
+  // Estado do login do aluno (derivado de portal.users role='user'); ver getAccessBySlugs.
+  access_status?: AccessStatus;
+  access_email?: string | null;
 };
 
 export type TeamMember = {
@@ -101,7 +106,16 @@ export async function listStudents({
 
   const { data, count, error } = await q;
   if (error) throw error;
-  return { data: (data ?? []) as StudentRow[], count: count ?? 0 };
+  const rows = (data ?? []) as StudentRow[];
+
+  // Enriquece com o estado do login (badge "sem acesso / ativo / desativado").
+  const access = await getAccessBySlugs(rows.map((r) => r.slug));
+  for (const r of rows) {
+    const a = access[r.slug];
+    r.access_status = a?.access_status ?? 'none';
+    r.access_email = a?.access_email ?? null;
+  }
+  return { data: rows, count: count ?? 0 };
 }
 
 export async function getStudent(slug: string): Promise<StudentRow | null> {
@@ -109,7 +123,39 @@ export async function getStudent(slug: string): Promise<StudentRow | null> {
   const supabase = createClient();
   const { data, error } = await supabase.from('v_students').select('*').eq('slug', slug).maybeSingle();
   if (error) throw error;
-  return (data ?? null) as StudentRow | null;
+  if (!data) return null;
+  const access = await getAccessBySlugs([slug]);
+  return { ...(data as StudentRow), ...(access[slug] ?? { access_status: 'none', access_email: null }) };
+}
+
+/**
+ * Estado do login de vários alunos em UMA query. O acesso vive na linha
+ * `portal.users` (role='user') do cliente — a mesma de onde v_students tira o
+ * owner_email. 'none' = sem login; 'active' = approved; 'disabled' = desativado.
+ */
+export async function getAccessBySlugs(
+  slugs: string[],
+): Promise<Record<string, { access_status: AccessStatus; access_email: string | null }>> {
+  const out: Record<string, { access_status: AccessStatus; access_email: string | null }> = {};
+  const clean = [...new Set((slugs || []).filter(Boolean))];
+  if (clean.length === 0) return out;
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('users')
+    .select('client_slug, email, status, auth_user_id')
+    .eq('role', 'user')
+    .in('client_slug', clean);
+  if (error) throw error;
+  for (const u of (data ?? []) as Array<{ client_slug: string; email: string | null; status: string | null; auth_user_id: string | null }>) {
+    // Sem auth_user_id a linha é só alias de matching Hotmart (não é login de verdade).
+    const status: AccessStatus = !u.auth_user_id ? 'none' : u.status === 'approved' ? 'active' : 'disabled';
+    const prev = out[u.client_slug];
+    // Se houver alias + login real no mesmo slug, o login real prevalece.
+    if (!prev || (prev.access_status === 'none' && status !== 'none')) {
+      out[u.client_slug] = { access_status: status, access_email: u.email };
+    }
+  }
+  return out;
 }
 
 export async function getStudentTeam(slug: string): Promise<TeamMember[]> {
@@ -217,11 +263,20 @@ export async function updateStudent(
   return data;
 }
 
+/**
+ * Exclui o aluno. Vai por rota server porque, além de apagar o cliente, precisa
+ * remover o login (auth.users + portal.users) — senão sobra órfão, como no fluxo antigo
+ * que só fazia DELETE em clients.
+ */
 export async function deleteStudent(slug: string) {
   if (!slug) throw new Error('slug obrigatório');
-  const supabase = createClient();
-  const { error } = await supabase.from('clients').delete().eq('slug', slug);
-  if (error) throw error;
+  const res = await fetch('/api/admin/excluir-aluno', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(body.error || 'Falha ao excluir o aluno.');
   return true;
 }
 
@@ -247,6 +302,55 @@ export async function createClientAccess({
   if (!res.ok) throw new Error(body.error || 'Falha ao criar acesso.');
 
   return { email: body.email ?? email, emailSent: Boolean(body.emailSent) };
+}
+
+/**
+ * Desativa/reativa o acesso do aluno. UPDATE direto na linha `portal.users`
+ * (role='user') pela sessão do admin — a policy `users_admin_update_all` permite.
+ * 'disabled' barra o login (login-form e requireRole exigem 'approved'); reversível.
+ */
+export async function setStudentAccessStatus(slug: string, status: 'approved' | 'disabled') {
+  if (!slug) throw new Error('slug obrigatório');
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('users')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('client_slug', slug)
+    .eq('role', 'user')
+    .not('auth_user_id', 'is', null) // não toca em aliases de matching Hotmart
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) throw new Error('Este aluno não tem login para alterar.');
+  return true;
+}
+
+/** Reenvia o link de definição de senha ao aluno (rota server → Resend). */
+export async function resendStudentAccess(slug: string): Promise<{ emailSent: boolean; email?: string }> {
+  if (!slug) throw new Error('slug obrigatório');
+  const res = await fetch('/api/admin/reenviar-acesso', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; email?: string; emailSent?: boolean };
+  if (!res.ok) throw new Error(body.error || 'Falha ao reenviar o link.');
+  return { emailSent: Boolean(body.emailSent), email: body.email };
+}
+
+/**
+ * Corrige o e-mail de login do aluno. Rota server porque precisa mudar tanto
+ * `auth.users.email` (login) quanto `portal.users.email` — só a service-role faz o primeiro.
+ */
+export async function updateStudentAccessEmail(slug: string, email: string): Promise<{ email: string }> {
+  if (!slug) throw new Error('slug obrigatório');
+  const res = await fetch('/api/admin/alterar-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, email: email.trim().toLowerCase() }),
+  });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; email?: string };
+  if (!res.ok) throw new Error(body.error || 'Falha ao alterar o e-mail.');
+  return { email: body.email ?? email };
 }
 
 // ── Equipe operacional / assignments ─────────────────────────────────────

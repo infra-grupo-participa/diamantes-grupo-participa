@@ -19,10 +19,14 @@ import {
   updateStudent,
   deleteStudent,
   createClientAccess,
+  setStudentAccessStatus,
+  resendStudentAccess,
+  updateStudentAccessEmail,
   exportStudentsCsv,
   downloadBlob,
   canonicalServiceName,
   type StudentRow,
+  type AccessStatus,
   type TeamMember,
   type ServiceRow,
   type OperatorOption,
@@ -78,6 +82,15 @@ function billingBadge(status?: string | null): { cls: string; txt: string } {
     late: { cls: s.badgeRed, txt: 'Atrasado' },
   };
   return map[status ?? ''] || { cls: s.badgeYellow, txt: status || 'Sem status' };
+}
+
+function accessBadge(status?: AccessStatus): { cls: string; txt: string } {
+  const map: Record<AccessStatus, { cls: string; txt: string }> = {
+    active: { cls: s.badgeGreen, txt: 'Acesso ativo' },
+    disabled: { cls: s.badgeGray, txt: 'Acesso desativado' },
+    none: { cls: s.badgeYellow, txt: 'Sem acesso' },
+  };
+  return map[status ?? 'none'];
 }
 
 function nearestDueService(services: ServiceRow[]): ServiceRow | null {
@@ -249,8 +262,37 @@ export default function AlunosClient() {
     try {
       const { email: e, emailSent } = await createClientAccess({ slug: row.slug, email, name: row.display_name || row.name });
       setCreds({ name, email: e, emailSent });
+      await Promise.all([load(), loadStats()]);
     } catch (err) {
       alert('Erro ao criar acesso: ' + ((err as Error).message || err));
+    }
+  }
+
+  // Desativa/reativa o login do aluno (reversível). Espelha o toggleAdmin da Equipe.
+  async function onToggleAccess(row: StudentRow) {
+    const name = row.display_name || row.name || row.slug;
+    const disabling = row.access_status === 'active';
+    const verb = disabling ? 'desativar' : 'reativar';
+    if (!confirm(`Tem certeza que deseja ${verb} o acesso de "${name}"?`)) return;
+    try {
+      await setStudentAccessStatus(row.slug, disabling ? 'disabled' : 'approved');
+      toast(disabling ? 'Acesso desativado.' : 'Acesso reativado.');
+      await Promise.all([load(), loadStats()]);
+      if (current?.slug === row.slug) await refreshCurrent();
+    } catch (e) {
+      toast('Erro: ' + ((e as Error).message || e), 'error');
+    }
+  }
+
+  // Reenvia o link de definição de senha ao aluno.
+  async function onResendAccess(row: StudentRow) {
+    const name = row.display_name || row.name || row.slug;
+    if (!confirm(`Reenviar o link de acesso para "${name}" (${row.access_email ?? row.owner_email})?`)) return;
+    try {
+      const { emailSent, email } = await resendStudentAccess(row.slug);
+      toast(emailSent ? `Link reenviado para ${email}.` : 'Não foi possível enviar o e-mail agora.', emailSent ? 'success' : 'warning');
+    } catch (e) {
+      toast('Erro ao reenviar: ' + ((e as Error).message || e), 'error');
     }
   }
 
@@ -393,6 +435,7 @@ export default function AlunosClient() {
                   <th>Equipe</th>
                   <th>Serviços</th>
                   <th>Status</th>
+                  <th>Acesso</th>
                   <th style={{ textAlign: 'right' }}>Ação</th>
                 </tr>
               </thead>
@@ -401,13 +444,13 @@ export default function AlunosClient() {
                   Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : tableError ? (
                   <tr>
-                    <td colSpan={6} className={s.cellError}>
+                    <td colSpan={7} className={s.cellError}>
                       Erro ao carregar: {tableError}
                     </td>
                   </tr>
                 ) : students.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className={s.cellEmpty}>
+                    <td colSpan={7} className={s.cellEmpty}>
                       Nenhum aluno encontrado.
                     </td>
                   </tr>
@@ -421,6 +464,8 @@ export default function AlunosClient() {
                       onOpen={() => openDetail(row)}
                       onEdit={() => setStudentModal({ editingSlug: row.slug })}
                       onAccess={() => onAccessFlow(row)}
+                      onToggleAccess={() => onToggleAccess(row)}
+                      onResendAccess={() => onResendAccess(row)}
                       onDelete={() => onDelete(row)}
                     />
                   ))
@@ -658,6 +703,7 @@ function SkeletonRow() {
       <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 28 }} /></td>
       <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 28 }} /></td>
       <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 64, height: 20, borderRadius: 999 }} /></td>
+      <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 80, height: 20, borderRadius: 999 }} /></td>
       <td><span className={`${s.skel} ${s.skelLine}`} style={{ width: 90, height: 28, marginLeft: 'auto' }} /></td>
     </tr>
   );
@@ -748,6 +794,8 @@ function StudentRowView({
   onOpen,
   onEdit,
   onAccess,
+  onToggleAccess,
+  onResendAccess,
   onDelete,
 }: {
   row: StudentRow;
@@ -756,6 +804,8 @@ function StudentRowView({
   onOpen: () => void;
   onEdit: () => void;
   onAccess: () => void;
+  onToggleAccess: () => void;
+  onResendAccess: () => void;
   onDelete: () => void;
 }) {
   let dueBadge: React.ReactNode = null;
@@ -771,6 +821,9 @@ function StudentRowView({
     else if (diff <= 18) dueBadge = <div className={`${s.dueWarn} ${s.future}`}>{label} — {due.toLocaleDateString('pt-BR')}</div>;
   }
   const b = billingBadge(row.billing_status);
+  const acc = accessBadge(row.access_status);
+  const hasAccess = row.access_status === 'active' || row.access_status === 'disabled';
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
   return (
     <tr className={selected ? s.selected : ''} onClick={onOpen}>
       <td className={s.cardHeader}>
@@ -795,19 +848,53 @@ function StudentRowView({
       <td data-label="Status">
         <span className={`${s.badge} ${b.cls}`}>{b.txt}</span>
       </td>
+      <td data-label="Acesso">
+        <span className={`${s.badge} ${acc.cls}`}>{acc.txt}</span>
+      </td>
       <td className={s.cardActions} data-label="Ação" style={{ textAlign: 'right' }}>
-        <div className={s.rowActions} onClick={(e) => e.stopPropagation()}>
+        <div className={s.rowActions} onClick={stop}>
           <button className={s.iconBtn} title="Editar" onClick={onEdit}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 20h9" />
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
             </svg>
           </button>
-          <button className={s.iconBtn} title="Gerar acesso de login" onClick={onAccess}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-            </svg>
-          </button>
+
+          {/* Ações de acesso conforme o estado do login */}
+          {row.access_status === 'none' && (
+            <button className={s.iconBtn} title="Criar acesso de login" onClick={onAccess}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+              </svg>
+            </button>
+          )}
+          {row.access_status === 'active' && (
+            <button className={s.iconBtn} title="Reenviar link de acesso" onClick={onResendAccess}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 2 11 13" />
+                <path d="M22 2 15 22l-4-9-9-4 20-7z" />
+              </svg>
+            </button>
+          )}
+          {hasAccess && (
+            <button
+              className={s.iconBtn}
+              title={row.access_status === 'active' ? 'Desativar acesso' : 'Reativar acesso'}
+              onClick={onToggleAccess}
+            >
+              {row.access_status === 'active' ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="m4.9 4.9 14.2 14.2" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </button>
+          )}
+
           <button className={s.iconBtn} title="Excluir" onClick={onDelete}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="3 6 5 6 21 6" />
@@ -913,6 +1000,10 @@ function StudentModal({
   const [name, setName] = useState(editing?.name || '');
   const [slug, setSlug] = useState(editing?.slug || '');
   const [color, setColor] = useState(editing?.primary_color || '#F29725');
+  // E-mail de login — só editável quando o aluno já tem acesso.
+  const hasAccess = editing?.access_status === 'active' || editing?.access_status === 'disabled';
+  const initialEmail = editing?.access_email || '';
+  const [accessEmail, setAccessEmail] = useState(initialEmail);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -924,6 +1015,10 @@ function StudentModal({
       const display_name = name.trim();
       if (editing) {
         await updateStudent(editing.slug, { display_name, primary_color: color });
+        const nextEmail = accessEmail.trim().toLowerCase();
+        if (hasAccess && nextEmail && nextEmail !== initialEmail.toLowerCase()) {
+          await updateStudentAccessEmail(editing.slug, nextEmail);
+        }
         toast('Aluno atualizado.');
       } else {
         await createStudent({ slug: slug.trim().toLowerCase(), display_name, primary_color: color });
@@ -965,6 +1060,19 @@ function StudentModal({
                   onChange={(e) => setSlug(e.target.value)}
                 />
                 <small className={s.hint}>Letras minúsculas, números e hífen. Não pode ser alterado depois.</small>
+              </div>
+            )}
+            {editing && hasAccess && (
+              <div>
+                <label className={s.label}>E-mail de acesso (login)</label>
+                <input
+                  className={s.modalInput}
+                  type="email"
+                  value={accessEmail}
+                  onChange={(e) => setAccessEmail(e.target.value)}
+                  placeholder="aluno@dominio.com"
+                />
+                <small className={s.hint}>Muda o e-mail que o aluno usa para entrar. Corrige um endereço digitado errado.</small>
               </div>
             )}
             <div>

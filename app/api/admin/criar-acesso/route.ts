@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient, createAdminClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
+import { assertAdminApi } from '@/lib/auth';
 import { generateRecoveryLink } from '@/lib/email/recovery-link';
 import { firstAccessEmail } from '@/lib/email/templates';
 import { sendTransactionalEmail } from '@/lib/email/send';
@@ -36,19 +37,10 @@ export async function POST(request: Request) {
   if (!EMAIL_RE.test(email)) return fail('E-mail inválido.', 400);
 
   // ── Auth: só admin aprovado ──────────────────────────────────────────────
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return fail('Sessão expirada.', 401);
+  const guard = await assertAdminApi();
+  if (guard instanceof NextResponse) return guard;
 
   const admin = createAdminClient();
-  const { data: caller } = await admin
-    .from('users')
-    .select('role, status')
-    .eq('auth_user_id', user.id)
-    .maybeSingle();
-  if (caller?.role !== 'admin' || caller.status !== 'approved') return fail('Permissão negada.', 403);
 
   // ── O aluno já tem acesso? ───────────────────────────────────────────────
   const { data: existing } = await admin

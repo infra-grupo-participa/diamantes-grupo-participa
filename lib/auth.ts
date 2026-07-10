@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import { redirect } from 'next/navigation';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export type Role = 'admin' | 'user' | 'client';
@@ -55,5 +56,19 @@ export async function requireRole(roles: Role[]): Promise<Profile> {
   if (!profile) redirect('/login');
   if (profile.status !== 'approved') redirect('/login');
   if (!roles.includes(profile.role)) redirect(homeFor(profile.role));
+  return profile;
+}
+
+/**
+ * Guarda para Route Handlers de admin. Diferente de requireRole (que redireciona
+ * páginas), retorna o perfil do admin OU um NextResponse de erro JSON pronto para
+ * devolver. Uso: `const g = await assertAdminApi(); if (g instanceof NextResponse) return g;`
+ */
+export async function assertAdminApi(): Promise<Profile | NextResponse> {
+  const profile = await getProfile();
+  if (!profile) return NextResponse.json({ ok: false, error: 'Sessão expirada.' }, { status: 401 });
+  if (profile.role !== 'admin' || profile.status !== 'approved') {
+    return NextResponse.json({ ok: false, error: 'Permissão negada.' }, { status: 403 });
+  }
   return profile;
 }
