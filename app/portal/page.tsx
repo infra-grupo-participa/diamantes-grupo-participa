@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   getDashboard,
-  isBaseReady,
+  getClientBriefing,
   getPendingProjectBriefing,
   getDashboardExtras,
   type DashboardData,
@@ -169,9 +169,17 @@ function ServicesCard({ services }: { services: DashboardData['services'] }) {
 }
 
 export default async function Dashboard() {
+  // As três fontes são independentes — buscar em paralelo (antes eram 3 idas
+  // sequenciais ao banco). Só o dashboard é crítico: se ele falhar, mostra o aviso.
   let data: DashboardData;
+  let briefing: Awaited<ReturnType<typeof getClientBriefing>>;
+  let extras: Awaited<ReturnType<typeof getDashboardExtras>> | null;
   try {
-    data = await getDashboard();
+    [data, briefing, extras] = await Promise.all([
+      getDashboard(),
+      getClientBriefing().catch(() => null),
+      getDashboardExtras().catch(() => null),
+    ]);
   } catch {
     return (
       <section className="page">
@@ -181,11 +189,9 @@ export default async function Dashboard() {
     );
   }
 
-  const baseReady = await isBaseReady();
-  const [pending, extras] = await Promise.all([
-    baseReady ? getPendingProjectBriefing().catch(() => null) : Promise.resolve(null),
-    getDashboardExtras().catch(() => null),
-  ]);
+  // O aviso "continue de onde parou" só existe depois do Briefing Básico enviado.
+  const baseReady = briefing?.base_status === 'submitted';
+  const pending = baseReady ? await getPendingProjectBriefing().catch(() => null) : null;
 
   const name = data.user?.name ?? '';
   const team = data.team ?? [];

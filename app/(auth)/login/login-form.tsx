@@ -55,16 +55,12 @@ export default function LoginForm() {
       return;
     }
 
-    // Carimba o último acesso (alimenta o KPI "Ativos hoje"); não bloqueia o login.
-    try {
-      await supabase.rpc('touch_my_last_login');
-    } catch {
-      /* noop */
-    }
+    // Carimba o último acesso (alimenta o KPI "Ativos hoje"); não bloqueia o login,
+    // então dispara sem aguardar — esperar a resposta só atrasava o redirect.
+    void Promise.resolve(supabase.rpc('touch_my_last_login')).catch(() => {});
 
     router.replace(profile.role === 'admin' ? '/admin' : '/portal');
     router.refresh();
-    setLoading(false);
   }
 
   return (

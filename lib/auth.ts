@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
@@ -13,8 +14,12 @@ export type Profile = {
   clientSlug: string | null;
 };
 
-/** Lê o perfil do usuário logado (portal.users) ou null se sem sessão. */
-export async function getProfile(): Promise<Profile | null> {
+/**
+ * Lê o perfil do usuário logado (portal.users) ou null se sem sessão.
+ * Memoizado por request (React cache): layout + página no mesmo render
+ * compartilham uma única validação de sessão em vez de repetir getUser+select.
+ */
+export const getProfile = cache(async (): Promise<Profile | null> => {
   const supabase = createClient();
   const {
     data: { user },
@@ -37,7 +42,7 @@ export async function getProfile(): Promise<Profile | null> {
     status: data.status,
     clientSlug: data.client_slug,
   };
-}
+});
 
 function homeFor(role: Role): string {
   if (role === 'admin') return '/admin';
