@@ -1,7 +1,6 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { translateAuthError } from '@/lib/i18n';
 
 /**
  * admin-alunos.ts — camada de dados de Alunos Diamantes.
@@ -227,79 +226,27 @@ export async function deleteStudent(slug: string) {
 }
 
 // ── ONB-01: gerar acesso (login) do aluno ────────────────────────────────
-function genPassword(len = 12): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$%';
-  const arr = new Uint32Array(len);
-  crypto.getRandomValues(arr);
-  let out = '';
-  for (let i = 0; i < len; i++) out += chars[arr[i] % chars.length];
-  return out;
-}
-
+/**
+ * Cria o login do aluno. A criação em si roda no servidor (/api/admin/criar-acesso),
+ * porque a instância tem signup desabilitado e `auth.signUp` no browser falharia.
+ * O aluno não recebe senha: define a dele pelo link enviado por e-mail.
+ */
 export async function createClientAccess({
   slug,
   email,
   name,
-}: { slug: string; email: string; name?: string | null }): Promise<{ email: string; password: string }> {
+}: { slug: string; email: string; name?: string | null }): Promise<{ email: string; emailSent: boolean }> {
   if (!slug || !email) throw new Error('Aluno (slug) e e-mail são obrigatórios.');
-  const supabase = createClient();
-  email = email.trim().toLowerCase();
 
-  const { data: existing } = await supabase
-    .from('users')
-    .select('id, email')
-    .eq('client_slug', slug)
-    .eq('role', 'user')
-    .maybeSingle();
-  if (existing) throw new Error('Este aluno já tem acesso: ' + existing.email);
-
-  const password = genPassword(12);
-  const { data: cur } = await supabase.auth.getSession();
-
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-    email,
-    password,
-    options: { data: { name: name || slug, role: 'user', status: 'approved' } },
+  const res = await fetch('/api/admin/criar-acesso', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ slug, email: email.trim().toLowerCase(), name: name || null }),
   });
-  // Traduz o erro do Auth (ex.: signup desabilitado → "Cadastro desabilitado.")
-  // em vez de vazar a mensagem crua em inglês do Supabase.
-  if (signUpError) throw new Error(translateAuthError(signUpError));
-  if (!signUpData?.user) throw new Error('Falha ao criar usuário no Auth.');
-  const newUserId = signUpData.user.id;
+  const body = (await res.json().catch(() => ({}))) as { error?: string; email?: string; emailSent?: boolean };
+  if (!res.ok) throw new Error(body.error || 'Falha ao criar acesso.');
 
-  // signUp troca a sessão ativa — restaura a do admin
-  if (cur?.session) {
-    await supabase.auth.setSession({
-      access_token: cur.session.access_token,
-      refresh_token: cur.session.refresh_token,
-    });
-  }
-
-  const { error: insErr } = await supabase.from('users').insert({
-    auth_user_id: newUserId,
-    email,
-    name: name || slug,
-    role: 'user',
-    status: 'approved',
-    client_slug: slug,
-  });
-  if (insErr) throw insErr;
-
-  // Marca reunião de configuração pendente (best-effort)
-  try {
-    const { data: prof } = await supabase
-      .from('client_profiles')
-      .select('data')
-      .eq('client_slug', slug)
-      .maybeSingle();
-    const d = ((prof && (prof.data as Record<string, unknown>)) || {}) as Record<string, unknown>;
-    d.onboarding = { meeting_pending: true, access_created_at: new Date().toISOString() };
-    await supabase.from('client_profiles').update({ data: d }).eq('client_slug', slug);
-  } catch {
-    /* perfil pode não existir ainda */
-  }
-
-  return { email, password };
+  return { email: body.email ?? email, emailSent: Boolean(body.emailSent) };
 }
 
 // ── Equipe operacional / assignments ─────────────────────────────────────

@@ -117,7 +117,7 @@ export default function AlunosClient() {
   // Modais
   const [studentModal, setStudentModal] = useState<null | { editingSlug: string | null }>(null);
   const [teamModal, setTeamModal] = useState(false);
-  const [creds, setCreds] = useState<null | { name: string; email: string; password: string }>(null);
+  const [creds, setCreds] = useState<null | { name: string; email: string; emailSent: boolean }>(null);
 
   // ── Carregamento ──
   const loadStats = useCallback(async () => {
@@ -242,13 +242,13 @@ export default function AlunosClient() {
     const name = row.display_name || row.name || row.slug;
     if (
       !confirm(
-        `Criar acesso para "${name}" com o e-mail ${email}?\n\nO sistema gera a senha — você envia manualmente ao aluno.`,
+        `Criar acesso para "${name}" com o e-mail ${email}?\n\nO aluno recebe um e-mail com o link para definir a própria senha.`,
       )
     )
       return;
     try {
-      const { email: e, password } = await createClientAccess({ slug: row.slug, email, name: row.display_name || row.name });
-      setCreds({ name, email: e, password });
+      const { email: e, emailSent } = await createClientAccess({ slug: row.slug, email, name: row.display_name || row.name });
+      setCreds({ name, email: e, emailSent });
     } catch (err) {
       alert('Erro ao criar acesso: ' + ((err as Error).message || err));
     }
@@ -1120,30 +1120,24 @@ function TeamModal({
 function CredentialsModal({
   name,
   email,
-  password,
+  emailSent,
   onClose,
 }: {
   name: string;
   email: string;
-  password: string;
+  emailSent: boolean;
   onClose: () => void;
 }) {
   const [copiedEmail, setCopiedEmail] = useState(false);
-  const [copiedPass, setCopiedPass] = useState(false);
 
-  function copy(value: string, which: 'email' | 'pass') {
+  function copy(value: string) {
     try {
       navigator.clipboard.writeText(value);
     } catch {
       /* ignore */
     }
-    if (which === 'email') {
-      setCopiedEmail(true);
-      setTimeout(() => setCopiedEmail(false), 1500);
-    } else {
-      setCopiedPass(true);
-      setTimeout(() => setCopiedPass(false), 1500);
-    }
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 1500);
   }
 
   return (
@@ -1153,32 +1147,33 @@ function CredentialsModal({
           <div>
             <div style={{ fontSize: '1.05rem', fontWeight: 700 }}>Acesso criado ✓</div>
             <div style={{ fontSize: '.82rem', color: 'var(--muted)', marginTop: 2 }}>
-              {name} — envie estes dados manualmente ao aluno.
+              {name} — o aluno define a própria senha pelo link.
             </div>
           </div>
         </div>
         <div className={s.modalBody} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <div className={s.credLabel}>E-mail</div>
+            <div className={s.credLabel}>E-mail de acesso</div>
             <div className={s.credField}>
               <input className={s.credInput} readOnly value={email} />
-              <button type="button" className={s.credCopy} onClick={() => copy(email, 'email')}>
+              <button type="button" className={s.credCopy} onClick={() => copy(email)}>
                 {copiedEmail ? 'Copiado' : 'Copiar'}
               </button>
             </div>
           </div>
-          <div>
-            <div className={s.credLabel}>Senha</div>
-            <div className={s.credField}>
-              <input className={`${s.credInput} ${s.mono}`} readOnly value={password} />
-              <button type="button" className={s.credCopy} onClick={() => copy(password, 'pass')}>
-                {copiedPass ? 'Copiado' : 'Copiar'}
-              </button>
-            </div>
-          </div>
           <div className={s.credWarn}>
-            ⚠️ Esta senha <strong>não será exibida de novo</strong>. Copie e envie agora. Uma{' '}
-            <strong>reunião de configuração</strong> foi marcada como pendente para este aluno.
+            {emailSent ? (
+              <>
+                ✉️ Enviamos um e-mail com o link para o aluno <strong>definir a senha</strong> (validade de 1 hora).
+                Se expirar, ele usa &quot;Esqueci minha senha&quot; no login. Uma{' '}
+                <strong>reunião de configuração</strong> foi marcada como pendente.
+              </>
+            ) : (
+              <>
+                ⚠️ A conta foi criada, mas <strong>o e-mail não pôde ser enviado</strong>. Peça ao aluno que use
+                &quot;Esqueci minha senha&quot; na tela de login para definir a senha dele.
+              </>
+            )}
           </div>
           <button type="button" className={`${s.btn} ${s.btnPrimary}`} style={{ justifyContent: 'center' }} onClick={onClose}>
             Fechar

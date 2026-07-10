@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 
 /**
- * Solicitação de redefinição (seguro): envia um link por e-mail via Supabase Auth.
- * Não revela se o e-mail existe (anti-enumeração) — sempre mostra sucesso.
+ * Solicitação de redefinição (seguro): a rota /api/auth/reset-password gera o link
+ * e o envia pelo Resend. Não revela se o e-mail existe (anti-enumeração) — sempre
+ * mostra sucesso.
  */
 export default function ResetForm() {
   const params = useSearchParams();
@@ -20,9 +20,11 @@ export default function ResetForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=/reset-password/update`;
-      await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
+      await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
     } catch {
       // Silencioso de propósito (não vaza existência do e-mail).
     } finally {

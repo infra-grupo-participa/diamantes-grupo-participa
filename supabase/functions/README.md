@@ -68,9 +68,9 @@ Mesmo padrão (trigger → pg_net → Edge Function → API externa), agora para
     `dedup_key = demanda_criada:<id>`.
   - `type:'projeto_criado'` (`project_id`) → avisa o cliente que o projeto foi criado e que
     falta o briefing. Dedup *uma vez só* por `dedup_key = projeto_criado:<id>`.
-  - `type:'custom'` (`to,subject,html`) → envio manual/teste.
-  - **Nova mensagem NÃO dispara e-mail** (o ClickUp já notifica). **Reset de senha** é via
-    SMTP do Supabase Auth, fora desta EF.
+  - `type:'custom'` (`to,subject,html`) → envio manual/teste. Usado também pelos e-mails de
+    **reset de senha** e **primeiro acesso**, disparados pelo app (ver abaixo).
+  - **Nova mensagem NÃO dispara e-mail** (o ClickUp já notifica).
 - **Triggers:** `demands_email_notify` em `portal.demands` (`_notify_demanda_criada`) e
   `projects_email_notify` em `portal.projects` (`_notify_projeto_criado`).
 - **Auditoria/dedup:** tabela `portal.email_log` (status `sent|failed|skipped`, `resend_id`,
@@ -78,11 +78,20 @@ Mesmo padrão (trigger → pg_net → Edge Function → API externa), agora para
 - **Secret:** `resend_api_key` no Vault (whitelist em `portal.get_internal_secret`).
 - **Remetente:** `nao-responder@diamantes.grupoparticipa.app.br` (domínio verificado no Resend).
 
-### Reset de senha seguro (Supabase Auth)
-O reset agora usa **link por e-mail** (`auth.resetPasswordForEmail` → `/auth/callback`
-troca o `code` por sessão → `/reset-password/update`). A rota insegura `app/api/reset-password`
-foi removida. **Requer SMTP custom (Resend) no Supabase Auth** para o envio do link —
-ver instruções no painel (Authentication → SMTP) e o redirect `…/auth/callback` na allowlist.
+### Reset de senha e primeiro acesso (Resend, sem SMTP do Auth)
+O link **não** sai mais pelo SMTP/template do Supabase Auth — o app gera e envia:
+
+1. `POST /api/auth/reset-password` (público) ou `POST /api/admin/criar-acesso` (admin);
+2. `admin.generateLink({type:'recovery'})` devolve o `hashed_token` **sem disparar e-mail**;
+3. o HTML sai de `lib/email/templates.ts` e vai pela EF `send-email` (`type:'custom'`);
+4. o link aponta para **`/auth/confirm`**, que faz `verifyOtp` e abre a sessão de recuperação,
+   redirecionando para `/reset-password/update`.
+
+`/auth/callback` (troca `code` do PKCE por sessão) continua no lugar para links antigos.
+Como o Next chama a EF, e ela só aceita `x-internal-key` (a service-role JWT **não** casa com
+o `SUPABASE_SERVICE_ROLE_KEY` que a EF lê), a chave é buscada no Vault via
+`portal.get_internal_secret` — sem env var nova. Não é preciso configurar SMTP no Auth;
+`supabase/auth-email-templates/` só serve se um dia o envio voltar para lá.
 
 ## Outras Edge Functions ativas (não versionadas aqui)
 `digisac-webhook`, `admin-digisac-lookup` (integração Digisac/WhatsApp),
