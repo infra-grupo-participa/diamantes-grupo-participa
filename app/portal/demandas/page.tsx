@@ -199,6 +199,11 @@ export default function DemandasPage() {
   const unsubRef = useRef<(() => void) | null>(null);
   const currentIdRef = useRef<string | null>(null);
   currentIdRef.current = currentId;
+  // Scroll do chat: só puxa pro fim se o usuário já está embaixo; senão oferece
+  // um botão "novas mensagens" em vez de arrancar a leitura do histórico.
+  const atBottomRef = useRef(true);
+  const prevChatIdRef = useRef<string | null>(null);
+  const [hasNewBelow, setHasNewBelow] = useState(false);
   const messagesRef = useRef<Record<string, ChatMessage[]>>({});
   messagesRef.current = messages;
 
@@ -291,11 +296,15 @@ export default function DemandasPage() {
   const loadMessages = useCallback(async (demandId: string) => {
     try {
       const msgs = await listMessages(demandId);
-      for (const m of msgs) {
-        if (Array.isArray(m.attachments) && m.attachments.length) {
-          m.attachments = await hydrateAttachments(m.attachments);
-        }
-      }
+      // Hidrata os anexos de todas as mensagens em paralelo (antes era mensagem a
+      // mensagem, em série — o chat só aparecia depois da última URL assinada).
+      await Promise.all(
+        msgs.map(async (m) => {
+          if (Array.isArray(m.attachments) && m.attachments.length) {
+            m.attachments = await hydrateAttachments(m.attachments);
+          }
+        }),
+      );
       setMessages((prev) => ({ ...prev, [demandId]: msgs }));
     } catch (e) {
       console.error(e);
@@ -325,11 +334,13 @@ export default function DemandasPage() {
       const existingIds = new Set((messagesRef.current[demandId] || []).map((m) => m.id));
       const novos = fresh.filter((m) => !existingIds.has(m.id));
       if (!novos.length) return;
-      for (const m of novos) {
-        if (Array.isArray(m.attachments) && m.attachments.length) {
-          m.attachments = await hydrateAttachments(m.attachments);
-        }
-      }
+      await Promise.all(
+        novos.map(async (m) => {
+          if (Array.isArray(m.attachments) && m.attachments.length) {
+            m.attachments = await hydrateAttachments(m.attachments);
+          }
+        }),
+      );
       setMessages((prev) => {
         const ex = prev[demandId] || [];
         const exIds = new Set(ex.map((x) => x.id));
@@ -351,7 +362,14 @@ export default function DemandasPage() {
     void loadMessages(currentId);
     // Lazy: carrega membros só da demanda aberta (rating tem efeito próprio abaixo).
     void ensureMembers(currentId);
+    // Saúde do realtime: enquanto o canal está inscrito, dispensamos o poll.
+    let realtimeOk = false;
     unsubRef.current = subscribe(currentId, {
+      onStatus: (connected) => {
+        // Ao (re)conectar, faz um resync pontual para cobrir eventos perdidos no gap.
+        if (connected && !realtimeOk) void syncMessages(currentId);
+        realtimeOk = connected;
+      },
       onMessage: (raw) => {
         const id = currentIdRef.current;
         const msgId = raw?.id != null ? String(raw.id) : null;
@@ -367,8 +385,11 @@ export default function DemandasPage() {
       },
     });
 
-    // Rede de segurança: poll leve + re-sync ao voltar o foco/visibilidade da aba.
-    const poll = setInterval(() => void syncMessages(currentId), 7000);
+    // Rede de segurança: só entra em ação quando o realtime está CAÍDO. Com o canal
+    // saudável, o poll não faz fetch (antes recarregava todo o histórico a cada 7s).
+    const poll = setInterval(() => {
+      if (!realtimeOk) void syncMessages(currentId);
+    }, 7000);
     const onActive = () => {
       if (document.visibilityState === 'visible') void syncMessages(currentId);
     };
@@ -387,11 +408,53 @@ export default function DemandasPage() {
   }, [currentId, loadMessages, appendMessage, ensureMembers, syncMessages]);
 
 
-  // Auto-scroll do chat ao receber/atualizar mensagens.
+  const scrollChatToBottom = useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    atBottomRef.current = true;
+    setHasNewBelow(false);
+  }, []);
+
+  // Auto-scroll inteligente: ao trocar de demanda vai pro fim; ao chegar mensagem
+  // nova, só rola se o usuário já estava embaixo — senão sinaliza "novas mensagens".
+  const currentMsgsForScroll = currentId ? messages[currentId] : undefined;
   useEffect(() => {
     const el = chatScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, currentId]);
+    if (!el) return;
+    if (prevChatIdRef.current !== currentId) {
+      prevChatIdRef.current = currentId;
+      el.scrollTop = el.scrollHeight;
+      atBottomRef.current = true;
+      setHasNewBelow(false);
+      return;
+    }
+    if (atBottomRef.current) {
+      el.scrollTop = el.scrollHeight;
+      setHasNewBelow(false);
+    } else {
+      setHasNewBelow(true);
+    }
+  }, [currentMsgsForScroll, currentId]);
+
+  // Mantém atBottomRef atualizado conforme o usuário rola a conversa.
+  const onChatScroll = useCallback(() => {
+    const el = chatScrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    atBottomRef.current = nearBottom;
+    if (nearBottom) setHasNewBelow(false);
+  }, []);
+
+  // Fecha o lightbox de imagem com Escape.
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightbox(null);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [lightbox]);
 
   // ── Derivados ──
   // Não-lida = última mensagem é da EQUIPE e mais nova que a última vez que o cliente viu.
@@ -666,7 +729,7 @@ export default function DemandasPage() {
   }
 
   // ── Render de anexos de mensagem ──
-  function renderAttachments(atts: Attachment[]) {
+  const renderAttachments = useCallback((atts: Attachment[]) => {
     if (!Array.isArray(atts) || atts.length === 0) return null;
     return (
       <div className={styles.msgAtt}>
@@ -683,6 +746,7 @@ export default function DemandasPage() {
                 src={url}
                 alt={name}
                 loading="lazy"
+                decoding="async"
                 onClick={() => setLightbox({ url, alt: name })}
               />
             );
@@ -696,7 +760,59 @@ export default function DemandasPage() {
         })}
       </div>
     );
-  }
+  }, []);
+
+  // Nós da conversa memoizados: só recalculam quando as mensagens (ou o "eu") mudam —
+  // antes eram remontados a cada tecla na busca lateral, colapso de pasta, etc.
+  const messageNodes = useMemo(() => {
+    let lastDay = '';
+    const nodes: React.ReactNode[] = [];
+    for (const m of currentMsgs) {
+      const day = fmtDayLabel(m.created_at);
+      if (day !== lastDay) {
+        nodes.push(
+          <div key={'day-' + (m._localKey || m.id)} className={styles.msgDay}>
+            {day}
+          </div>,
+        );
+        lastDay = day;
+      }
+      const mine = !!me && m.user_id === me.id;
+      const role = mine ? 'cliente' : m.author_role === 'operator' ? 'equipe' : m.author_role || 'equipe';
+      nodes.push(
+        <div key={m._localKey || m.id} className={`${styles.msg} ${mine ? styles.mine : ''}`}>
+          <span
+            className={styles.msgAvatar}
+            style={m.avatar_url ? { backgroundImage: `url('${m.avatar_url}')` } : undefined}
+          >
+            {m.avatar_url ? '' : initials(m.author_name)}
+          </span>
+          <span>
+            <span className={styles.msgAuthor}>
+              {m.author_name || 'Alguém'} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>•</span>{' '}
+              <span className="role">{role}</span>
+            </span>
+            {m.content && (
+              <span className={styles.msgBubble} style={{ display: 'block', opacity: m._pending ? 0.65 : 1 }}>
+                {m.content}
+              </span>
+            )}
+            {renderAttachments(m.attachments)}
+            <span className={styles.msgTime} style={{ display: 'block', textAlign: mine ? 'right' : 'left' }}>
+              {m._failed ? (
+                <span style={{ color: 'var(--danger-strong)' }}>não enviado</span>
+              ) : m._pending ? (
+                'enviando…'
+              ) : (
+                fmtTime(m.created_at)
+              )}
+            </span>
+          </span>
+        </div>,
+      );
+    }
+    return nodes;
+  }, [currentMsgs, me, renderAttachments]);
 
 
   const toggleGroup = (key: string) =>
@@ -974,67 +1090,43 @@ export default function DemandasPage() {
             )}
           </div>
 
-          <div className={styles.chatScroll} ref={chatScrollRef}>
+          <div
+            className={styles.chatScroll}
+            ref={chatScrollRef}
+            onScroll={onChatScroll}
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            aria-label="Mensagens da conversa"
+          >
             {!current ? (
               <div className={styles.chatEmpty}>
                 Nada por aqui ainda.
                 <br />
                 <small>Clique em uma demanda na lista ao lado.</small>
               </div>
+            ) : currentMsgsForScroll === undefined ? (
+              // Carregando: distingue de "vazio" — antes uma conversa cheia parecia
+              // vazia enquanto o histórico não chegava.
+              <div className={styles.chatLoading} aria-hidden>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className={styles.chatSkelMsg}>
+                    <span className={styles.chatSkelAvatar} />
+                    <span className={styles.chatSkelBubble} />
+                  </div>
+                ))}
+              </div>
             ) : currentMsgs.length === 0 ? (
               <div className={styles.chatEmpty}>Comece a conversa com sua equipe — diga o que precisa pra essa demanda. 💬</div>
             ) : (
-              (() => {
-                let lastDay = '';
-                const nodes: React.ReactNode[] = [];
-                currentMsgs.forEach((m) => {
-                  const day = fmtDayLabel(m.created_at);
-                  if (day !== lastDay) {
-                    nodes.push(
-                      <div key={'day-' + m.id} className={styles.msgDay}>
-                        {day}
-                      </div>,
-                    );
-                    lastDay = day;
-                  }
-                  const mine = !!me && m.user_id === me.id;
-                  const role = mine ? 'cliente' : m.author_role === 'operator' ? 'equipe' : m.author_role || 'equipe';
-                  nodes.push(
-                    <div key={m.id} className={`${styles.msg} ${mine ? styles.mine : ''}`}>
-                      <span
-                        className={styles.msgAvatar}
-                        style={m.avatar_url ? { backgroundImage: `url('${m.avatar_url}')` } : undefined}
-                      >
-                        {m.avatar_url ? '' : initials(m.author_name)}
-                      </span>
-                      <span>
-                        <span className={styles.msgAuthor}>
-                          {m.author_name || 'Alguém'} <span style={{ color: 'var(--muted)', fontWeight: 400 }}>•</span>{' '}
-                          <span className="role">{role}</span>
-                        </span>
-                        {m.content && (
-                          <span className={styles.msgBubble} style={{ display: 'block', opacity: m._pending ? 0.65 : 1 }}>
-                            {m.content}
-                          </span>
-                        )}
-                        {renderAttachments(m.attachments)}
-                        <span className={styles.msgTime} style={{ display: 'block', textAlign: mine ? 'right' : 'left' }}>
-                          {m._failed ? (
-                            <span style={{ color: 'var(--danger-strong)' }}>não enviado</span>
-                          ) : m._pending ? (
-                            'enviando…'
-                          ) : (
-                            fmtTime(m.created_at)
-                          )}
-                        </span>
-                      </span>
-                    </div>,
-                  );
-                });
-                return nodes;
-              })()
+              messageNodes
             )}
           </div>
+          {hasNewBelow && (
+            <button type="button" className={styles.chatJump} onClick={scrollChatToBottom}>
+              ↓ Novas mensagens
+            </button>
+          )}
 
           <ChatComposer
             demandId={currentId}
@@ -1056,6 +1148,7 @@ export default function DemandasPage() {
                 author_role: 'client',
                 avatar_url: me.metadata?.avatar_url ?? null,
                 _pending: true,
+                _localKey: tempId, // key estável: sobrevive à troca de id temp→real
               };
               setMessages((prev) => ({ ...prev, [did]: [...(prev[did] || []), optimistic] }));
               markRead(did, optimistic.created_at);
@@ -1223,10 +1316,23 @@ export default function DemandasPage() {
       {showNew && <NewDemandModal onClose={() => setShowNew(false)} onCreated={(d) => void onDemandCreated(d)} />}
 
       {lightbox && (
-        <div className={styles.lightbox} onClick={() => setLightbox(null)}>
+        <div
+          className={styles.lightbox}
+          onClick={() => setLightbox(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={lightbox.alt || 'Imagem'}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={lightbox.url} alt={lightbox.alt} />
-          <button type="button" className={styles.lightboxClose} title="Fechar" onClick={() => setLightbox(null)}>
+          <button
+            type="button"
+            className={styles.lightboxClose}
+            title="Fechar"
+            aria-label="Fechar imagem"
+            autoFocus
+            onClick={() => setLightbox(null)}
+          >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />

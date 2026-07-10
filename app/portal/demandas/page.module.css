@@ -168,6 +168,10 @@
   max-height: calc(100vh - 200px);
   overflow: hidden;
 }
+/* Ancora o botão flutuante "novas mensagens" (position: absolute). */
+.chatPane {
+  position: relative;
+}
 
 /* ── Lista (esquerda) ── */
 .listHead {
@@ -914,4 +918,69 @@
   height: 9px;
   margin-top: 7px;
   width: 65%;
+}
+
+/* ── Chat: skeleton de carregando mensagens ── */
+.chatLoading {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 8px 0;
+}
+.chatSkelMsg {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.chatSkelMsg:nth-child(2) {
+  grid-template-columns: 1fr 30px;
+  direction: rtl;
+}
+.chatSkelAvatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(100deg, var(--border) 30%, var(--hero-tint) 50%, var(--border) 70%);
+  background-size: 200% 100%;
+  animation: skShimmer 1.3s ease-in-out infinite;
+}
+.chatSkelBubble {
+  height: 46px;
+  max-width: 260px;
+  border-radius: 14px;
+  background: linear-gradient(100deg, var(--border) 30%, var(--hero-tint) 50%, var(--border) 70%);
+  background-size: 200% 100%;
+  animation: skShimmer 1.3s ease-in-out infinite;
+}
+
+/* ── Chat: botão "novas mensagens" (aparece quando o usuário rolou p/ cima) ── */
+.chatJump {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 88px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--shadow-cta, 0 6px 18px rgba(0, 0, 0, 0.18));
+  animation: chatJumpIn 0.18s ease-out;
+}
+.chatJump:hover {
+  filter: brightness(1.05);
+}
+@keyframes chatJumpIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
 }

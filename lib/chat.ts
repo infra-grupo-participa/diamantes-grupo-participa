@@ -30,6 +30,7 @@ export type ChatMessage = {
   avatar_url: string | null;
   _pending?: boolean; // UI otimista: aguardando confirmação do envio
   _failed?: boolean; // UI otimista: falhou ao enviar
+  _localKey?: string; // key de render estável (id do servidor troca temp→real)
 };
 
 function safeFileName(name: string): string {
@@ -133,10 +134,16 @@ export async function postMessage(
   return data;
 }
 
-/** Realtime: INSERT em demand_messages + UPDATE em demands, ambos filtrados pela demanda. */
+/** Realtime: INSERT em demand_messages + UPDATE em demands, ambos filtrados pela demanda.
+ *  `onStatus(true)` quando o canal está inscrito e saudável; `false` em erro/fechamento —
+ *  o caller usa isso para só acionar o poll de segurança quando o realtime está caído. */
 export function subscribe(
   demandId: string,
-  callbacks: { onMessage?: (row: Record<string, unknown>) => void; onDemandUpdate?: (row: Record<string, unknown>) => void },
+  callbacks: {
+    onMessage?: (row: Record<string, unknown>) => void;
+    onDemandUpdate?: (row: Record<string, unknown>) => void;
+    onStatus?: (connected: boolean) => void;
+  },
 ): () => void {
   const supabase = createClient();
   const channel: RealtimeChannel = supabase
@@ -155,7 +162,9 @@ export function subscribe(
         callbacks.onDemandUpdate?.(payload.new as Record<string, unknown>);
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      callbacks.onStatus?.(status === 'SUBSCRIBED');
+    });
   return () => {
     try {
       supabase.removeChannel(channel);
@@ -201,20 +210,14 @@ export async function signAttachment(path: string, ttlSec = SIGNED_URL_TTL): Pro
 /** Re-assina anexos que vieram só com `path` (lidos do BD). */
 export async function hydrateAttachments(attachments: Attachment[]): Promise<Attachment[]> {
   if (!Array.isArray(attachments) || attachments.length === 0) return [];
-  const out: Attachment[] = [];
-  for (const a of attachments) {
-    if (!a) {
-      out.push(a);
-      continue;
-    }
-    if (a.signedUrl) {
-      out.push(a);
-      continue;
-    }
-    const url = await signAttachment(a.path);
-    out.push({ ...a, signedUrl: url });
-  }
-  return out;
+  // Assina todos em paralelo — antes era um round-trip sequencial por anexo (N+1).
+  return Promise.all(
+    attachments.map(async (a) => {
+      if (!a || a.signedUrl) return a;
+      const url = await signAttachment(a.path);
+      return { ...a, signedUrl: url };
+    }),
+  );
 }
 
 export const CHAT_CONFIG = { BUCKET, SIGNED_URL_TTL, MAX_FILE_SIZE };

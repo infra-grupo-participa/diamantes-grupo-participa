@@ -104,24 +104,28 @@ export default function ChatComposer({
       if (valid.length > limit) {
         toast(`Máximo de ${MAX_FILES} anexos por mensagem. ${valid.length - limit} não foram adicionados.`, 'warning');
       }
-      for (const file of arr) {
-        const id = Math.random().toString(36).slice(2);
-        const item: Pending = {
-          id,
-          file,
-          status: 'uploading',
-          thumbUrl: isImage(file.type) ? URL.createObjectURL(file) : null,
-          meta: null,
-        };
-        setPending((prev) => [...prev, item]);
-        try {
-          const meta = await uploadAttachment(demandId, file);
-          setPending((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'ready', meta } : p)));
-        } catch (e) {
-          setPending((prev) => prev.map((p) => (p.id === id ? { ...p, status: 'error' } : p)));
-          toast('Falha no upload: ' + errMessage(e), 'error');
-        }
-      }
+      // Mostra todos como "enviando" de uma vez e sobe em paralelo — antes era um
+      // arquivo por vez, em série (anexar 5 arquivos esperava um terminar pro outro).
+      const items: Pending[] = arr.map((file) => ({
+        id: Math.random().toString(36).slice(2),
+        file,
+        status: 'uploading',
+        thumbUrl: isImage(file.type) ? URL.createObjectURL(file) : null,
+        meta: null,
+      }));
+      if (!items.length) return;
+      setPending((prev) => [...prev, ...items]);
+      await Promise.all(
+        items.map(async (item) => {
+          try {
+            const meta = await uploadAttachment(demandId, item.file);
+            setPending((prev) => prev.map((p) => (p.id === item.id ? { ...p, status: 'ready', meta } : p)));
+          } catch (e) {
+            setPending((prev) => prev.map((p) => (p.id === item.id ? { ...p, status: 'error' } : p)));
+            toast('Falha no upload: ' + errMessage(e), 'error');
+          }
+        }),
+      );
     },
     [demandId],
   );
