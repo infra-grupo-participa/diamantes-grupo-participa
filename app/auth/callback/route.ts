@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { safeOrigin } from '@/lib/site-url';
 
 export const runtime = 'nodejs';
 
@@ -9,7 +10,9 @@ export const runtime = 'nodejs';
  * futuramente, confirmação de e-mail. Depois redireciona para `next`.
  */
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  // Atrás do proxy da Hostinger, request.url traz o bind interno (0.0.0.0:3000).
+  const origin = safeOrigin(request);
   const code = searchParams.get('code');
   // Supabase pode sinalizar erro direto na URL (link expirado/usado, sem code).
   const authError = searchParams.get('error') || searchParams.get('error_code');

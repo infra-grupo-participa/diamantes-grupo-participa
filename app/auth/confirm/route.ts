@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { EmailOtpType } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { safeOrigin } from '@/lib/site-url';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,10 @@ export const dynamic = 'force-dynamic';
 const ALLOWED_TYPES: EmailOtpType[] = ['recovery', 'invite', 'email'];
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  // Atrás do proxy da Hostinger, request.url traz o bind interno (0.0.0.0:3000) —
+  // redirecionar para ele levaria o usuário a um endereço inacessível.
+  const origin = safeOrigin(request);
   const tokenHash = searchParams.get('token_hash');
   const type = searchParams.get('type') as EmailOtpType | null;
 
