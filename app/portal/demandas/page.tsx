@@ -149,6 +149,37 @@ function iconKeyFor(d: Demand): 'done' | 'review' | 'in_progress' {
   return 'in_progress';
 }
 
+// Anexo de uma mensagem. Imagem vira miniatura clicável; qualquer outra coisa
+// (ou imagem que o navegador não consegue decodificar — HEIC de iPhone fora do
+// Safari) vira card de arquivo, que o cliente baixa e abre. Sem isso, o print de
+// celular aparecia como imagem quebrada.
+function MsgAttachment({ att, onOpen }: { att: Attachment; onOpen: (url: string, alt: string) => void }) {
+  const [broken, setBroken] = useState(false);
+  const url = att.signedUrl || att.url || '';
+  const name = att.name || 'arquivo';
+
+  if (isImage(att.mime) && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        className={styles.msgImg}
+        src={url}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        onError={() => setBroken(true)}
+        onClick={() => onOpen(url, name)}
+      />
+    );
+  }
+  return (
+    <a className={styles.msgFile} href={url} target="_blank" rel="noopener noreferrer">
+      <FileIcon />
+      <span>{name}</span>
+    </a>
+  );
+}
+
 export default function DemandasPage() {
   const [demands, setDemands] = useState<Demand[]>([]);
   const [members, setMembers] = useState<Record<string, DemandMember[]>>({});
@@ -733,31 +764,9 @@ export default function DemandasPage() {
     if (!Array.isArray(atts) || atts.length === 0) return null;
     return (
       <div className={styles.msgAtt}>
-        {atts.map((a, i) => {
-          if (!a) return null;
-          const url = a.signedUrl || a.url || '';
-          const name = a.name || 'arquivo';
-          if (isImage(a.mime)) {
-            return (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                className={styles.msgImg}
-                src={url}
-                alt={name}
-                loading="lazy"
-                decoding="async"
-                onClick={() => setLightbox({ url, alt: name })}
-              />
-            );
-          }
-          return (
-            <a key={i} className={styles.msgFile} href={url} target="_blank" rel="noopener noreferrer">
-              <FileIcon />
-              <span>{name}</span>
-            </a>
-          );
-        })}
+        {atts.map((a, i) =>
+          a ? <MsgAttachment key={i} att={a} onOpen={(url, alt) => setLightbox({ url, alt })} /> : null,
+        )}
       </div>
     );
   }, []);
@@ -1313,7 +1322,9 @@ export default function DemandasPage() {
         </aside>
       </div>
 
-      {showNew && <NewDemandModal onClose={() => setShowNew(false)} onCreated={(d) => void onDemandCreated(d)} />}
+      {showNew && (
+        <NewDemandModal userId={me?.id ?? null} onClose={() => setShowNew(false)} onCreated={(d) => void onDemandCreated(d)} />
+      )}
 
       {lightbox && (
         <div

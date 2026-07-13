@@ -9,6 +9,44 @@ const BUCKET = 'demand-attachments';
 const SIGNED_URL_TTL = 3600;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
+/** Anexos por mensagem (chat) ou por demanda nova (modal de criação). */
+export const MAX_FILES = 5;
+
+/** Valor do `accept` do <input type="file"> — espelha ACCEPTED_MIME/ACCEPTED_EXT. */
+export const ACCEPT_ATTR = 'image/*,.heic,.heif,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip';
+
+// Tipos aceitos (espelha o accept do <input>): imagens, PDF, docs, planilhas, txt, zip.
+const ACCEPTED_MIME = /^(image\/|application\/pdf$|application\/msword$|application\/vnd\.openxmlformats|application\/vnd\.ms-excel$|text\/csv$|text\/plain$|application\/zip$|application\/x-zip-compressed$)/;
+const ACCEPTED_EXT = /\.(png|jpe?g|gif|webp|svg|heic|heif|avif|pdf|docx?|xlsx?|csv|txt|zip)$/i;
+
+export function isAcceptedFile(file: File): boolean {
+  if (file.type && ACCEPTED_MIME.test(file.type)) return true;
+  // Alguns navegadores não preenchem o mime: cai pra extensão.
+  return ACCEPTED_EXT.test(file.name || '');
+}
+
+// O bucket valida pelo content-type declarado. Quando o navegador não informa o
+// mime (acontece com .heic e alguns downloads), deduzir pela extensão evita cair
+// em application/octet-stream — que o bucket recusa, e o cliente via só "falha no upload".
+const EXT_MIME: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+  webp: 'image/webp', svg: 'image/svg+xml', heic: 'image/heic', heif: 'image/heif',
+  avif: 'image/avif', pdf: 'application/pdf', doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  csv: 'text/csv', txt: 'text/plain', zip: 'application/zip',
+};
+
+function contentTypeOf(file: File): string {
+  if (file.type && ACCEPTED_MIME.test(file.type)) {
+    // Windows manda .zip como x-zip-compressed; normaliza pro tipo canônico.
+    return file.type === 'application/x-zip-compressed' ? 'application/zip' : file.type;
+  }
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  return EXT_MIME[ext] || 'application/octet-stream';
+}
+
 export type Attachment = {
   path: string;
   name: string;
@@ -181,9 +219,10 @@ export async function uploadAttachment(demandId: string, file: File): Promise<At
   const supabase = createClient();
   const name = safeFileName(file.name || 'arquivo');
   const path = `${demandId}/${randomId()}-${name}`;
+  const mime = contentTypeOf(file);
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, file, {
     upsert: false,
-    contentType: file.type || 'application/octet-stream',
+    contentType: mime,
   });
   if (upErr) throw upErr;
 
@@ -194,7 +233,7 @@ export async function uploadAttachment(demandId: string, file: File): Promise<At
     path,
     name: file.name,
     size: file.size,
-    mime: file.type || 'application/octet-stream',
+    mime,
     signedUrl: signed?.signedUrl || null,
   };
 }

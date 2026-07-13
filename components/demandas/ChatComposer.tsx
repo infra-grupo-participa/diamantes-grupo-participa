@@ -5,7 +5,7 @@
 // Shift+Enter quebra linha; drag-and-drop e paste de imagens.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fmtSize, isImage, uploadAttachment, type Attachment } from '@/lib/chat';
+import { ACCEPT_ATTR, MAX_FILES, fmtSize, isAcceptedFile, isImage, uploadAttachment, type Attachment } from '@/lib/chat';
 import { toast } from '@/lib/toast';
 import { errMessage } from '@/lib/errors';
 import styles from './ChatComposer.module.css';
@@ -17,18 +17,6 @@ type Pending = {
   thumbUrl: string | null;
   meta: Attachment | null;
 };
-
-const MAX_FILES = 5;
-
-// Tipos aceitos (espelha o accept do <input>): imagens, PDF, docs, planilhas, txt, zip.
-const ACCEPTED_MIME = /^(image\/|application\/pdf$|application\/msword$|application\/vnd\.openxmlformats|application\/vnd\.ms-excel$|text\/csv$|text\/plain$|application\/zip$|application\/x-zip-compressed$)/;
-const ACCEPTED_EXT = /\.(png|jpe?g|gif|webp|svg|pdf|docx?|xlsx?|csv|txt|zip)$/i;
-
-function isAcceptedFile(file: File): boolean {
-  if (file.type && ACCEPTED_MIME.test(file.type)) return true;
-  // Alguns navegadores não preenchem o mime: cai pra extensão.
-  return ACCEPTED_EXT.test(file.name || '');
-}
 
 const IconFile = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -221,7 +209,7 @@ export default function ChatComposer({
           ref={fileRef}
           type="file"
           multiple
-          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip"
+          accept={ACCEPT_ATTR}
           style={{ display: 'none' }}
           onChange={(e) => {
             if (e.target.files?.length) void addFiles(e.target.files);
