@@ -1,4 +1,4 @@
-// send-email v7 — e-mails transacionais do portal (Resend).
+// send-email v8 — e-mails transacionais do portal (Resend).
 // Disparada por triggers pg_net:
 //   • _notify_demanda_criada           → { type:'demanda_criada', demand_id }
 //   • _notify_projeto_criado           → { type:'projeto_criado', project_id }
@@ -6,6 +6,11 @@
 //                                        demanda_cancelada | demanda_ajustes (+demand_id, stamp)
 //   • _notify_nova_mensagem            → { type:'nova_mensagem', message_id }
 //   • _retry_failed_emails (cron 5min) → { type:'retry_failed' }
+//   • clickup-webhook (taskAssigneeUpdated, migration 086)
+//                                      → { type:'divergencia_assignee', demand_id, before, after }
+//                                        alerta a TODOS os admins aprovados quando o ClickUp
+//                                        diverge do portal nos responsáveis da demanda. Só na
+//                                        divergência NOVA (o webhook não reenvia se já sabia).
 //
 // D1: cada e-mail é logado em portal.email_log; falha NÃO se perde (status='failed'
 //     + attempts/next_attempt_at). O retry_failed reenvia em background e atualiza a
@@ -101,6 +106,16 @@ async function resolveClientRecipient(supabase: any, entity: any): Promise<{ ema
     if (data?.email && data.role === "user") return { email: data.email, name: data.name || "" };
   }
   return null;
+}
+
+// Admins aprovados (destino do alerta de divergência). Exclui contas de teste
+// (@*.test) — alerta operacional real, não deve poluir inbox de fixture de E2E.
+async function resolveAdminRecipients(supabase: any): Promise<Array<{ email: string; name: string }>> {
+  const { data } = await supabase.schema("portal").from("users")
+    .select("email, name").eq("role", "admin").eq("status", "approved").not("email", "is", null);
+  return ((data || []) as any[])
+    .filter((u) => u.email && !/@[^.]+\.test$/i.test(u.email))
+    .map((u) => ({ email: u.email, name: u.name || "" }));
 }
 
 // Operadores da demanda (têm e-mail @ — não têm login no portal; CTA aponta ao ClickUp).
@@ -206,6 +221,44 @@ async function composeSpecs(supabase: any, type: string, payload: any): Promise<
       html: baseLayout({ title: "O cliente pediu ajustes 🔧",
         intro: `Olá${firstName(op.name)}, o cliente revisou a demanda <strong>${esc(d.title)}</strong> e pediu ajustes. A demanda voltou para "em andamento" — confira os comentários na tarefa do ClickUp.`,
         bodyHtml: "", ctaLabel: "Abrir tarefa no ClickUp", ctaHref }),
+    }));
+  }
+
+  // Divergência de responsáveis (ClickUp x portal) → avisa TODOS os admins.
+  // Dois emissores, mesmo type, diferenciados por payload.context:
+  //   • context:'webhook' (clickup-webhook, estado 'external'): before=esperado pelo
+  //     portal, after=o que o ClickUp tem agora (mudança feita direto lá, fora do portal).
+  //   • context:'sync' (clickup-sync, estados 'partial'/'partial_expected'/'none', só na
+  //     1ª detecção — ver persistAssigneeSync): before=quem FOI assignee de fato,
+  //     after=quem ficou de fora (guest, na maioria dos casos hoje — Marcio decidiu
+  //     manter guest, não converter).
+  // Nota: no runRetry(), before/after/context NÃO são reconstruídos (só demand_id
+  // sobrevive via ref_id) — o retry ainda envia o alerta, mas com "nenhum/nenhum" no
+  // corpo. Aceitável: é best-effort e a linha em audit_log (webhook) /
+  // clickup_assignee_detail (sync) já têm o snapshot completo.
+  if (type === "divergencia_assignee") {
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, client_slug").eq("id", demand_id).maybeSingle();
+    if (!d) return [];
+    const admins = await resolveAdminRecipients(supabase);
+    if (!admins.length) return [];
+    const before: string[] = Array.isArray(payload.before) ? payload.before : [];
+    const after: string[] = Array.isArray(payload.after) ? payload.after : [];
+    const beforeTxt = before.length ? esc(before.join(", ")) : "<em>nenhum</em>";
+    const afterTxt = after.length ? esc(after.join(", ")) : "<em>nenhum</em>";
+    const isSync = payload.context === "sync";
+    const beforeLabel = isSync ? "Foi para o ClickUp" : "Portal esperava";
+    const afterLabel = isSync ? "Ficou de fora (não virou assignee)" : "ClickUp tem";
+    const dedupStamp = stamp || new Date().toISOString().slice(0, 10); // 1 alerta/demanda/dia no máximo
+    return admins.map((admin) => ({
+      to: admin.email, name: admin.name,
+      dedupKey: `divergencia_assignee:${demand_id}:${dedupStamp}:${admin.email}`,
+      refType: "demand", refId: demand_id,
+      subject: `Divergência de responsáveis: ${d.title}`,
+      html: baseLayout({ title: "Responsáveis divergentes no ClickUp ⚠️",
+        intro: `Olá${firstName(admin.name)}, a demanda <strong>${esc(d.title)}</strong> tem responsáveis diferentes entre o portal e o ClickUp. Revise e resolva pelo painel de demandas.`,
+        bodyHtml: `<p style="margin:0 0 16px;font-size:14px;color:${C.muted};"><strong>${esc(beforeLabel)}:</strong> ${beforeTxt}<br><strong>${esc(afterLabel)}:</strong> ${afterTxt}</p>`,
+        ctaLabel: "Resolver divergência", ctaHref: `${PORTAL_URL}/admin/demandas?d=${demand_id}` }),
     }));
   }
 
@@ -330,7 +383,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: true, type, ...(res.ok ? { sent: to } : { failed: res.error }) }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    const KNOWN = ["demanda_criada","projeto_criado","demanda_em_revisao","demanda_concluida","demanda_cancelada","demanda_ajustes","nova_mensagem"];
+    const KNOWN = ["demanda_criada","projeto_criado","demanda_em_revisao","demanda_concluida","demanda_cancelada","demanda_ajustes","nova_mensagem","divergencia_assignee"];
     if (!KNOWN.includes(type)) {
       return new Response(JSON.stringify({ error: `type inválido: ${type}` }), { status: 400, headers: { "Content-Type": "application/json" } });
     }

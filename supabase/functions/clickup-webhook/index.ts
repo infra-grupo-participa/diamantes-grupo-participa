@@ -1,8 +1,30 @@
-// clickup-webhook v2 — sync reversa: task updates + comentários.
+// clickup-webhook v3 — sync reversa: task updates + comentários + assignees.
 // ClickUp → (webhook) → esta função → portal.demands / portal.demand_messages.
+//
+// v3 (migration 086): ramo taskAssigneeUpdated ANTES do bloco genérico de task field
+// updates. Compara demand_operators (via operators.clickup_user_id) com task.assignees
+// e grava clickup_assignee_sync='external' + detail antes/depois quando diverge (e volta
+// para 'ok' quando converge). NÃO escreve em demand_operators — o webhook só OBSERVA e
+// REGISTRA; o admin decide pelo painel via portal.admin_resolve_assignee_divergence
+// (decisão do Marcio). Também dispara e-mail ao admin (send-email type
+// 'divergencia_assignee', context:'webhook') quando a divergência é NOVA (não reenvia se
+// já estava 'external' e continua 'external' com o mesmo conjunto de assignees).
+//
+// 'external' é DIFERENTE de 'partial'/'partial_expected'/'none' (populados pelo
+// clickup-sync na saída portal→ClickUp, ver esse arquivo para o caso GUEST): aqui é
+// sempre uma mudança feita DIRETO no ClickUp, fora do fluxo do portal.
+//
+// ⚠️ Este evento só chega se o webhook estiver REGISTRADO com taskAssigneeUpdated na
+// lista de eventos (webhook_id em portal.clickup_config). Escutar no código não faz o
+// ClickUp enviar — é preciso re-registrar via API e confirmar.
 //
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
+//
+// ⚠️ EDIÇÃO 2026-09-01 (086/B3): feita SOBRE A CÓPIA DO REPO, sem confirmação contra o
+// remoto (supabase functions download indisponível neste ambiente — sem
+// SUPABASE_ACCESS_TOKEN). NÃO FAÇA DEPLOY sem antes diffar este arquivo contra
+// `supabase functions download clickup-webhook` a partir de uma máquina autenticada.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -73,6 +95,88 @@ async function findUserForClickUpUser(supabase: any, cuUser: any): Promise<{ id:
     if (data) return data;
   }
   return null;
+}
+
+// Dispara o alerta de divergência ao admin reusando a trilha existente
+// (email_log + edge send-email) — sem canal novo. Best-effort: falha SÓ loga,
+// nunca derruba o processamento do webhook (mesma lição do try/catch-log das
+// migrations 032/054/055).
+async function notifyAdminDivergence(supabase: any, demand_id: string, before: string[], after: string[]) {
+  try {
+    const key = await getSecret(supabase, "clickup_sync_internal_key");
+    if (!key) return;
+    // context:'webhook' → send-email usa o rótulo "portal esperava/ClickUp tem"
+    // (mudança feita direto no ClickUp, fora do portal — estado 'external').
+    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-internal-key": key },
+      body: JSON.stringify({ type: "divergencia_assignee", demand_id, context: "webhook", before, after }),
+    });
+  } catch (e) {
+    console.error("notifyAdminDivergence err", demand_id, (e as any)?.message || e);
+  }
+}
+
+// ===== taskAssigneeUpdated =====
+// Compara demand_operators (esperado, via operators.clickup_user_id) com os
+// assignees reais da task (ClickUp). NUNCA escreve em demand_operators — só
+// observa e registra (decisão do Marcio: o admin decide manualmente pelo
+// painel, via portal.admin_resolve_assignee_divergence).
+async function handleAssigneeUpdated(supabase: any, apiKey: string, demand: any) {
+  const { data: dops } = await supabase.schema("portal")
+    .from("demand_operators").select("operator_id").eq("demand_id", demand.id);
+  const opIds = (dops || []).map((d: any) => d.operator_id);
+  let expectedOps: Array<{ clickup_user_id: number | null; name: string | null }> = [];
+  if (opIds.length) {
+    const { data: ops } = await supabase.schema("portal")
+      .from("operators").select("clickup_user_id, name").in("id", opIds);
+    expectedOps = ops || [];
+  }
+  const expected = new Set(
+    expectedOps.map((o) => (o.clickup_user_id ? Number(o.clickup_user_id) : null)).filter((n): n is number => n !== null && !isNaN(n)),
+  );
+
+  const task = await fetchTaskFromClickUp(apiKey, demand.clickup_task_id);
+  const currentAssignees: Array<{ id: number; name: string }> = (task?.assignees || [])
+    .map((a: any) => ({ id: Number(a.id), name: a.username || a.email || String(a.id) }))
+    .filter((a: any) => !isNaN(a.id));
+  const current = new Set(currentAssignees.map((a) => a.id));
+
+  const missing = [...expected].filter((id) => !current.has(id));
+  const extra = [...current].filter((id) => !expected.has(id));
+  const diverged = missing.length > 0 || extra.length > 0;
+
+  const { data: prevDemand } = await supabase.schema("portal")
+    .from("demands").select("clickup_assignee_sync").eq("id", demand.id).maybeSingle();
+  const wasExternal = prevDemand?.clickup_assignee_sync === "external";
+
+  const beforeNames = expectedOps.map((o) => o.name).filter(Boolean) as string[];
+  const afterPayload = currentAssignees.map((a) => ({ id: String(a.id), name: a.name }));
+  const afterNames = currentAssignees.map((a) => a.name);
+
+  if (!diverged) {
+    await supabase.schema("portal").from("demands")
+      .update({ clickup_assignee_sync: "ok", clickup_assignee_detail: {} }).eq("id", demand.id);
+    return { converged: true };
+  }
+
+  await supabase.schema("portal").from("demands").update({
+    clickup_assignee_sync: "external",
+    clickup_assignee_detail: { before: beforeNames, after: afterPayload },
+  }).eq("id", demand.id);
+
+  await supabase.schema("portal").from("audit_log").insert({
+    event: "demand_assignee_divergence_detected",
+    user_id: null,
+    identifier: demand.id,
+    metadata: { before: beforeNames, after: afterNames, missing_count: missing.length, extra_count: extra.length },
+  });
+
+  // E-mail só na divergência NOVA (não reenvia a cada evento se já estava external).
+  if (!wasExternal) {
+    await notifyAdminDivergence(supabase, demand.id, beforeNames, afterNames);
+  }
+  return { diverged: true, missing: missing.length, extra: extra.length };
 }
 
 function stripBotPrefix(text: string): string {
@@ -171,6 +275,14 @@ Deno.serve(async (req: Request) => {
       .eq("clickup_task_id", taskId).maybeSingle();
     if (!demand) {
       return new Response(JSON.stringify({ ok: true, skipped: "unknown_task", task_id: taskId }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    // ===== Assignee events (migration 086) — ANTES do bloco genérico de task
+    // field updates: só observa/registra, nunca escreve em demand_operators. =====
+    if (event === "taskAssigneeUpdated") {
+      const apiKey = await getSecret(supabase, "clickup_api_key");
+      const res = await handleAssigneeUpdated(supabase, apiKey, demand);
+      return new Response(JSON.stringify({ ok: true, event, demand_id: demand.id, ...res }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
     // ===== Comment events =====

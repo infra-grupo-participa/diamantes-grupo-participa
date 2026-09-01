@@ -9,6 +9,31 @@ import { createClient } from '@/lib/supabase/client';
 
 export type DemandStatus = 'open' | 'in_progress' | 'review' | 'done' | 'canceled';
 
+/**
+ * Estado da última comparação portal vs ClickUp para os assignees da task
+ * (portal.demands.clickup_assignee_sync — migration 086, revisada 2026-09-01 pós-teste
+ * real na API). `null` = nunca sincronizado (demanda sem clickup_task_id ou anterior a
+ * este lote). Detecção é por COMPARAÇÃO pós-resposta (o ClickUp aceita HTTP 200 e
+ * descarta assignee guest em silêncio quando a lista mistura member+guest — não há
+ * exceção para capturar isso), nunca por watcher (endpoint não existe na API v2).
+ *   ok               → todos os operadores da demanda estão como assignee no ClickUp.
+ *   partial          → 1+ operador esperado ficou de fora por causa NÃO-permanente
+ *                       (ex.: espaço momentaneamente single-assignee) — acionável.
+ *   partial_expected → 1+ operador ficou de fora e a causa é 100% GUEST no ClickUp
+ *                       (clickup_assignee_detail.permanent === true). Estado ESPERADO
+ *                       enquanto a decisão for manter guest (Marcio) — NÃO é erro a
+ *                       corrigir. O painel não deve tratar como pendência acionável nem
+ *                       alertar repetidamente (o e-mail ao admin já só dispara 1x).
+ *   none             → nenhum operador esperado da demanda está como assignee.
+ *   external         → o ClickUp tem assignee(s) que o portal não reconhece (mudança
+ *                       feita direto no ClickUp) — populado só pelo webhook.
+ */
+export type AssigneeSyncState = 'ok' | 'partial' | 'partial_expected' | 'none' | 'external' | null;
+
+/** Item de `clickup_assignee_detail.missing[]` (estados partial/partial_expected/none). */
+export type AssigneeDivergenceReason = 'guest_cannot_assign' | 'space_single_assignee' | 'unknown_rejected';
+export type MissingAssignee = { name: string | null; clickup_user_id: number; reason: AssigneeDivergenceReason };
+
 export type Demand = {
   id: string;
   title: string | null;
@@ -24,6 +49,8 @@ export type Demand = {
   messages_count: number | null;
   clickup_task_id: string | null;
   operators_total: number | null;
+  clickup_assignee_sync: AssigneeSyncState;
+  clickup_assignee_detail: Record<string, unknown> | null;
   [key: string]: unknown;
 };
 
@@ -336,6 +363,27 @@ export async function removeDemandOperator(demandId: string, operatorId: string)
   const supabase = createClient();
   const { error } = await supabase.rpc('admin_remove_demand_operator', { p_demand_id: demandId, p_operator_id: operatorId });
   if (error) throw new Error(error.message || 'Não foi possível remover o operador.');
+}
+
+export type AssigneeDivergenceAction = 'reapply' | 'accept_clickup' | 'dismiss';
+
+/**
+ * Resolve manualmente uma divergência de responsáveis entre portal e ClickUp
+ * (RPC admin_resolve_assignee_divergence — migration 086). O admin decide:
+ *   'reapply'       → reaplica o estado do portal no ClickUp (não muda demand_operators).
+ *   'accept_clickup' → reescreve demand_operators a partir do estado real do ClickUp.
+ *   'dismiss'        → marca a divergência como revisada, sem alterar nada.
+ */
+export async function resolveAssigneeDivergence(
+  demandId: string,
+  action: AssigneeDivergenceAction,
+): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc('admin_resolve_assignee_divergence', {
+    p_demand_id: demandId,
+    p_action: action,
+  });
+  if (error) throw new Error(error.message || 'Não foi possível resolver a divergência de responsáveis.');
 }
 
 /** Muda o status de uma demanda (com finalized_at quando done). */

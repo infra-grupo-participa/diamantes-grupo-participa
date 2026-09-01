@@ -1,11 +1,42 @@
-// clickup-sync v11 — hierarquia Pasta(aluno) → Lista(projeto/avulsas) → Tarefa(demanda).
+// clickup-sync v13 — hierarquia Pasta(aluno) → Lista(projeto/avulsas) → Tarefa(demanda).
 // portal.demands (INSERT/UPDATE) → trigger pg_net (portal._sync_demand_to_clickup)
 // → esta função cria/atualiza a task no ClickUp e grava demands.clickup_task_id.
 // Ações extras: {action:"provision_structure"} cria pastas/listas em lote;
-// {action:"ensure_project_list", project_id} garante e devolve a lista do projeto.
+// {action:"ensure_project_list", project_id} garante e devolve a lista do projeto;
+// {action:"reconcile_assignees"} varre demandas com clickup_task_id e popula
+// clickup_assignee_sync/detail sem escrever no ClickUp (ação manual, migration 086).
+//
+// v13 (086, revisão pós-teste real na API — 2026-09-01): multiple_assignees JÁ ESTÁ
+// LIGADO no espaço 901313801473 (confirmado pelo coordenador com task real de 5
+// assignees, ClickUp aceitou 3). spaceAllowsMultipleAssignees() continua existindo —
+// é o que detecta isso e mantém o fallback de 1 assignee se algum dia for desligado —
+// mas o problema real NÃO é capability do espaço, é o papel GUEST de 2 operadores
+// (Caio Marcondes cu=84118999, Manuela Rios cu=84099161 — decisão do Marcio: MANTER
+// como guest, não converter).
+//
+// Guest não pode ser assignee (ITEM_087) NEM watcher: POST /task/{id}/watcher NÃO
+// EXISTE na API v2 (404 — a v12 presumiu esse endpoint errado, removido nesta versão),
+// e PUT /task/{id} com watchers.add para guest dá ITEM_096 "must have access to all
+// lists". E o pior: quando a lista de assignees MISTURA member+guest, o ClickUp
+// **aceita com HTTP 200 e descarta o guest em silêncio** — sem ITEM_087, sem erro
+// nenhum. Por isso a detecção deixou de ser por catch de exceção e passou a ser por
+// COMPARAÇÃO: depois de criar/atualizar a task, compara quem foi PEDIDO
+// (assigneesFor(members)) com quem voltou de fato em task.assignees, e classifica a
+// causa de cada ausente (guest_cannot_assign / no_clickup_user / space_single_assignee)
+// consultando um cache de papéis do workspace (GET /team, role 4 = guest, TTL 1h,
+// mesmo padrão do cache de space). 'guest_cannot_assign' é marcado como
+// clickup_assignee_detail.permanent=true e clickup_assignee_sync='partial_expected' —
+// é um estado ESPERADO enquanto a decisão for manter guest, não uma falha a corrigir,
+// e por isso o e-mail ao admin só dispara na primeira detecção (ver clickup-webhook).
 //
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
+//
+// ⚠️ EDIÇÃO 2026-09-01 (086/B1-B2-B5, revisada pós-teste real): feita SOBRE A CÓPIA DO
+// REPO, sem confirmação contra o remoto (supabase functions download indisponível
+// neste ambiente — sem SUPABASE_ACCESS_TOKEN). NÃO FAÇA DEPLOY sem antes diffar este
+// arquivo contra `supabase functions download clickup-sync` a partir de uma máquina
+// autenticada.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
@@ -36,6 +67,177 @@ async function getConfig(supabase: any) {
   const { data, error } = await supabase.schema("portal").from("clickup_config").select("key, value");
   if (error) throw new Error("Config: " + error.message);
   return Object.fromEntries((data || []).map((r: any) => [r.key, r.value]));
+}
+
+async function setConfig(supabase: any, key: string, value: string) {
+  await supabase.schema("portal").from("clickup_config")
+    .upsert({ key, value }, { onConflict: "key" })
+    .then(({ error }: any) => { if (error) console.error("setConfig", key, error.message); });
+}
+
+const MULTI_ASSIGNEE_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
+
+// Capability do espaço: multiple_assignees ligado ou desligado no ClickApp.
+// Cache em clickup_config.space_multi_assignee_cache (jsonb-as-text: "true"/"false"
+// + timestamp), TTL 1h — evita bater GET /space a cada createTask/updateTask.
+// Falha na consulta → assume FALSE (conservador: prefere fallback de 1 assignee a ITEM_417).
+async function spaceAllowsMultipleAssignees(supabase: any, apiKey: string, cfg: any): Promise<boolean> {
+  const raw = cfg.space_multi_assignee_cache || "";
+  if (raw) {
+    try {
+      const cached = JSON.parse(raw);
+      if (cached && typeof cached.value === "boolean" && Date.now() - Number(cached.at || 0) < MULTI_ASSIGNEE_CACHE_TTL_MS) {
+        return cached.value;
+      }
+    } catch (_) { /* cache corrompido/formato antigo — revalida */ }
+  }
+  if (!cfg.space_id) return false;
+  try {
+    const space = await clickupRequest(apiKey, `/space/${cfg.space_id}`);
+    // Campo top-level (confirmado via GET /space real): { ..., "multiple_assignees": bool }.
+    // NÃO fica em features.multiple_assignees.enabled.
+    const value = space?.multiple_assignees === true;
+    await setConfig(supabase, "space_multi_assignee_cache", JSON.stringify({ value, at: Date.now() }));
+    return value;
+  } catch (e) {
+    console.error("spaceAllowsMultipleAssignees GET /space falhou — assumindo false", (e as any)?.message || e);
+    return false;
+  }
+}
+
+// ⚠️ NÃO EXISTE POST /task/{id}/watcher na API v2 do ClickUp (404 — testado real
+// pelo coordenador). E mesmo se existisse um caminho de watcher (PUT /task com
+// watchers.add), guest dá ITEM_096 "must have access to all lists of the task".
+// Watcher NÃO é fallback para guest. Removido nesta versão (v13) — não recriar.
+
+const ROLE_CACHE_TTL_MS = 60 * 60 * 1000; // 1h — mesmo TTL do cache de space.
+const GUEST_ROLE = 4; // GET /team: user.role === 4 é guest (confirmado real).
+
+// Cache de "quem é guest no workspace" (GET /team, role 4), em
+// clickup_config.guest_clickup_ids_cache (jsonb-as-text: {ids:number[], at}).
+// Usado só para CLASSIFICAR a causa de um assignee ausente após a comparação —
+// nunca para decidir o que mandar (mandamos todos sempre; o ClickUp decide quem aceita).
+async function getGuestIds(supabase: any, apiKey: string, cfg: any): Promise<Set<number>> {
+  const raw = cfg.guest_clickup_ids_cache || "";
+  if (raw) {
+    try {
+      const cached = JSON.parse(raw);
+      if (cached && Array.isArray(cached.ids) && Date.now() - Number(cached.at || 0) < ROLE_CACHE_TTL_MS) {
+        return new Set<number>(cached.ids);
+      }
+    } catch (_) { /* cache corrompido/formato antigo — revalida */ }
+  }
+  if (!cfg.team_id) return new Set<number>();
+  try {
+    const resp = await clickupRequest(apiKey, `/team`);
+    const team = (resp?.teams || []).find((t: any) => String(t.id) === String(cfg.team_id));
+    const ids = ((team?.members || []) as any[])
+      .filter((m) => Number(m?.user?.role) === GUEST_ROLE)
+      .map((m) => Number(m.user.id))
+      .filter((n) => !isNaN(n));
+    await setConfig(supabase, "guest_clickup_ids_cache", JSON.stringify({ ids, at: Date.now() }));
+    return new Set(ids);
+  } catch (e) {
+    console.error("getGuestIds GET /team falhou — sem classificação de guest nesta chamada", (e as any)?.message || e);
+    return new Set<number>();
+  }
+}
+
+// Classifica a causa de um operador esperado que NÃO apareceu em task.assignees
+// (detectado por COMPARAÇÃO — é o caminho principal, não catch de exceção: o ClickUp
+// aceita HTTP 200 e descarta guest em silêncio quando a lista mistura member+guest).
+function classifyMissingReason(clickupUserId: number, guestIds: Set<number>, multiAllowed: boolean): string {
+  if (guestIds.has(clickupUserId)) return "guest_cannot_assign";
+  if (!multiAllowed) return "space_single_assignee";
+  return "unknown_rejected";
+}
+
+// Compara quem foi PEDIDO (expectedOps: [{id,name}]) com quem voltou de fato na
+// resposta do ClickUp (task.assignees) e monta o estado final. Esta é a fonte da
+// verdade sobre o que realmente aconteceu — response-diffing, não pré-cálculo.
+//   - nenhum ausente                              → 'ok'
+//   - todos ausentes por guest (permanente)        → 'partial_expected' (permanent:true)
+//   - mistura de guest + outra causa, ou só outra  → 'partial' (não-permanente)
+//   - nenhum operador esperado chegou               → 'none'
+function buildAssigneeSyncState(
+  expectedOps: Array<{ clickup_user_id: number; name: string | null }>,
+  actualAssignees: Array<{ id: number; name: string }>,
+  guestIds: Set<number>,
+  multiAllowed: boolean,
+): { sync: string; detail: Record<string, unknown> } {
+  if (expectedOps.length === 0) return { sync: "ok", detail: {} };
+  const actualIds = new Set(actualAssignees.map((a) => a.id));
+  const missing = expectedOps.filter((o) => !actualIds.has(o.clickup_user_id));
+  if (missing.length === 0) return { sync: "ok", detail: {} };
+
+  const missingWithReason = missing.map((o) => ({
+    name: o.name,
+    clickup_user_id: o.clickup_user_id,
+    reason: classifyMissingReason(o.clickup_user_id, guestIds, multiAllowed),
+  }));
+  const allPermanentGuest = missingWithReason.every((m) => m.reason === "guest_cannot_assign");
+  const sentNames = expectedOps.filter((o) => actualIds.has(o.clickup_user_id)).map((o) => o.name).filter(Boolean);
+
+  const detail = {
+    sent: sentNames,
+    missing: missingWithReason,
+    permanent: allPermanentGuest,
+  };
+
+  if (missing.length === expectedOps.length && !allPermanentGuest) {
+    return { sync: "none", detail };
+  }
+  // 'partial_expected': divergência 100% explicada por guest — estado ESPERADO
+  // enquanto a decisão for manter guest (não é falha a corrigir). 'partial': tem
+  // pelo menos 1 ausência por outro motivo — essa sim é acionável pelo admin.
+  return { sync: allPermanentGuest ? "partial_expected" : "partial", detail };
+}
+
+// Dispara o alerta de divergência ao admin reusando a trilha existente (email_log +
+// edge send-email) — mesmo canal usado pelo clickup-webhook para 'external'. Best-
+// effort: falha só loga, nunca derruba a operação principal.
+async function notifyAdminDivergence(supabase: any, demand_id: string, sent: string[], missing: string[]) {
+  try {
+    const key = await getSecret(supabase, "clickup_sync_internal_key");
+    if (!key) return;
+    // context:'sync' → send-email usa o rótulo "foi/ficou de fora" (saída portal→ClickUp).
+    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-internal-key": key },
+      body: JSON.stringify({ type: "divergencia_assignee", demand_id, context: "sync", before: sent, after: missing }),
+    });
+  } catch (e) {
+    console.error("notifyAdminDivergence err", demand_id, (e as any)?.message || e);
+  }
+}
+
+// Grava o estado de sync de assignees na demanda. SÓ LOGA em falha — diagnóstico
+// nunca derruba a operação principal (lição das migrations 032/054/055).
+//
+// Alerta por e-mail: dispara SÓ quando o estado muda PARA 'partial'/'partial_expected'/
+// 'none' vindo de um estado diferente (primeira detecção) — nunca a cada chamada, senão
+// vira spam diário para o mesmo caso conhecido (guest permanente sobretudo). Lê o estado
+// anterior antes de sobrescrever, propositalmente síncrono (é 1 SELECT extra, tabela
+// tem 15 linhas — sem custo real).
+async function persistAssigneeSync(supabase: any, demand_id: string, sync: string, detail: Record<string, unknown>) {
+  try {
+    const { data: prev } = await supabase.schema("portal").from("demands")
+      .select("clickup_assignee_sync").eq("id", demand_id).maybeSingle();
+    const wasDivergent = prev?.clickup_assignee_sync && prev.clickup_assignee_sync !== "ok";
+    const isDivergentNow = sync !== "ok" && sync !== "external"; // 'external' é alertado pelo webhook, não aqui
+
+    const { error } = await supabase.schema("portal").from("demands")
+      .update({ clickup_assignee_sync: sync, clickup_assignee_detail: detail }).eq("id", demand_id);
+    if (error) { console.error("persistAssigneeSync update err", demand_id, error.message); return; }
+
+    if (isDivergentNow && !wasDivergent) {
+      const sent = (detail as any)?.sent as string[] | undefined;
+      const missing = ((detail as any)?.missing as Array<{ name?: string | null }> | undefined) || [];
+      await notifyAdminDivergence(supabase, demand_id, sent || [], missing.map((m) => m.name || "").filter(Boolean));
+    }
+  } catch (e) {
+    console.error("persistAssigneeSync threw", demand_id, (e as any)?.message || e);
+  }
 }
 
 async function getDemand(supabase: any, demand_id: string) {
@@ -130,6 +332,15 @@ async function fetchCurrentAssignees(apiKey: string, task_id: string): Promise<n
   try {
     const t = await clickupRequest(apiKey, `/task/${task_id}`);
     return (t?.assignees || []).map((a: any) => Number(a.id)).filter((n: number) => !isNaN(n));
+  } catch (_) { return []; }
+}
+
+// Variante com nome (não só id) — usada por reconcileAssignees (B5) para poder
+// classificar a causa de cada ausência com buildAssigneeSyncState.
+async function fetchCurrentAssigneesFull(apiKey: string, task_id: string): Promise<Array<{ id: number; name: string }>> {
+  try {
+    const t = await clickupRequest(apiKey, `/task/${task_id}`);
+    return actualAssigneesFromResponse(t);
   } catch (_) { return []; }
 }
 
@@ -277,8 +488,75 @@ async function provisionStructure(supabase: any, apiKey: string, cfg: any): Prom
   return new Response(JSON.stringify({ ok: true, ...out }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
-async function createTask(apiKey: string, listId: string, cfg: any, demand: any, members: any[], requester: string) {
+// Varre demandas com clickup_task_id e compara operadores esperados (portal)
+// vs assignees reais (ClickUp), populando clickup_assignee_sync/detail com a MESMA
+// classificação por guest usada em createTask/updateTask (buildAssigneeSyncState).
+// Ação MANUAL (não roda em cron) — passivo das divergências não é reaplicado em
+// massa, só fica visível no painel para resolução caso a caso (decisão do Marcio).
+async function reconcileAssignees(supabase: any, apiKey: string, cfg: any): Promise<Response> {
+  const out = { checked: 0, ok: 0, partial: 0, partial_expected: 0, none: 0, errors: [] as string[] };
+  const { data: demands, error } = await supabase.schema("portal")
+    .from("demands").select("id, clickup_task_id").not("clickup_task_id", "is", null);
+  if (error) return new Response(JSON.stringify({ error: "demands: " + error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+  const multiAllowed = await spaceAllowsMultipleAssignees(supabase, apiKey, cfg);
+  const guestIds = await getGuestIds(supabase, apiKey, cfg);
+
+  for (const d of (demands || [])) {
+    out.checked++;
+    try {
+      const members = await getMembersInfo(supabase, d.id);
+      const expected = expectedOpsFor(members);
+      const actual = await fetchCurrentAssigneesFull(apiKey, d.clickup_task_id);
+      const { sync, detail } = buildAssigneeSyncState(expected, actual, guestIds, multiAllowed);
+
+      await persistAssigneeSync(supabase, d.id, sync, detail);
+      if (sync === "ok") out.ok++;
+      else if (sync === "partial") out.partial++;
+      else if (sync === "partial_expected") out.partial_expected++;
+      else if (sync === "none") out.none++;
+    } catch (e) {
+      out.errors.push(`${d.id}: ${String((e as any)?.message || e)}`);
+    }
+    await new Promise((r) => setTimeout(r, 350)); // throttle ClickUp
+  }
+  return new Response(JSON.stringify({ ok: true, ...out }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+// Monta a lista de operadores esperados no formato que buildAssigneeSyncState precisa.
+function expectedOpsFor(members: any[]): Array<{ clickup_user_id: number; name: string | null }> {
+  return members
+    .filter((m) => m.role === "operator" && m.user.clickup_user_id)
+    .map((m) => ({ clickup_user_id: Number(m.user.clickup_user_id), name: m.user.name || m.user.email || null }))
+    .filter((o) => !isNaN(o.clickup_user_id));
+}
+
+// Extrai os assignees REAIS da resposta do ClickUp (POST/PUT devolvem a task
+// atualizada) — é essa lista, não o que foi pedido, que decide o estado.
+function actualAssigneesFromResponse(task: any): Array<{ id: number; name: string }> {
+  return ((task?.assignees || []) as any[])
+    .map((a: any) => ({ id: Number(a.id), name: a.username || a.email || String(a.id) }))
+    .filter((a) => !isNaN(a.id));
+}
+
+// Depois de criar/atualizar, compara o esperado com o que voltou de fato na resposta
+// e grava o estado. Caminho PRINCIPAL de detecção (a mistura member+guest é aceita
+// com HTTP 200 e o ClickUp descarta o guest em silêncio — não há exceção pra pegar).
+async function reconcileFromResponse(
+  supabase: any, apiKey: string, cfg: any, demand_id: string, members: any[], task: any,
+) {
+  const multiAllowed = await spaceAllowsMultipleAssignees(supabase, apiKey, cfg);
+  const guestIds = await getGuestIds(supabase, apiKey, cfg);
+  const expected = expectedOpsFor(members);
+  const actual = actualAssigneesFromResponse(task);
+  const { sync, detail } = buildAssigneeSyncState(expected, actual, guestIds, multiAllowed);
+  await persistAssigneeSync(supabase, demand_id, sync, detail);
+}
+
+async function createTask(supabase: any, apiKey: string, listId: string, cfg: any, demand: any, members: any[], requester: string) {
+  const legacy = cfg.assignee_strategy === "legacy";
   const assignees = assigneesFor(members);
+
   let task;
   try {
     task = await clickupRequest(apiKey, `/list/${listId}/task`, {
@@ -287,19 +565,24 @@ async function createTask(apiKey: string, listId: string, cfg: any, demand: any,
     });
   } catch (e) {
     const msg = String((e as any)?.message || e);
-    // Espaço sem o ClickApp de múltiplos assignees (ITEM_417): recria com 1 só.
+    // ITEM_417 (espaço sem múltiplos assignees — hoje ligado, mas mantido como rede
+    // caso seja desligado de novo) e ITEM_087 (sem acesso à pasta) são ramos
+    // SEPARADOS — causas diferentes, log e reconciliação diferentes. A mistura
+    // member+guest NÃO cai aqui — o ClickUp aceita com 200 e descarta o guest
+    // em silêncio (por isso reconcileFromResponse() roda sempre depois, e não só
+    // nestes catches).
     if (assignees.length > 1 && msg.includes("ITEM_417")) {
-      console.warn("espaço single-assignee — recriando com 1 responsável");
+      console.warn("ITEM_417 — espaço single-assignee, recriando com 1 responsável");
       task = await clickupRequest(apiKey, `/list/${listId}/task`, {
         method: "POST",
         body: JSON.stringify(buildCreatePayload(demand, assignees.slice(0, 1))),
       });
-    } else if (assignees.length && (msg.includes("ITEM_087") || msg.includes("ITEM_417"))) {
-      // Responsáveis sem acesso à pasta (ITEM_087, pasta recém-criada/privada) ou
-      // single-assignee sem nenhum válido: cria a task SEM responsáveis. Melhor uma
-      // task sem assignee do que nenhuma — o vínculo se resolve quando a pasta for
-      // compartilhada (a próxima atualização reconcilia os assignees).
-      console.warn("assignees barrados (" + msg + ") — criando sem responsáveis");
+    } else if (assignees.length && msg.includes("ITEM_087")) {
+      // Responsáveis sem acesso à pasta (ITEM_087, pasta recém-criada/privada):
+      // cria a task SEM responsáveis. Melhor uma task sem assignee do que nenhuma —
+      // o vínculo se resolve quando a pasta for compartilhada (próxima atualização
+      // reconcilia os assignees).
+      console.warn("ITEM_087 — responsáveis sem acesso à pasta, criando sem responsáveis");
       task = await clickupRequest(apiKey, `/list/${listId}/task`, {
         method: "POST",
         body: JSON.stringify(buildCreatePayload(demand, [])),
@@ -309,14 +592,17 @@ async function createTask(apiKey: string, listId: string, cfg: any, demand: any,
     }
   }
   await setCustomFields(apiKey, task.id, cfg, demand, members, requester);
+  if (!legacy) await reconcileFromResponse(supabase, apiKey, cfg, demand.id, members, task);
   return task;
 }
 
-async function updateTask(apiKey: string, cfg: any, task_id: string, demand: any, members: any[], requester: string) {
-  const desired  = new Set(assigneesFor(members));
-  const current  = new Set(await fetchCurrentAssignees(apiKey, task_id));
-  const add = [...desired].filter(id => !current.has(id));
-  const rem = [...current].filter(id => !desired.has(id));
+async function updateTask(supabase: any, apiKey: string, cfg: any, task_id: string, demand: any, members: any[], requester: string) {
+  const legacy = cfg.assignee_strategy === "legacy";
+  const desired = new Set(assigneesFor(members));
+  const current = new Set(await fetchCurrentAssignees(apiKey, task_id));
+  const add = [...desired].filter((id) => !current.has(id));
+  const rem = [...current].filter((id) => !desired.has(id));
+
   let task;
   try {
     task = await clickupRequest(apiKey, `/task/${task_id}`, {
@@ -325,16 +611,18 @@ async function updateTask(apiKey: string, cfg: any, task_id: string, demand: any
     });
   } catch (e) {
     const msg = String((e as any)?.message || e);
-    // Espaço single-assignee (ITEM_417): adiciona só 1 responsável.
+    // Ramos separados ITEM_417/ITEM_087 — mesma razão do createTask. A mistura
+    // member+guest não cai aqui (200 silencioso); reconcileFromResponse() cobre isso.
     if (add.length > 1 && msg.includes("ITEM_417")) {
+      console.warn("ITEM_417 — espaço single-assignee, atualizando com 1 responsável");
       task = await clickupRequest(apiKey, `/task/${task_id}`, {
         method: "PUT",
         body: JSON.stringify(buildUpdatePayload(demand, add.slice(0, 1), rem)),
       });
-    } else if (msg.includes("ITEM_087") || msg.includes("ITEM_417")) {
+    } else if (msg.includes("ITEM_087")) {
       // Responsáveis sem acesso à pasta (ITEM_087): atualiza status/título/datas SEM
       // mexer nos assignees, pra não travar a propagação do resto da demanda.
-      console.warn("assignees barrados (" + msg + ") — atualizando sem assignees");
+      console.warn("ITEM_087 — assignees barrados, atualizando sem mexer neles");
       task = await clickupRequest(apiKey, `/task/${task_id}`, {
         method: "PUT",
         body: JSON.stringify(buildUpdatePayload(demand, [], [])),
@@ -344,6 +632,7 @@ async function updateTask(apiKey: string, cfg: any, task_id: string, demand: any
     }
   }
   await setCustomFields(apiKey, task_id, cfg, demand, members, requester);
+  if (!legacy) await reconcileFromResponse(supabase, apiKey, cfg, demand.id, members, task);
   return task;
 }
 
@@ -372,6 +661,14 @@ Deno.serve(async (req: Request) => {
       return await provisionStructure(supabase, apiKey, cfg);
     }
 
+    // Modo lote (manual, não-cron): varre demandas com clickup_task_id e popula
+    // clickup_assignee_sync/detail comparando com o estado real no ClickUp (mesma
+    // classificação por guest de createTask/updateTask). Só LÊ o ClickUp — não
+    // escreve assignees (isso é papel do create/updateTask). Migration 086.
+    if (body.action === "reconcile_assignees") {
+      return await reconcileAssignees(supabase, apiKey, cfg);
+    }
+
     // Garante a pasta do aluno + a lista do projeto e devolve o list_id (usado pelo
     // /api/briefing-to-clickup para anexar o PDF do briefing na lista do projeto).
     if (body.action === "ensure_project_list") {
@@ -398,10 +695,10 @@ Deno.serve(async (req: Request) => {
 
     let task;
     if (demand.clickup_task_id) {
-      task = await updateTask(apiKey, cfg, demand.clickup_task_id, demand, members, requester);
+      task = await updateTask(supabase, apiKey, cfg, demand.clickup_task_id, demand, members, requester);
     } else {
       const listId = await resolveDestinationList(supabase, apiKey, cfg, demand);
-      task = await createTask(apiKey, listId, cfg, demand, members, requester);
+      task = await createTask(supabase, apiKey, listId, cfg, demand, members, requester);
       // Persistir o vínculo é crítico: se falhar, a próxima execução cria task
       // duplicada. Propaga o erro para o trigger pg_net poder reprocessar.
       const { error: linkErr } = await supabase.schema("portal").from("demands")
