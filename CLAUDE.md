@@ -55,6 +55,11 @@ npm run dev                  # http://localhost:3000/login
 
 ## Notas
 
-- **Sem GitHub Actions** (removidos para não consumir plano). O deploy do app roda pelo auto-deploy da Node App no push da `main` — migrations (Supabase) e edge functions são deploy à parte.
+- **GitHub Actions (desde 2026-09-03):** `.github/workflows/supabase-deploy.yml` dispara no push da `main`
+  quando o commit toca `db/migrations/**` ou `supabase/functions/**` — roda `supabase db push` +
+  `supabase functions deploy`. Secrets exigidos no repo: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`,
+  `SUPABASE_PROJECT_ID` (ver `supabase/functions/README.md`, seção "Primeiro deploy" — tem um passo manual
+  obrigatório antes da primeira execução). O deploy do APP em si continua sendo o auto-deploy da Node App
+  no push da `main` (sem relação com este workflow — são dois deploys independentes no mesmo push).
 - Backend Supabase é a fonte da verdade; vários RPCs/views vivem só no banco remoto (ver `docs/.../PARITY.md`).
 - Schema `portal` em todas as chamadas (configurado no client/server Supabase).

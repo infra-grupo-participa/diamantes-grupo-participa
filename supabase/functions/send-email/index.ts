@@ -11,6 +11,11 @@
 //                                        alerta a TODOS os admins aprovados quando o ClickUp
 //                                        diverge do portal nos responsáveis da demanda. Só na
 //                                        divergência NOVA (o webhook não reenvia se já sabia).
+//   • _notify_demanda_atribuida_guest (trigger AFTER INSERT em demand_operators,
+//     migration 087) → { type:'demanda_atribuida_guest', demand_id, operator_id }
+//                       operador GUEST no ClickUp (clickup_notifiable=false) foi
+//                       atribuído a uma demanda — ele não vai virar assignee/watcher
+//                       lá, então recebe o link da task por e-mail.
 //
 // D1: cada e-mail é logado em portal.email_log; falha NÃO se perde (status='failed'
 //     + attempts/next_attempt_at). O retry_failed reenvia em background e atualiza a
@@ -119,14 +124,22 @@ async function resolveAdminRecipients(supabase: any): Promise<Array<{ email: str
 }
 
 // Operadores da demanda (têm e-mail @ — não têm login no portal; CTA aponta ao ClickUp).
-async function resolveDemandOperators(supabase: any, demand_id: string): Promise<Array<{ email: string; name: string }>> {
+// clickup_notifiable (migration 087): false = operador é GUEST no ClickUp (não pode
+// ser assignee nem watcher — descartado em silêncio). Incluído aqui para o type
+// 'demanda_atribuida_guest' poder filtrar quem precisa do aviso por e-mail (ele não
+// vai saber pelo ClickUp).
+async function resolveDemandOperators(
+  supabase: any, demand_id: string,
+): Promise<Array<{ email: string; name: string; clickup_notifiable: boolean }>> {
   const { data: dops } = await supabase.schema("portal")
     .from("demand_operators").select("operator_id").eq("demand_id", demand_id);
   const ids = (dops || []).map((d: any) => d.operator_id);
   if (!ids.length) return [];
   const { data: ops } = await supabase.schema("portal")
-    .from("operators").select("name, email").in("id", ids).not("email", "is", null);
-  return (ops || []).filter((o: any) => o.email).map((o: any) => ({ email: o.email, name: o.name || "" }));
+    .from("operators").select("name, email, clickup_notifiable").in("id", ids).not("email", "is", null);
+  return (ops || []).filter((o: any) => o.email).map((o: any) => ({
+    email: o.email, name: o.name || "", clickup_notifiable: o.clickup_notifiable !== false,
+  }));
 }
 
 type Spec = { to: string; name?: string; subject: string; html: string; dedupKey: string | null; refType: string | null; refId: string | null };
@@ -222,6 +235,35 @@ async function composeSpecs(supabase: any, type: string, payload: any): Promise<
         intro: `Olá${firstName(op.name)}, o cliente revisou a demanda <strong>${esc(d.title)}</strong> e pediu ajustes. A demanda voltou para "em andamento" — confira os comentários na tarefa do ClickUp.`,
         bodyHtml: "", ctaLabel: "Abrir tarefa no ClickUp", ctaHref }),
     }));
+  }
+
+  // Operador ATRIBUÍDO à demanda e é GUEST no ClickUp (migration 087,
+  // operators.clickup_notifiable=false) → não vai ser assignee nem watcher lá
+  // (descartado em silêncio pelo ClickUp). Avisa por e-mail com link da task, já que
+  // ele não vai saber pelo ClickUp. Disparado por trigger AFTER INSERT em
+  // demand_operators (payload: demand_id, operator_id) — só o operador recém-atribuído
+  // recebe (não reenvia para os já notificados da mesma demanda).
+  if (type === "demanda_atribuida_guest") {
+    const { operator_id } = payload;
+    if (!operator_id) return [];
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, clickup_task_id").eq("id", demand_id).maybeSingle();
+    if (!d) return [];
+    const { data: op } = await supabase.schema("portal").from("operators")
+      .select("name, email, clickup_notifiable").eq("id", operator_id).maybeSingle();
+    // Só notifica quem é GUEST (clickup_notifiable=false) — operador normal já vai
+    // ser assignee de fato e sabe pelo próprio ClickUp.
+    if (!op || op.clickup_notifiable !== false || !op.email) return [];
+    const ctaHref = d.clickup_task_id ? `https://app.clickup.com/t/${d.clickup_task_id}` : `${PORTAL_URL}`;
+    return [{
+      to: op.email, name: op.name || "",
+      dedupKey: `demanda_atribuida_guest:${demand_id}:${operator_id}`,
+      refType: "demand", refId: demand_id,
+      subject: `Você foi atribuído: ${d.title}`,
+      html: baseLayout({ title: "Você foi atribuído a uma demanda 📋",
+        intro: `Olá${firstName(op.name)}, você foi atribuído à demanda <strong>${esc(d.title)}</strong>. Como seu acesso ao ClickUp é como convidado, você não aparece como responsável por lá — mas pode acompanhar e comentar direto na tarefa pelo link abaixo.`,
+        bodyHtml: "", ctaLabel: "Abrir tarefa no ClickUp", ctaHref }),
+    }];
   }
 
   // Divergência de responsáveis (ClickUp x portal) → avisa TODOS os admins.
@@ -328,6 +370,11 @@ async function runRetry(supabase: any, apiKey: string) {
     if (row.type === "projeto_criado") payload.project_id = row.ref_id;
     else if (row.type === "nova_mensagem") payload.message_id = row.ref_id;
     else payload.demand_id = row.ref_id;
+    // Nota (mesma limitação já documentada para divergencia_assignee): email_log.ref_id
+    // só guarda demand_id — 'demanda_atribuida_guest' também precisa de operator_id,
+    // que não sobrevive ao retry. composeSpecs devolve [] nesse caso (sem operator_id
+    // → sem destinatário) e a linha vira 'skipped' abaixo. Aceitável: best-effort, e o
+    // e-mail original só falha por queda do provider (Resend), não por lógica de negócio.
 
     const specs = await composeSpecs(supabase, row.type, payload);
     const spec = specs.find((s) => s.to === row.to_email) || specs[0];
@@ -383,7 +430,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: true, type, ...(res.ok ? { sent: to } : { failed: res.error }) }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    const KNOWN = ["demanda_criada","projeto_criado","demanda_em_revisao","demanda_concluida","demanda_cancelada","demanda_ajustes","nova_mensagem","divergencia_assignee"];
+    const KNOWN = ["demanda_criada","projeto_criado","demanda_em_revisao","demanda_concluida","demanda_cancelada","demanda_ajustes","nova_mensagem","divergencia_assignee","demanda_atribuida_guest"];
     if (!KNOWN.includes(type)) {
       return new Response(JSON.stringify({ error: `type inválido: ${type}` }), { status: 400, headers: { "Content-Type": "application/json" } });
     }

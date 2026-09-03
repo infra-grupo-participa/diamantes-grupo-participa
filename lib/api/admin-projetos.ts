@@ -31,7 +31,16 @@ export async function getProjectPanorama(
 
   const [accessRes, demandsRes] = await Promise.all([
     supabase.from('client_briefing').select('access').eq('client_slug', clientSlug).maybeSingle(),
-    supabase.from('v_demands').select('*').eq('project_id', projectId).order('created_at', { ascending: false }),
+    supabase
+      .from('v_demands')
+      .select(
+        `id, client_slug, client_name, title, description, status, starts_at, ends_at,
+         clickup_task_id, finalized_at, created_at, updated_at, service_type, briefing_status,
+         created_by_name, operators_total, messages_count, last_message_at, project_id,
+         project_title, last_message_preview, last_message_from, clickup_assignee_sync`,
+      )
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false }),
   ]);
 
   const access = ((accessRes.data?.access as Record<string, Record<string, unknown>>) ?? {}) as Record<

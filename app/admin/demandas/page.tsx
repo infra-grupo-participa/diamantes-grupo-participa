@@ -9,6 +9,7 @@ import {
   adminDemandStats,
   listClientsSimple,
   loadOperatorsByDemand,
+  listPendingAssigneeDivergences,
   type Demand,
   type DemandStats,
   type DemandFilter,
@@ -19,7 +20,7 @@ import { DemandCard, StudentDemandCard } from '@/components/admin/DemandCard';
 import DemandDetailModal from '@/components/admin/DemandDetailModal';
 import styles from './demandas.module.css';
 
-type ViewMode = 'kanban' | 'students';
+type ViewMode = 'kanban' | 'students' | 'pending';
 
 const VIEW_KEY = 'admin_demands_view';
 const COLLAPSED_KEY = 'admin_demands_collapsed';
@@ -47,6 +48,9 @@ export default function AdminDemandasPage() {
   const [demands, setDemands] = useState<Demand[]>([]);
   const [operatorsById, setOperatorsById] = useState<Record<string, DemandOperatorLite[]>>({});
   const [clients, setClients] = useState<ClientSimple[]>([]);
+  // Fila de pendências de responsáveis (clickup_assignee_sync acionável) —
+  // carregada junto com o resto para não duplicar round-trip por troca de aba.
+  const [pending, setPending] = useState<Demand[]>([]);
 
   const [search, setSearch] = useState('');
   const [clientSlug, setClientSlug] = useState('all');
@@ -64,15 +68,20 @@ export default function AdminDemandasPage() {
 
   const loadAll = useCallback(async () => {
     try {
-      const [s, list] = await Promise.all([
+      const [s, list, pendingList] = await Promise.all([
         adminDemandStats(),
         listAllDemands(filterRef.current),
+        listPendingAssigneeDivergences(),
       ]);
       setStats(s);
       setDemands(list);
+      setPending(pendingList);
 
       // Avatares dos cards vêm de demand_operators (fonte real dos responsáveis).
-      setOperatorsById(await loadOperatorsByDemand(list.map((d) => d.id)));
+      // Junta IDs das duas listas (kanban/aluno + fila de pendências) numa única
+      // carga — evita round-trip duplicado quando a demanda aparece nas duas.
+      const ids = [...new Set([...list.map((d) => d.id), ...pendingList.map((d) => d.id)])];
+      setOperatorsById(await loadOperatorsByDemand(ids));
     } catch (e) {
       console.error(e);
       toast('Erro ao carregar demandas: ' + ((e as Error).message || e), 'error');
@@ -91,7 +100,7 @@ export default function AdminDemandasPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(VIEW_KEY);
-      if (saved === 'students' || saved === 'kanban') setView(saved);
+      if (saved === 'students' || saved === 'kanban' || saved === 'pending') setView(saved);
     } catch {
       /* noop */
     }
@@ -401,6 +410,19 @@ export default function AdminDemandasPage() {
             </svg>
             Por aluno
           </button>
+          <button
+            type="button"
+            className={view === 'pending' ? styles.toggleActive : ''}
+            onClick={() => changeView('pending')}
+            title="Fila de pendências de responsáveis (ClickUp)"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+            Pendências
+            {pending.length > 0 && <span className={styles.kcolCount}>{pending.length}</span>}
+          </button>
         </div>
         <button className={styles.btnRefresh} onClick={() => loadAll()} title="Atualizar">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
@@ -540,6 +562,43 @@ export default function AdminDemandasPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* View: fila de pendências (divergência de responsáveis ClickUp) */}
+      {view === 'pending' && (
+        <div className={styles.kanban} style={{ gridTemplateColumns: '1fr' }}>
+          <div className={styles.kcol}>
+            <div className={styles.kcolHead}>
+              <div className={styles.kcolTitle}>
+                <span className={`${styles.kcolDot} ${styles.dotReview}`} />
+                Divergência de responsáveis (ClickUp)
+              </div>
+              <span className={styles.kcolCount}>{pending.length}</span>
+            </div>
+            <div className={styles.kcards}>
+              {loading ? (
+                Array.from({ length: 2 }).map((_, i) => (
+                  <div className={styles.skelCard} key={i}>
+                    <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '80%' }} />
+                    <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '50%', height: 9 }} />
+                    <div className={`${styles.skel} ${styles.skelLine}`} style={{ width: '100%', height: 9 }} />
+                  </div>
+                ))
+              ) : pending.length > 0 ? (
+                pending.map((d) => (
+                  <DemandCard
+                    key={d.id}
+                    demand={d}
+                    operators={operatorsById[d.id] || []}
+                    onOpen={setDetailId}
+                  />
+                ))
+              ) : (
+                <div className={styles.empty}>Nenhuma divergência pendente — tudo sincronizado.</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

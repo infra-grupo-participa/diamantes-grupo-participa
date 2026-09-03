@@ -122,7 +122,14 @@ export async function getMe(): Promise<Me | null> {
 /** Demandas do cliente (view v_demands), ordenadas por ATIVIDADE recente
  *  (última mensagem ou, na falta, data de criação) — conversas ativas sobem. */
 export async function listMyDemands(status: string = 'all'): Promise<Demand[]> {
-  let q = db().from('v_demands').select('*');
+  let q = db()
+    .from('v_demands')
+    .select(
+      `id, client_slug, client_name, title, description, status, starts_at, ends_at,
+       clickup_task_id, finalized_at, created_at, updated_at, service_type, briefing_status,
+       created_by_name, operators_total, messages_count, last_message_at, project_id,
+       project_title, last_message_preview, last_message_from`,
+    );
   if (status && status !== 'all') q = q.eq('status', status);
   const { data, error } = await q;
   if (error) throw error;
@@ -133,7 +140,16 @@ export async function listMyDemands(status: string = 'all'): Promise<Demand[]> {
 }
 
 export async function getDemand(id: string): Promise<Demand | null> {
-  const { data, error } = await db().from('v_demands').select('*').eq('id', id).maybeSingle();
+  const { data, error } = await db()
+    .from('v_demands')
+    .select(
+      `id, client_slug, client_name, title, description, status, starts_at, ends_at,
+       clickup_task_id, finalized_at, created_at, updated_at, service_type, briefing_status,
+       created_by_name, operators_total, messages_count, last_message_at, project_id,
+       project_title, last_message_preview, last_message_from`,
+    )
+    .eq('id', id)
+    .maybeSingle();
   if (error) throw error;
   return (data as Demand) || null;
 }

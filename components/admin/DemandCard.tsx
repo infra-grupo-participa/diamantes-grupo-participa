@@ -5,6 +5,7 @@ import {
   STATUS_BADGE,
   dueLabel,
   clickupTaskUrl,
+  assigneeSyncBadge,
   type Demand,
   type DemandOperatorLite,
 } from '@/lib/api/admin-demandas';
@@ -54,6 +55,7 @@ export function DemandCard({
 }) {
   const due = dueLabel(demand);
   const dueCls = due.cls ? `${styles.due} ${styles[due.cls]}` : styles.due;
+  const sync = assigneeSyncBadge(demand.clickup_assignee_sync);
 
   return (
     <div className={styles.kcard} onClick={() => onOpen(demand.id)}>
@@ -65,6 +67,12 @@ export function DemandCard({
           </div>
         </div>
       </div>
+      {sync && (
+        <span className={`${styles.syncBadge} ${styles[sync.cls]}`}>
+          <span className={styles.syncIcon} aria-hidden="true">{sync.icon}</span>
+          {sync.label}
+        </span>
+      )}
       <div className={styles.metaRow}>
         <Avatars operators={operators} max={4} />
         <span className={dueCls}>{due.text}</span>
@@ -119,6 +127,7 @@ export function StudentDemandCard({
             ? styles.done
             : styles.cancel;
   const label = STATUS_BADGE[demand.status]?.label || demand.status;
+  const sync = assigneeSyncBadge(demand.clickup_assignee_sync);
 
   return (
     <div
@@ -129,6 +138,12 @@ export function StudentDemandCard({
       }}
     >
       <span className={`${styles.badgeMini} ${miniCls}`}>{label}</span>
+      {sync && (
+        <span className={`${styles.syncBadge} ${styles[sync.cls]}`} style={{ marginLeft: 6 }}>
+          <span className={styles.syncIcon} aria-hidden="true">{sync.icon}</span>
+          {sync.label}
+        </span>
+      )}
       <div className={styles.cardTitle}>{demand.title || 'Sem título'}</div>
       <div className={styles.metaRow}>
         <Avatars operators={operators} max={3} />

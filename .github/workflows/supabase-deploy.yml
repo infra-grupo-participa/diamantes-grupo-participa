@@ -1,0 +1,58 @@
+name: Deploy Supabase (migrations + edge functions)
+
+# Dispara só quando o push na main toca migration ou edge function — não em
+# qualquer commit (o deploy do APP em si continua sendo o auto-deploy da
+# Hostinger no push da main, sem relação com este workflow).
+#
+# ⚠️ PRIMEIRO DEPLOY (leia antes de rodar pela primeira vez): as edge functions
+# deste repo podem estar ATRÁS do que já está publicado no Supabase (avisos em
+# supabase/functions/clickup-sync e clickup-webhook dizem que foram editadas
+# sem diff contra o remoto). Rodar este workflow sem checar isso pode
+# SOBRESCREVER correções feitas direto no painel do Supabase. Ver
+# supabase/functions/README.md, seção "Primeiro deploy" — é manual, de propósito
+# não está automatizado aqui.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'db/migrations/**'
+      - 'supabase/functions/**'
+  workflow_dispatch: {} # permite rodar manualmente (ex.: reprocessar após o diff manual do 1º deploy)
+
+# Só checkout + CLI do Supabase — não fala com a API do GitHub. Sem write
+# nenhum (default do repo pode ser mais amplo); reduz o raio de dano deste
+# job, que carrega SUPABASE_ACCESS_TOKEN e SUPABASE_DB_PASSWORD de produção.
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link do projeto Supabase
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Aplica migrations (db push)
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Deploy das edge functions
+        run: |
+          for fn in clickup-sync clickup-webhook clickup-comment-sync send-email cron-service-expiry; do
+            echo "Deploy $fn"
+            supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_ID"
+          done
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}

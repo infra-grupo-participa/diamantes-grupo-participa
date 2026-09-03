@@ -1,4 +1,4 @@
-// clickup-webhook v3 — sync reversa: task updates + comentários + assignees.
+// clickup-webhook v4 — sync reversa: task updates + comentários + assignees.
 // ClickUp → (webhook) → esta função → portal.demands / portal.demand_messages.
 //
 // v3 (migration 086): ramo taskAssigneeUpdated ANTES do bloco genérico de task field
@@ -18,15 +18,32 @@
 // lista de eventos (webhook_id em portal.clickup_config). Escutar no código não faz o
 // ClickUp enviar — é preciso re-registrar via API e confirmar.
 //
+// v4 (086/087, revisão do arquiteto 2026-09-03 — ANTES de qualquer deploy real):
+//   - handleAssigneeUpdated agora respeita clickup_config.assignee_strategy='legacy':
+//     antes só o clickup-sync lia essa chave — em modo legacy o webhook continuava
+//     gravando 'external' e mandando e-mail, o que é reversão INCOMPLETA (o admin liga
+//     'legacy' esperando desligar a feature toda, não só metade dela).
+//   - notifyAdminDivergence extraída para _shared/notify-admin-divergence.ts (estava
+//     duplicada literalmente em clickup-sync) — também respeita agora
+//     assignee_alert_email='off'.
+//   - stripBotPrefix e a remoção do prefixo "[Projeto] " no nome da task: taskName()
+//     no clickup-sync não põe mais esse prefixo desde a v10 (hierarquia pasta→lista
+//     tornou o prefixo redundante). O código aqui é compat para tasks CRIADAS ANTES
+//     da v10 que ainda tenham o prefixo no nome — documentado, não removido (task
+//     antiga com prefixo residual continuaria sincronizando o nome errado se
+//     removêssemos sem mais checagem).
+//
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
 //
-// ⚠️ EDIÇÃO 2026-09-01 (086/B3): feita SOBRE A CÓPIA DO REPO, sem confirmação contra o
-// remoto (supabase functions download indisponível neste ambiente — sem
+// ⚠️ EDIÇÃO 2026-09-03 (086/087, v4): feita SOBRE A CÓPIA DO REPO, sem confirmação
+// contra o remoto (supabase functions download indisponível neste ambiente — sem
 // SUPABASE_ACCESS_TOKEN). NÃO FAÇA DEPLOY sem antes diffar este arquivo contra
-// `supabase functions download clickup-webhook` a partir de uma máquina autenticada.
+// `supabase functions download clickup-webhook` a partir de uma máquina autenticada —
+// ver supabase/functions/README.md, seção "Primeiro deploy".
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { notifyAdminDivergence as notifyAdminDivergenceShared } from "../_shared/notify-admin-divergence.ts";
 
 const CLICKUP_API  = "https://api.clickup.com/api/v2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -52,6 +69,14 @@ async function getSecret(supabase: any, name: string): Promise<string> {
     .rpc("get_internal_secret", { p_name: name });
   if (error) throw new Error(`secret ${name}: ${error.message}`);
   return data || "";
+}
+
+// v4: o webhook passou a precisar de clickup_config (assignee_strategy,
+// assignee_alert_email) — antes só o clickup-sync lia essa tabela.
+async function getConfig(supabase: any) {
+  const { data, error } = await supabase.schema("portal").from("clickup_config").select("key, value");
+  if (error) throw new Error("Config: " + error.message);
+  return Object.fromEntries((data || []).map((r: any) => [r.key, r.value]));
 }
 
 async function verifyHmac(payload: string, signature: string, secret: string): Promise<boolean> {
@@ -97,24 +122,12 @@ async function findUserForClickUpUser(supabase: any, cuUser: any): Promise<{ id:
   return null;
 }
 
-// Dispara o alerta de divergência ao admin reusando a trilha existente
-// (email_log + edge send-email) — sem canal novo. Best-effort: falha SÓ loga,
-// nunca derruba o processamento do webhook (mesma lição do try/catch-log das
-// migrations 032/054/055).
-async function notifyAdminDivergence(supabase: any, demand_id: string, before: string[], after: string[]) {
-  try {
-    const key = await getSecret(supabase, "clickup_sync_internal_key");
-    if (!key) return;
-    // context:'webhook' → send-email usa o rótulo "portal esperava/ClickUp tem"
-    // (mudança feita direto no ClickUp, fora do portal — estado 'external').
-    await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-internal-key": key },
-      body: JSON.stringify({ type: "divergencia_assignee", demand_id, context: "webhook", before, after }),
-    });
-  } catch (e) {
-    console.error("notifyAdminDivergence err", demand_id, (e as any)?.message || e);
-  }
+// Alerta de divergência ao admin (extraído para _shared — estava duplicado
+// literalmente em clickup-sync, ver migration 086/087 revisão 2026-09-03).
+async function notifyAdminDivergence(supabase: any, cfg: any, demand_id: string, before: string[], after: string[]) {
+  // context:'webhook' → send-email usa o rótulo "portal esperava/ClickUp tem"
+  // (mudança feita direto no ClickUp, fora do portal — estado 'external').
+  await notifyAdminDivergenceShared(supabase, SUPABASE_URL, getSecret, cfg, demand_id, "webhook", before, after);
 }
 
 // ===== taskAssigneeUpdated =====
@@ -122,7 +135,14 @@ async function notifyAdminDivergence(supabase: any, demand_id: string, before: s
 // assignees reais da task (ClickUp). NUNCA escreve em demand_operators — só
 // observa e registra (decisão do Marcio: o admin decide manualmente pelo
 // painel, via portal.admin_resolve_assignee_divergence).
-async function handleAssigneeUpdated(supabase: any, apiKey: string, demand: any) {
+//
+// v4: respeita clickup_config.assignee_strategy='legacy' — em modo legacy, o
+// webhook não compara nem grava 'external' (reversão completa; antes só o
+// clickup-sync respeitava essa chave).
+async function handleAssigneeUpdated(supabase: any, apiKey: string, cfg: any, demand: any) {
+  if (cfg?.assignee_strategy === "legacy") {
+    return { skipped: "legacy_strategy" };
+  }
   const { data: dops } = await supabase.schema("portal")
     .from("demand_operators").select("operator_id").eq("demand_id", demand.id);
   const opIds = (dops || []).map((d: any) => d.operator_id);
@@ -174,7 +194,7 @@ async function handleAssigneeUpdated(supabase: any, apiKey: string, demand: any)
 
   // E-mail só na divergência NOVA (não reenvia a cada evento se já estava external).
   if (!wasExternal) {
-    await notifyAdminDivergence(supabase, demand.id, beforeNames, afterNames);
+    await notifyAdminDivergence(supabase, cfg, demand.id, beforeNames, afterNames);
   }
   return { diverged: true, missing: missing.length, extra: extra.length };
 }
@@ -281,7 +301,8 @@ Deno.serve(async (req: Request) => {
     // field updates: só observa/registra, nunca escreve em demand_operators. =====
     if (event === "taskAssigneeUpdated") {
       const apiKey = await getSecret(supabase, "clickup_api_key");
-      const res = await handleAssigneeUpdated(supabase, apiKey, demand);
+      const cfg = await getConfig(supabase);
+      const res = await handleAssigneeUpdated(supabase, apiKey, cfg, demand);
       return new Response(JSON.stringify({ ok: true, event, demand_id: demand.id, ...res }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
@@ -309,7 +330,10 @@ Deno.serve(async (req: Request) => {
     const cuStatusName = task?.status?.status || "";
     const mapped = mapStatusReverse(cuStatusName);
     if (mapped && mapped !== demand.status) patch.status = mapped;
-    // Remove o prefixo "[Projeto] " que o clickup-sync adiciona, p/ não poluir o título.
+    // Remove o prefixo "[Projeto] " — COMPAT: taskName() no clickup-sync não põe mais
+    // esse prefixo desde a v10 (hierarquia pasta-do-aluno→lista-do-projeto tornou o
+    // prefixo redundante), mas tasks criadas ANTES da v10 ainda podem carregá-lo. Sem
+    // custo manter (regex é no-op quando não há colchetes no início do nome).
     const cuName = typeof task?.name === "string" ? task.name.replace(/^\s*\[[^\]]*\]\s*/, "").trim() : "";
     if (cuName && cuName !== demand.title) patch.title = cuName;
     if (typeof task?.description === "string" && (task.description || "") !== (demand.description || "")) patch.description = task.description || "";

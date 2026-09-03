@@ -30,9 +30,21 @@ export type DemandStatus = 'open' | 'in_progress' | 'review' | 'done' | 'cancele
  */
 export type AssigneeSyncState = 'ok' | 'partial' | 'partial_expected' | 'none' | 'external' | null;
 
-/** Item de `clickup_assignee_detail.missing[]` (estados partial/partial_expected/none). */
-export type AssigneeDivergenceReason = 'guest_cannot_assign' | 'space_single_assignee' | 'unknown_rejected';
-export type MissingAssignee = { name: string | null; clickup_user_id: number; reason: AssigneeDivergenceReason };
+/**
+ * Item de `clickup_assignee_detail.missing[]` (estados partial/partial_expected/none).
+ * `no_clickup_user` e `stale_clickup_user` (migration 086/087, revisão do arquiteto
+ * 2026-09-03): antes o operador sem clickup_user_id era filtrado ANTES da comparação
+ * (a razão 'no_clickup_user' nunca aparecia de fato) e não existia distinção entre
+ * "é guest" e "ID cadastrado não existe mais no workspace" (fantasma, ex. Gabriel
+ * Alves 230453991) — os dois caíam em 'unknown_rejected', que virava lixeira.
+ */
+export type AssigneeDivergenceReason =
+  | 'guest_cannot_assign'
+  | 'space_single_assignee'
+  | 'no_clickup_user'
+  | 'stale_clickup_user'
+  | 'unknown_rejected';
+export type MissingAssignee = { name: string | null; clickup_user_id: number | null; reason: AssigneeDivergenceReason };
 
 export type Demand = {
   id: string;
@@ -50,7 +62,12 @@ export type Demand = {
   clickup_task_id: string | null;
   operators_total: number | null;
   clickup_assignee_sync: AssigneeSyncState;
-  clickup_assignee_detail: Record<string, unknown> | null;
+  /**
+   * Presente só quando a query pede explicitamente (detalhe do modal). Na
+   * LISTAGEM (`listAllDemands`/`getProjectPanorama`) não é carregado — o jsonb
+   * pode crescer livremente e não deve pesar toda tela de demandas.
+   */
+  clickup_assignee_detail?: Record<string, unknown> | null;
   [key: string]: unknown;
 };
 
@@ -105,15 +122,36 @@ export type DemandFilter = {
   search?: string;
   clientSlug?: string;
   status?: string;
+  /** Teto rígido em 200 dentro de `listAllDemands` — ver comentário da função. */
+  limit?: number;
 };
 
 const VALID_STATUS: DemandStatus[] = ['open', 'in_progress', 'review', 'done', 'canceled'];
 
-/** Lista todas as demandas (v_demands) com filtros de busca/cliente/status. */
+/**
+ * Lista todas as demandas (v_demands) com filtros de busca/cliente/status.
+ * `limit` tem teto: a view tem 5 subqueries correlacionadas por linha
+ * (operators_total, messages_count, last_message_at/preview/from) que rodam
+ * UMA VEZ POR LINHA retornada — sem teto o custo cresce linearmente com o
+ * volume de demandas (egress do Supabase é restrição real, ver
+ * docs/specs/pendencias/086-087-explain-pendente.md). 200 é generoso para o
+ * uso real: o Kanban/listagem do painel (`app/admin/demandas/page.tsx`) é
+ * operacional, não relatório histórico, e hoje tem 16 demandas no total.
+ */
 export async function listAllDemands(filter: DemandFilter = {}): Promise<Demand[]> {
-  const { search = '', clientSlug = 'all', status = 'all' } = filter;
+  const { search = '', clientSlug = 'all', status = 'all', limit = 200 } = filter;
+  const capped = Math.min(200, Math.max(1, limit));
   const supabase = createClient();
-  let q = supabase.from('v_demands').select('*').order('created_at', { ascending: false });
+  let q = supabase
+    .from('v_demands')
+    .select(
+      `id, client_slug, client_name, title, description, status, starts_at, ends_at,
+       clickup_task_id, finalized_at, created_at, updated_at, service_type, briefing_status,
+       created_by_name, operators_total, messages_count, last_message_at, project_id,
+       project_title, last_message_preview, last_message_from, clickup_assignee_sync`,
+    )
+    .order('created_at', { ascending: false })
+    .limit(capped);
   if (status && status !== 'all') q = q.eq('status', status);
   if (clientSlug && clientSlug !== 'all') q = q.eq('client_slug', clientSlug);
   if (search && search.trim()) {
@@ -205,9 +243,26 @@ export async function getDemandFullDetails(demandId: string): Promise<{
   const supabase = createClient();
   const [{ data: demand, error: demandErr }, { data: members, error: membersErr }, { data: messages, error: messagesErr }] =
     await Promise.all([
-      supabase.from('v_demands').select('*').eq('id', demandId).maybeSingle(),
-      supabase.from('demand_members').select('*').eq('demand_id', demandId),
-      supabase.from('demand_messages').select('*').eq('demand_id', demandId).order('created_at'),
+      supabase
+        .from('v_demands')
+        .select(
+          `id, client_slug, client_name, title, description, status, starts_at, ends_at,
+           clickup_task_id, finalized_at, created_at, updated_at, service_type, briefing_status,
+           created_by_name, operators_total, messages_count, last_message_at, project_id,
+           project_title, last_message_preview, last_message_from, clickup_assignee_sync,
+           clickup_assignee_detail`,
+        )
+        .eq('id', demandId)
+        .maybeSingle(),
+      supabase
+        .from('demand_members')
+        .select('id, demand_id, user_id, role, approved_finish, approved_at, added_at')
+        .eq('demand_id', demandId),
+      supabase
+        .from('demand_messages')
+        .select('id, demand_id, user_id, content, created_at, clickup_author')
+        .eq('demand_id', demandId)
+        .order('created_at'),
     ]);
   if (demandErr) throw demandErr;
   if (membersErr) throw membersErr;
@@ -294,6 +349,22 @@ export async function getDemandFullDetails(demandId: string): Promise<{
 }
 
 // ── Operadores da demanda (responsáveis reais — tabela demand_operators) ──────
+
+/**
+ * Estado de entrega do assignee no ClickUp por operador (portal.demand_operators
+ * .clickup_delivery — coluna nova, ainda não aplicada no banco nesta sessão).
+ * 'unknown' é o fallback seguro: coluna ausente/não gravada ainda, não é erro.
+ */
+export type ClickupDeliveryState = 'delivered' | 'blocked_guest' | 'blocked_other' | 'no_clickup_user' | 'unknown';
+
+export const CLICKUP_DELIVERY_LABEL: Record<ClickupDeliveryState, { cls: string; label: string }> = {
+  delivered: { cls: 'deliveryDelivered', label: 'Entregue' },
+  blocked_guest: { cls: 'deliveryBlockedGuest', label: 'Bloqueado (guest)' },
+  blocked_other: { cls: 'deliveryBlockedOther', label: 'Bloqueado (outro motivo)' },
+  no_clickup_user: { cls: 'deliveryNoClickup', label: 'Sem cadastro no ClickUp' },
+  unknown: { cls: 'deliveryUnknown', label: 'Estado desconhecido' },
+};
+
 export type DemandOperator = {
   operator_id: string;
   name: string | null;
@@ -301,14 +372,41 @@ export type DemandOperator = {
   clickup_user_id: string | null;
   position_name: string | null;
   position_color: string | null;
+  /** Só populado por `getDemandOperators` (contexto de UMA demanda). Ausente
+   *  no panorama do projeto (agrega várias demandas — não há um "estado de
+   *  entrega" único por operador nesse escopo). */
+  clickup_delivery?: ClickupDeliveryState;
 };
 
 /** Operadores atualmente atribuídos à demanda (demand_operators → operators). */
 export async function getDemandOperators(demandId: string): Promise<DemandOperator[]> {
   const supabase = createClient();
-  const { data: dops, error } = await supabase.from('demand_operators').select('operator_id').eq('demand_id', demandId);
-  if (error) throw error;
-  const ids = [...new Set(((dops ?? []) as Array<{ operator_id: string }>).map((d) => d.operator_id))];
+  // clickup_delivery é coluna nova (backend em paralelo): se ainda não existir no
+  // banco, a query com a coluna falha com 42703 (undefined_column) — cai para o
+  // select sem ela e cada operador vira 'unknown', sem quebrar a tela.
+  let dops: Array<{ operator_id: string; clickup_delivery?: string | null }> | null = null;
+  {
+    const { data, error } = await supabase
+      .from('demand_operators')
+      .select('operator_id, clickup_delivery')
+      .eq('demand_id', demandId);
+    if (error) {
+      if (error.code === '42703') {
+        const fallback = await supabase.from('demand_operators').select('operator_id').eq('demand_id', demandId);
+        if (fallback.error) throw fallback.error;
+        dops = (fallback.data ?? []) as Array<{ operator_id: string }>;
+      } else {
+        throw error;
+      }
+    } else {
+      dops = data as Array<{ operator_id: string; clickup_delivery?: string | null }>;
+    }
+  }
+  const deliveryByOp: Record<string, ClickupDeliveryState> = {};
+  for (const row of dops ?? []) {
+    deliveryByOp[row.operator_id] = (row.clickup_delivery as ClickupDeliveryState) || 'unknown';
+  }
+  const ids = [...new Set((dops ?? []).map((d) => d.operator_id))];
   if (!ids.length) return [];
   const { data: ops, error: e2 } = await supabase
     .from('operators')
@@ -329,23 +427,48 @@ export async function getDemandOperators(demandId: string): Promise<DemandOperat
     clickup_user_id: (o.clickup_user_id as string) ?? null,
     position_name: posById[String(o.position_id)]?.name ?? null,
     position_color: posById[String(o.position_id)]?.color ?? null,
+    clickup_delivery: deliveryByOp[o.id as string] ?? 'unknown',
   }));
 }
 
-/** Operadores ativos (para o seletor de adicionar à demanda). */
-export async function listActiveOperators(): Promise<DemandOperator[]> {
+/**
+ * Operadores ativos (para o seletor de adicionar à demanda). `clickup_notifiable`
+ * (portal.operators — coluna nova do backend) indica se o operador RECEBE no
+ * ClickUp; ausente/coluna inexistente → `null` (estado desconhecido, não afirma
+ * nada) para não sugerir falsamente que o operador é notificável.
+ */
+export async function listActiveOperators(): Promise<Array<DemandOperator & { clickup_notifiable: boolean | null }>> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from('v_operators')
-    .select('id, name, email, clickup_user_id, position_name, position_color, status')
-    .neq('status', 'inactive')
-    .order('name', { ascending: true });
-  if (error) throw error;
+  let data: Array<Record<string, unknown>> | null = null;
+  {
+    const res = await supabase
+      .from('v_operators')
+      .select('id, name, email, clickup_user_id, position_name, position_color, status, clickup_notifiable')
+      .neq('status', 'inactive')
+      .order('name', { ascending: true });
+    if (res.error) {
+      if (res.error.code === '42703') {
+        const fallback = await supabase
+          .from('v_operators')
+          .select('id, name, email, clickup_user_id, position_name, position_color, status')
+          .neq('status', 'inactive')
+          .order('name', { ascending: true });
+        if (fallback.error) throw fallback.error;
+        data = fallback.data as Array<Record<string, unknown>>;
+      } else {
+        throw res.error;
+      }
+    } else {
+      data = res.data as Array<Record<string, unknown>>;
+    }
+  }
   return ((data ?? []) as Array<Record<string, unknown>>).map((o) => ({
     operator_id: o.id as string,
     name: (o.name as string) ?? null,
     email: (o.email as string) ?? null,
     clickup_user_id: (o.clickup_user_id as string) ?? null,
+    clickup_delivery: 'unknown' as ClickupDeliveryState,
+    clickup_notifiable: (o.clickup_notifiable as boolean | undefined) ?? null,
     position_name: (o.position_name as string) ?? null,
     position_color: (o.position_color as string) ?? null,
   }));
@@ -474,3 +597,79 @@ export function dueLabel(d: Demand): DueLabel {
 }
 
 export const clickupTaskUrl = (taskId: string) => `https://app.clickup.com/t/${taskId}`;
+
+/**
+ * Rótulo + classe CSS do badge de sincronização de responsáveis (card e lista).
+ * `partial_expected` é NEUTRO por decisão de produto (guest permanente, não é
+ * erro) — só `partial`/`none`/`external` são acionáveis (âmbar/vermelho).
+ * `null`/`ok` não geram badge (ver `hasSyncBadge`).
+ */
+export const ASSIGNEE_SYNC_BADGE: Record<
+  Exclude<AssigneeSyncState, null>,
+  { cls: string; icon: string; label: string }
+> = {
+  ok: { cls: 'syncOk', icon: '✓', label: 'Sincronizado' },
+  partial_expected: { cls: 'syncPartialExpected', icon: '–', label: '1+ fora do ClickUp (guest)' },
+  partial: { cls: 'syncPartial', icon: '!', label: 'Divergência parcial' },
+  none: { cls: 'syncNone', icon: '×', label: 'Nenhum responsável no ClickUp' },
+  external: { cls: 'syncExternal', icon: '⇄', label: 'Alterado direto no ClickUp' },
+};
+
+/** `true` quando vale a pena mostrar o badge (oculta 'ok' e null — sem ruído). */
+export function hasSyncBadge(state: AssigneeSyncState): state is Exclude<AssigneeSyncState, 'ok' | null> {
+  return !!state && state !== 'ok';
+}
+
+export function assigneeSyncBadge(state: AssigneeSyncState) {
+  if (!state) return null;
+  return ASSIGNEE_SYNC_BADGE[state] ?? null;
+}
+
+// ── Fila de pendências de responsáveis (painel admin) ──────────────────────
+
+/**
+ * Estados que entram na FILA DE PENDÊNCIAS do painel — precisam de ação do admin.
+ * 'partial_expected' fica FORA de propósito (estado esperado permanente enquanto a
+ * decisão for manter guest — não é pendência). Esta lista tem que casar CARACTERE A
+ * CARACTERE com o WHERE do índice parcial idx_demands_assignee_pending (migration 086)
+ * — casamento PROVADO em produção (EXPLAIN de 03/09/2026 colado em
+ * docs/specs/pendencias/086-087-explain-pendente.md: Index Scan no índice parcial).
+ * Mudar aqui sem mudar lá (ou vice-versa) faz o planner deixar de usar o índice,
+ * silenciosamente.
+ */
+const PENDING_ASSIGNEE_STATES: Exclude<AssigneeSyncState, 'ok' | 'partial_expected' | null>[] = [
+  'partial',
+  'none',
+  'external',
+];
+
+/**
+ * Fila de demandas com divergência de responsáveis ACIONÁVEL pelo admin (badge de
+ * pendências do painel). Usa o índice parcial idx_demands_assignee_pending
+ * (created_at desc) WHERE clickup_assignee_sync IN ('partial','none','external') —
+ * MESMA lista de PENDING_ASSIGNEE_STATES acima (EXPLAIN de confirmação executado em
+ * 03/09/2026, ver docs/specs/pendencias/086-087-explain-pendente.md). `limit` tem teto:
+ * sem paginação full-table (egress do Supabase é restrição real) — a fila é
+ * operacional, não um relatório histórico, então um teto de 100 é generoso mesmo em
+ * pico.
+ */
+export async function listPendingAssigneeDivergences(limit = 50): Promise<Demand[]> {
+  const capped = Math.min(100, Math.max(1, limit));
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('v_demands')
+    .select(
+      `id, client_slug, client_name, title, status, clickup_task_id, created_at,
+       operators_total, clickup_assignee_sync, clickup_assignee_detail`,
+    )
+    .in('clickup_assignee_sync', PENDING_ASSIGNEE_STATES)
+    .order('created_at', { ascending: false })
+    .limit(capped);
+  if (error) throw error;
+  return (data ?? []) as Demand[];
+}
+
+// Status de drift do schema (repo × banco): ver `lib/api/admin-drift.ts`
+// (getSchemaDriftStatus) — RPC `get_schema_drift_status`, migration 087. Não
+// duplicado aqui: o módulo de drift já existe com fallback gracioso para RPC
+// ainda não deployada (42883/PGRST202 → null, em vez de estourar erro).

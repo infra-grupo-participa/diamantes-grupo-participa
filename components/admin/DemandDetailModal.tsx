@@ -10,13 +10,20 @@ import {
   listActiveOperators,
   addDemandOperator,
   removeDemandOperator,
+  resolveAssigneeDivergence,
   STATUS_BADGE,
+  ASSIGNEE_SYNC_BADGE,
+  hasSyncBadge,
+  CLICKUP_DELIVERY_LABEL,
   clickupTaskUrl,
   type DemandStatus,
   type Demand,
   type DemandMemberFull,
   type DemandMessage,
   type DemandOperator,
+  type AssigneeDivergenceAction,
+  type MissingAssignee,
+  type ClickupDeliveryState,
 } from '@/lib/api/admin-demandas';
 import { errMessage } from '@/lib/errors';
 import styles from '@/app/admin/demandas/demandas.module.css';
@@ -44,9 +51,11 @@ export default function DemandDetailModal({
   const [det, setDet] = useState<Details | null>(null);
   const [busy, setBusy] = useState(false);
   const [ops, setOps] = useState<DemandOperator[]>([]);
-  const [allOps, setAllOps] = useState<DemandOperator[]>([]);
+  const [allOps, setAllOps] = useState<Array<DemandOperator & { clickup_notifiable: boolean | null }>>([]);
   const [opBusy, setOpBusy] = useState(false);
   const [selOp, setSelOp] = useState('');
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [confirmAccept, setConfirmAccept] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -100,6 +109,32 @@ export default function DemandDetailModal({
     }
   }
 
+  /** 'reapply' e 'dismiss' não reescrevem demand_operators — seguem direto.
+   *  'accept_clickup' é destrutivo: passa pelo modal de confirmação nominal
+   *  (ver `renderAcceptConfirm`), nunca dispara daqui direto. */
+  async function runDivergenceAction(action: AssigneeDivergenceAction) {
+    if (syncBusy) return;
+    setSyncBusy(true);
+    try {
+      await resolveAssigneeDivergence(demandId, action);
+      toast(
+        action === 'reapply'
+          ? 'Reaplicado no ClickUp.'
+          : action === 'accept_clickup'
+            ? 'Responsáveis atualizados a partir do ClickUp.'
+            : 'Divergência marcada como revisada.',
+        'success',
+      );
+      onChanged();
+      await load();
+    } catch (e) {
+      toast(errMessage(e), 'error');
+    } finally {
+      setSyncBusy(false);
+      setConfirmAccept(false);
+    }
+  }
+
   useEffect(() => {
     load();
   }, [load]);
@@ -130,6 +165,26 @@ export default function DemandDetailModal({
 
   const d = det?.demand;
   const sb = d ? STATUS_BADGE[d.status] ?? { cls: 'bCancel', label: d.status } : null;
+  const syncState = d?.clickup_assignee_sync ?? null;
+  const syncBadge = syncState ? ASSIGNEE_SYNC_BADGE[syncState] : null;
+  const syncMissing: MissingAssignee[] = Array.isArray(
+    (d?.clickup_assignee_detail as { missing?: unknown } | null)?.missing,
+  )
+    ? ((d!.clickup_assignee_detail as { missing: MissingAssignee[] }).missing ?? [])
+    : [];
+  const syncAfter: Array<{ id: string; name?: string | null }> = Array.isArray(
+    (d?.clickup_assignee_detail as { after?: unknown } | null)?.after,
+  )
+    ? ((d!.clickup_assignee_detail as { after: Array<{ id: string; name?: string | null }> }).after ?? [])
+    : [];
+
+  // Diff nominal para o modal de confirmação de accept_clickup: quem SAI
+  // (está em demand_operators hoje e não tem clickup_user_id no snapshot do
+  // ClickUp) e quem ENTRA (aparece no snapshot mas ainda não é operador aqui).
+  const afterIds = new Set(syncAfter.map((a) => String(a.id)));
+  const currentIds = new Set(ops.map((o) => String(o.clickup_user_id ?? '')));
+  const diffOut = ops.filter((o) => !o.clickup_user_id || !afterIds.has(String(o.clickup_user_id)));
+  const diffIn = syncAfter.filter((a) => !currentIds.has(String(a.id)));
 
   return (
     <div
@@ -288,49 +343,86 @@ export default function DemandDetailModal({
               {/* Operadores responsáveis (reais — demand_operators) */}
               <div>
                 <h4 className={styles.sectionTitle}>Operadores responsáveis</h4>
+                {syncBadge && hasSyncBadge(syncState) && (
+                  <div style={{ marginBottom: 10 }}>
+                    <span className={`${styles.syncBadge} ${styles[syncBadge.cls]}`}>
+                      <span className={styles.syncIcon} aria-hidden="true">{syncBadge.icon}</span>
+                      {syncBadge.label}
+                    </span>
+                  </div>
+                )}
                 <div className={styles.teamList}>
                   {ops.length === 0 ? (
                     <div className={styles.teamEmpty}>Nenhum operador atribuído ainda.</div>
                   ) : (
-                    ops.map((o) => (
-                      <div key={o.operator_id} className={styles.teamRow}>
-                        <div
-                          className={styles.avatar}
-                          style={o.position_color ? { background: `linear-gradient(135deg,${o.position_color}33,${o.position_color})` } : undefined}
-                        >
-                          {initials(o.name)}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className={styles.teamName}>{o.name || '—'}</div>
-                          <div className={styles.teamRole}>{o.position_name || o.email || ''}</div>
-                        </div>
-                        <div className={styles.teamRight}>
-                          {o.clickup_user_id ? (
-                            <span className={styles.cuBadge} title={`Vinculado ao ClickUp (ID ${o.clickup_user_id})`}>
-                              <ClickUpIcon />
-                              ClickUp
-                            </span>
-                          ) : (
-                            <span className={styles.cuNone} title="Sem usuário no ClickUp — não recebe notificação">
-                              sem ClickUp
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            className={styles.opRemove}
-                            disabled={opBusy}
-                            onClick={() => void removeOp(o.operator_id, o.name)}
-                            title="Remover da demanda"
+                    ops.map((o) => {
+                      // Casa por clickup_user_id quando os dois lados têm; sem ID em algum
+                      // lado (operador nunca teve ClickUp cadastrado), casa por nome — é o
+                      // caso que a 087 passou a deixar aparecer de verdade em missing[].
+                      const missingReason = syncMissing.find((m) =>
+                        m.clickup_user_id != null && o.clickup_user_id
+                          ? String(m.clickup_user_id) === String(o.clickup_user_id)
+                          : m.clickup_user_id == null && !o.clickup_user_id && m.name === o.name,
+                      );
+                      // Estado de entrega em português: prioriza demand_operators.clickup_delivery
+                      // (contrato do backend); sem operador no ClickUp, fica explícito; com
+                      // divergência conhecida (missing[]) e delivery ainda 'unknown', deriva do
+                      // motivo para não mostrar "desconhecido" quando já se sabe o porquê.
+                      const knownDelivery = o.clickup_delivery ?? 'unknown';
+                      const delivery: ClickupDeliveryState = !o.clickup_user_id
+                        ? 'no_clickup_user'
+                        : knownDelivery !== 'unknown'
+                          ? knownDelivery
+                          : missingReason?.reason === 'guest_cannot_assign'
+                            ? 'blocked_guest'
+                            : missingReason?.reason === 'no_clickup_user'
+                              ? 'no_clickup_user'
+                              : missingReason
+                                ? 'blocked_other'
+                                : 'unknown';
+                      const deliveryInfo = CLICKUP_DELIVERY_LABEL[delivery];
+                      return (
+                        <div key={o.operator_id} className={styles.teamRow}>
+                          <div
+                            className={styles.avatar}
+                            style={o.position_color ? { background: `linear-gradient(135deg,${o.position_color}33,${o.position_color})` } : undefined}
                           >
-                            ×
-                          </button>
+                            {initials(o.name)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className={styles.teamName}>{o.name || '—'}</div>
+                            <div className={styles.teamRole}>{o.position_name || o.email || ''}</div>
+                          </div>
+                          <div className={styles.teamRight}>
+                            <span
+                              className={`${styles.deliveryTag} ${styles[deliveryInfo.cls]}`}
+                              title={o.clickup_user_id ? `ClickUp ID ${o.clickup_user_id}` : 'Sem usuário no ClickUp'}
+                            >
+                              {deliveryInfo.label}
+                            </span>
+                            <button
+                              type="button"
+                              className={styles.opRemove}
+                              disabled={opBusy}
+                              onClick={() => void removeOp(o.operator_id, o.name)}
+                              title="Remover da demanda"
+                            >
+                              ×
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
                 <div className={styles.opAddRow}>
-                  <select className={styles.opSelect} value={selOp} onChange={(e) => setSelOp(e.target.value)} disabled={opBusy}>
+                  <select
+                    className={styles.opSelect}
+                    value={selOp}
+                    onChange={(e) => setSelOp(e.target.value)}
+                    disabled={opBusy}
+                    aria-label="Adicionar operador à demanda"
+                  >
                     <option value="">Adicionar operador…</option>
                     {allOps
                       .filter((a) => !ops.some((o) => o.operator_id === a.operator_id))
@@ -338,7 +430,11 @@ export default function DemandDetailModal({
                         <option key={a.operator_id} value={a.operator_id}>
                           {a.name}
                           {a.position_name ? ` — ${a.position_name}` : ''}
-                          {a.clickup_user_id ? '' : ' (sem ClickUp)'}
+                          {!a.clickup_user_id
+                            ? ' (sem ClickUp)'
+                            : a.clickup_notifiable === false
+                              ? ' (não recebe no ClickUp — guest)'
+                              : ''}
                         </option>
                       ))}
                   </select>
@@ -347,7 +443,121 @@ export default function DemandDetailModal({
                   </button>
                 </div>
                 <small className={styles.opHint}>Operadores recebem a demanda como responsáveis no ClickUp (notificação).</small>
+
+                {hasSyncBadge(syncState) && syncState !== 'partial_expected' && (
+                  <>
+                    <div className={styles.syncActions}>
+                      <button
+                        type="button"
+                        className={styles.syncActionBtn}
+                        disabled={syncBusy}
+                        onClick={() => void runDivergenceAction('reapply')}
+                      >
+                        Reaplicar no ClickUp
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.syncActionBtn}
+                        disabled={syncBusy}
+                        onClick={() => setConfirmAccept(true)}
+                      >
+                        Aceitar estado do ClickUp
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.syncActionBtn} ${styles.syncActionDanger}`}
+                        disabled={syncBusy}
+                        onClick={() => void runDivergenceAction('dismiss')}
+                      >
+                        Dispensar
+                      </button>
+                    </div>
+                    <small className={styles.syncNote}>
+                      &quot;Aceitar estado do ClickUp&quot; reescreve os responsáveis desta demanda a partir do que
+                      está realmente atribuído lá — confirmação nominal antes de aplicar.
+                    </small>
+                  </>
+                )}
+                {syncState === 'partial_expected' && (
+                  <small className={styles.syncNote}>
+                    Estado esperado: operador é convidado (guest) no ClickUp e não pode ser responsável lá. Decisão
+                    vigente é manter guest — não é necessário agir.
+                  </small>
+                )}
               </div>
+
+              {confirmAccept && (
+                <div
+                  className={styles.modalBg}
+                  style={{ zIndex: 1100 }}
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget && !syncBusy) setConfirmAccept(false);
+                  }}
+                >
+                  <div className={styles.modal} style={{ maxWidth: 480 }}>
+                    <div className={styles.modalHead}>
+                      <h3>Aceitar estado do ClickUp?</h3>
+                      <button
+                        className={styles.modalClose}
+                        onClick={() => !syncBusy && setConfirmAccept(false)}
+                        aria-label="Fechar"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className={styles.modalBody}>
+                      <p>
+                        Isto reescreve os responsáveis do portal a partir do que está atribuído hoje no ClickUp para
+                        esta demanda:
+                      </p>
+                      <div className={styles.confirmDiffGrid}>
+                        <div className={`${styles.confirmDiffCol} ${styles.diffOut}`}>
+                          <h5>Sai</h5>
+                          {diffOut.length === 0 ? (
+                            <div className={styles.confirmDiffEmpty}>Ninguém sai.</div>
+                          ) : (
+                            <ul>
+                              {diffOut.map((o) => (
+                                <li key={o.operator_id}>{o.name || o.operator_id}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        <div className={`${styles.confirmDiffCol} ${styles.diffIn}`}>
+                          <h5>Entra</h5>
+                          {diffIn.length === 0 ? (
+                            <div className={styles.confirmDiffEmpty}>Ninguém entra.</div>
+                          ) : (
+                            <ul>
+                              {diffIn.map((a) => (
+                                <li key={String(a.id)}>{a.name || `ClickUp #${a.id}`}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                      <div className={styles.confirmActions}>
+                        <button
+                          type="button"
+                          className={styles.syncActionBtn}
+                          disabled={syncBusy}
+                          onClick={() => setConfirmAccept(false)}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.syncActionBtn} ${styles.syncActionDanger}`}
+                          disabled={syncBusy}
+                          onClick={() => void runDivergenceAction('accept_clickup')}
+                        >
+                          Confirmar e reescrever
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Chat (read-only) */}
               <div>
