@@ -1,4 +1,4 @@
-// clickup-sync v14 — hierarquia Pasta(aluno) → Lista(projeto/avulsas) → Tarefa(demanda).
+// clickup-sync v15 — hierarquia Pasta(aluno) → Lista(projeto/avulsas) → Tarefa(demanda).
 // portal.demands (INSERT/UPDATE) → trigger pg_net (portal._sync_demand_to_clickup)
 // → esta função cria/atualiza a task no ClickUp e grava demands.clickup_task_id.
 // Ações extras: {action:"provision_structure"} cria pastas/listas em lote;
@@ -51,14 +51,30 @@
 //   - setConfig agora console.warn explícito em falha (antes engolia em silêncio —
 //     se o cache nunca gravasse, batia no ClickUp em toda invocação sem ninguém notar).
 //
+// v15 (089/090/091, 2026-09-24 — plano definitivo de atribuição de responsáveis):
+//   - PASSO 3: getTeamRoles agora PROJETA o resultado do /team em
+//     portal.operators.clickup_notifiable (syncNotifiableFromTeam). A coluna era órfã
+//     desde a 087 — o COMMENT prometia manutenção automática e nenhum código escrevia
+//     nela, então guest NOVO nunca era marcado e nunca recebia o e-mail de
+//     substituição. Só escreve no caminho de REVALIDAÇÃO (fetch real do /team com
+//     sucesso) e nunca com `members` vazio — ver a guarda na própria função.
+//   - PASSO 5: reconcile_assignees aceita {all:true} e encadeia lotes internamente
+//     (até 4 × limit) devolvendo `batches`/`stopped_reason`. O cron da migration 090
+//     dispara UMA chamada HTTP e não tem quem leia o next_cursor para continuar.
+//   - reconcileAssignees PULA demandas em 'external_*' (conta em skipped_external).
+//     Era o conflito 4 do plano: sem isso o cron diário reclassificaria como
+//     'partial'/'none' as demandas que o webhook marcou como perda/troca/reforço,
+//     anulando o split do passo 2 todo dia às 04:00 em silêncio.
+//   - persistAssigneeSync: `sync !== "external"` virou `!sync.startsWith("external")`
+//     — com o split, o literal deixava os 3 estados novos dispararem e-mail por aqui.
+//
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
 //
-// ⚠️ EDIÇÃO 2026-09-03 (086/087, v14): feita SOBRE A CÓPIA DO REPO, sem confirmação
-// contra o remoto (supabase functions download indisponível neste ambiente — sem
-// SUPABASE_ACCESS_TOKEN). NÃO FAÇA DEPLOY sem antes diffar este arquivo contra
-// `supabase functions download clickup-sync` a partir de uma máquina autenticada —
-// ver supabase/functions/README.md, seção "Primeiro deploy".
+// ✅ DIFF CONTRA O REMOTO FEITO EM 2026-09-24: a v14 em produção foi baixada e
+// conferida idêntica a esta cópia do repo antes da edição da v15. O aviso "NÃO FAÇA
+// DEPLOY sem diffar" que vivia aqui desde 03/09 foi removido por estar cumprido —
+// ver supabase/functions/README.md.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { notifyAdminDivergence as notifyAdminDivergenceShared } from "../_shared/notify-admin-divergence.ts";
@@ -149,6 +165,109 @@ const GUEST_ROLE = 4; // GET /team: user.role === 4 é guest (confirmado real).
 // `members` = todos os IDs vistos no /team (member ou guest) — usado para distinguir
 // stale_clickup_user (cadastrado mas não existe mais no workspace) de unknown_rejected
 // (existe no workspace, não é guest, e mesmo assim não virou assignee — causa desconhecida).
+// v15 / passo 3 (2026-09-24) — portal.operators.clickup_notifiable vira PROJEÇÃO do
+// GET /team, não mais um campo editado à mão.
+//
+// Por que existia o problema: o COMMENT da migration 087 prometia que a coluna era
+// "mantida pela reconciliação", mas NENHUM código escrevia nela — `grep update|upsert|
+// insert` nas edges dava vazio. Os dois `false` de produção eram edição manual de
+// 03/09. Consequência: guest NOVO nunca era marcado, a trigger
+// demand_operators_notify_guest nunca disparava para ele, e ele não recebia nem
+// notificação do ClickUp (guest não pode ser assignee) nem e-mail do portal —
+// passivo crescendo calado, 8→10 vínculos em 21 dias.
+//
+// ⚠️ GUARDAS (a parte que importa). São DUAS, e a segunda é a que pega o caso difícil:
+//   (i)  esta função SÓ é chamada no caminho em que o fetch real do /team RETORNOU COM
+//        SUCESSO, e ainda assim recusa escrever se `members` veio vazio. Um /team que
+//        falha devolve Set vazio, e Set vazio é indistinguível de "workspace sem
+//        guests" — escrever aí marcaria TODO MUNDO como notifiable=true e desligaria o
+//        e-mail de guest da operação inteira, em silêncio.
+//   (ii) `true` só por AFIRMAÇÃO POSITIVA (o ID está PRESENTE em memberIds), nunca por
+//        exclusão. A guarda (i) sozinha não cobre resposta 200 PARCIAL — paginação ou
+//        degradação do ClickUp devolvendo um subconjunto do workspace. Nesse caso um
+//        guest ausente da resposta não entra em guestIds e, se o filtro fosse "não é
+//        guest logo é member", viraria notifiable=true. Quem não aparece no /team desta
+//        resposta NÃO É TOCADO. (achado do kirad, 24/09/2026)
+// Nos dois casos a regra é a mesma: sem dado, não se escreve.
+//
+// Os 2 UPDATEs usam IS DISTINCT FROM: a 2ª execução seguida tem que afetar 0 linhas
+// (é o que o EXPLAIN do passo 3 prova). Sem isso, a coluna updated_at/triggers seriam
+// tocadas de hora em hora sem mudança nenhuma de valor.
+async function syncNotifiableFromTeam(supabase: any, guestIds: number[], memberIds: number[]) {
+  if (!memberIds.length) {
+    console.warn("syncNotifiableFromTeam: /team sem members — NÃO escrevendo clickup_notifiable (vazio ≠ sem guests)");
+    return;
+  }
+  try {
+    // operators.clickup_user_id é TEXT (migration 016) — comparar com strings.
+    const guestText = new Set(guestIds.map((n) => String(n)));
+
+    // Lê os 11 operadores cadastrados e decide em memória quem precisa mudar. Fazer o
+    // "NOT IN (guests)" direto no PostgREST exigiria interpolar a lista numa string de
+    // filtro (`not.in.(...)`), que quebra com aspas/vírgula no valor — com uma tabela
+    // de 11 linhas, ler e comparar aqui é mais barato de entender e impossível de
+    // injetar. Escala: se um dia forem 10 mil operadores, isto vira 2 UPDATEs por SQL.
+    const { data: ops, error: readErr } = await supabase.schema("portal")
+      .from("operators").select("id, clickup_user_id, clickup_notifiable")
+      .not("clickup_user_id", "is", null);
+    if (readErr) { console.error("syncNotifiableFromTeam read err", readErr.message); return; }
+
+    // (1) guests do /team que ainda não estão false → false
+    const toFalse = (ops || [])
+      .filter((o: any) => guestText.has(String(o.clickup_user_id)) && o.clickup_notifiable !== false)
+      .map((o: any) => o.id);
+    // (2) → true SÓ por AFIRMAÇÃO POSITIVA: o operador tem que estar PRESENTE em
+    // memberIds (foi visto no /team desta resposta) e não ser guest. Nunca por
+    // exclusão ("não está na lista de guests, logo é member").
+    //
+    // ⚠️ Achado do kirad (24/09/2026): a guarda de `!memberIds.length` só cobre
+    // resposta VAZIA. Uma resposta 200 PARCIAL (paginação, degradação do ClickUp) traz
+    // menos gente do que o workspace tem — um guest ausente dessa resposta não entra em
+    // guestIds, e com o filtro por exclusão cairia em toTrue e seria marcado
+    // clickup_notifiable=true. Dois estragos de uma vez: o e-mail de substituição
+    // (demand_operators_notify_guest) para de sair para ele, e a barreira (c) do
+    // tryAutoReconcile no webhook deixa de reconhecê-lo como guest — passando a
+    // AUTO-APLICAR trocas que envolvem guest, que é justamente o que a decisão 4
+    // exclui. Operador não visto no /team fica INTOCADO: sem dado, não se escreve.
+    const memberText = new Set(memberIds.map((n) => String(n)));
+    const toTrue = (ops || [])
+      .filter((o: any) => {
+        const cid = String(o.clickup_user_id);
+        return memberText.has(cid) && !guestText.has(cid) && o.clickup_notifiable !== true;
+      })
+      .map((o: any) => o.id);
+
+    // Os dois UPDATEs só tocam linhas que REALMENTE mudam de valor (o filtro acima é o
+    // IS DISTINCT FROM): rodar duas vezes seguidas afeta 0 linhas na 2ª.
+    if (toFalse.length) {
+      const { error: gErr } = await supabase.schema("portal").from("operators")
+        .update({ clickup_notifiable: false }).in("id", toFalse);
+      if (gErr) console.error("syncNotifiableFromTeam guests err", gErr.message);
+    }
+    if (toTrue.length) {
+      const { error: mErr } = await supabase.schema("portal").from("operators")
+        .update({ clickup_notifiable: true }).in("id", toTrue);
+      if (mErr) console.error("syncNotifiableFromTeam members err", mErr.message);
+    }
+    // `untouched` = operadores com clickup_user_id que NÃO apareceram nesta resposta do
+    // /team. Em operação normal é 0. Valor alto e persistente é o sintoma de resposta
+    // parcial (ou de cadastro com ID fantasma) — é o que torna a guarda (ii) visível
+    // nos logs em vez de silenciosa.
+    const untouched = (ops || []).filter(
+      (o: any) => !memberText.has(String(o.clickup_user_id)),
+    ).length;
+    if (toFalse.length || toTrue.length || untouched) {
+      console.log(
+        `syncNotifiableFromTeam: ${toFalse.length} → false, ${toTrue.length} → true, ${untouched} não vistos no /team (intocados)`,
+      );
+    }
+  } catch (e) {
+    // Best-effort: manter a coluna é diagnóstico/roteamento de e-mail, nunca pode
+    // derrubar a sincronização de assignees (lição das migrations 032/054/055).
+    console.error("syncNotifiableFromTeam threw", (e as any)?.message || e);
+  }
+}
+
 async function getTeamRoles(supabase: any, apiKey: string, cfg: any): Promise<{ guestIds: Set<number>; memberIds: Set<number> }> {
   const raw = cfg.guest_clickup_ids_cache || "";
   if (raw) {
@@ -175,6 +294,9 @@ async function getTeamRoles(supabase: any, apiKey: string, cfg: any): Promise<{ 
       .map((m) => Number(m?.user?.id))
       .filter((n) => !isNaN(n));
     await setConfig(supabase, "guest_clickup_ids_cache", JSON.stringify({ ids, members, at: Date.now() }));
+    // v15 (passo 3): o /team acabou de responder com sucesso — é o único momento em que
+    // se sabe a verdade sobre quem é guest hoje. Projeta isso em operators.clickup_notifiable.
+    await syncNotifiableFromTeam(supabase, ids, members);
     return { guestIds: new Set(ids), memberIds: new Set(members) };
   } catch (e) {
     console.error("getTeamRoles GET /team falhou — sem classificação de guest/stale nesta chamada", (e as any)?.message || e);
@@ -289,7 +411,12 @@ async function persistAssigneeSync(
     const { data: prev } = await supabase.schema("portal").from("demands")
       .select("clickup_assignee_sync").eq("id", demand_id).maybeSingle();
     const wasDivergent = prev?.clickup_assignee_sync && prev.clickup_assignee_sync !== "ok";
-    const isDivergentNow = sync !== "ok" && sync !== "external"; // 'external' é alertado pelo webhook, não aqui
+    // v15: o estado 'external' virou três ('external_loss'/'external_reassigned'/
+    // 'external_added', migration 089) — o `!== "external"` literal deixava os três
+    // novos passarem por aqui e mandarem e-mail pelo caminho do SYNC, duplicando o
+    // alerta que o webhook já decide mandar (e mandando também nos casos que a decisão
+    // de 24/09 mandou parar de alertar). Prefixo, não igualdade.
+    const isDivergentNow = sync !== "ok" && !sync.startsWith("external"); // 'external*' é alertado pelo webhook, não aqui
 
     const { error } = await supabase.schema("portal").from("demands")
       .update({ clickup_assignee_sync: sync, clickup_assignee_detail: detail }).eq("id", demand_id);
@@ -576,26 +703,51 @@ const RECONCILE_MAX_LIMIT = 100;
 // de timeout da Edge Function, e sem cursor o corte no meio do caminho perde TODO o
 // progresso do lote (próxima chamada recomeça do zero). Com cursor, cada chamada
 // processa até `limit` demandas e devolve `next_cursor` para o chamador continuar.
-async function reconcileAssignees(supabase: any, apiKey: string, cfg: any, body: any): Promise<Response> {
-  const limit = Math.min(RECONCILE_MAX_LIMIT, Math.max(1, Number(body?.limit) || RECONCILE_DEFAULT_LIMIT));
-  const after = typeof body?.after === "string" ? body.after : null;
+type ReconcileBatchResult = {
+  checked: number; ok: number; partial: number; partial_expected: number; none: number;
+  skipped_external: number; errors: string[]; next_cursor: string | null;
+};
 
-  const out = { checked: 0, ok: 0, partial: 0, partial_expected: 0, none: 0, errors: [] as string[], next_cursor: null as string | null };
+async function reconcileAssigneesBatch(
+  supabase: any, apiKey: string, cfg: any, limit: number, after: string | null,
+): Promise<ReconcileBatchResult | { error: string }> {
+  const out = {
+    checked: 0, ok: 0, partial: 0, partial_expected: 0, none: 0,
+    skipped_external: 0,
+    errors: [] as string[], next_cursor: null as string | null,
+  };
 
+  // v15: lê clickup_assignee_sync junto — é o que permite PULAR as demandas em
+  // 'external_*' logo abaixo.
   let q = supabase.schema("portal")
-    .from("demands").select("id, clickup_task_id, created_at")
+    .from("demands").select("id, clickup_task_id, created_at, clickup_assignee_sync")
     .not("clickup_task_id", "is", null)
     .order("created_at", { ascending: true })
     .limit(limit);
   if (after) q = q.gt("created_at", after);
   const { data: demands, error } = await q;
-  if (error) return new Response(JSON.stringify({ error: "demands: " + error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+  if (error) return { error: "demands: " + error.message };
 
   const multiAllowed = await spaceAllowsMultipleAssignees(supabase, apiKey, cfg);
   const { guestIds, memberIds } = await getTeamRoles(supabase, apiKey, cfg);
 
   for (const d of (demands || [])) {
     out.checked++;
+    // ⚠️ PULA demandas já classificadas como 'external_*' (conflito 4 do plano: o P5
+    // anularia o P2). O split external_loss/reassigned/added é conhecimento do WEBHOOK
+    // — ele viu QUEM saiu e QUEM entrou no momento do evento. Este reconcile só compara
+    // portal × ClickUp e produz ok/partial/partial_expected/none; passar por uma demanda
+    // 'external_reassigned' a reclassificaria como 'partial' (ou 'none'), apagando a
+    // distinção que o passo 2 criou — todo dia às 04:00, em silêncio, e ainda tirando-a
+    // da fila ou botando-a de volta errada. O estado external só sai daqui por ação do
+    // admin (admin_resolve_assignee_divergence), por auto-reconciliação, ou por um novo
+    // evento do webhook que faça convergir.
+    const prevSync: string = d.clickup_assignee_sync || "";
+    if (prevSync.startsWith("external")) {
+      out.skipped_external++;
+      out.next_cursor = d.created_at;
+      continue; // sem throttle: não houve chamada ao ClickUp
+    }
     try {
       const dops = await getDemandOperatorIds(supabase, d.id);
       const expected = await expectedOpsFor(supabase, dops);
@@ -617,7 +769,69 @@ async function reconcileAssignees(supabase: any, apiKey: string, cfg: any, body:
   // Só sinaliza "tem mais" se o lote veio cheio (senão next_cursor aponta pro fim,
   // o chamador saberia parar de qualquer forma, mas fica explícito).
   if ((demands || []).length < limit) out.next_cursor = null;
-  return new Response(JSON.stringify({ ok: true, ...out }), { status: 200, headers: { "Content-Type": "application/json" } });
+  return out;
+}
+
+// Teto de lotes de UMA invocação com {all:true}. 4 × 25 = 100 demandas por execução
+// do cron. O teto é de TEMPO, não de vontade: cada demanda custa ~350 ms de throttle
+// + o GET /task, e a Edge Function morre em 150 s. 100 × ~0,5 s ≈ 50 s deixa folga
+// confortável; 8 lotes já flertariam com o timeout e o trabalho do lote cortado no
+// meio não é perdido (o cursor avança), mas o `stopped_reason` deixaria de ser
+// informativo. Passivo maior que 100/dia significa que algo está errado a montante —
+// é para aparecer, não para ser absorvido em silêncio.
+const RECONCILE_MAX_BATCHES = 4;
+
+// Entrada da ação `reconcile_assignees`. Dois modos:
+//   {limit, after}  → UM lote, devolve next_cursor (modo manual, já existia na v14).
+//   {all:true}      → encadeia lotes internamente até next_cursor=null ou o teto de
+//                      RECONCILE_MAX_BATCHES. É o modo do CRON (migration 090):
+//                      pg_cron dispara UMA chamada HTTP e vai embora — não existe quem
+//                      leia o next_cursor e chame de novo. Sem isto, o cron diário
+//                      reconciliaria eternamente só as 25 demandas mais antigas.
+async function reconcileAssignees(supabase: any, apiKey: string, cfg: any, body: any): Promise<Response> {
+  const limit = Math.min(RECONCILE_MAX_LIMIT, Math.max(1, Number(body?.limit) || RECONCILE_DEFAULT_LIMIT));
+  const all = body?.all === true;
+  let cursor = typeof body?.after === "string" ? body.after : null;
+
+  const total: ReconcileBatchResult & { batches: number; stopped_reason: string } = {
+    checked: 0, ok: 0, partial: 0, partial_expected: 0, none: 0, skipped_external: 0,
+    errors: [], next_cursor: null, batches: 0, stopped_reason: "",
+  };
+
+  const maxBatches = all ? RECONCILE_MAX_BATCHES : 1;
+  for (let i = 0; i < maxBatches; i++) {
+    const res = await reconcileAssigneesBatch(supabase, apiKey, cfg, limit, cursor);
+    if ("error" in res) {
+      // Erro no meio do encadeamento: devolve o PROGRESSO já feito (os lotes
+      // anteriores gravaram de verdade) junto do erro — o cursor perdido é o custo,
+      // mas o cron da noite seguinte recomeça do início e reencontra o mesmo ponto.
+      return new Response(
+        JSON.stringify({ ...total, ok_count: total.ok, ok: false, error: res.error }),
+        { status: 500, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    total.batches++;
+    total.checked += res.checked;
+    total.ok += res.ok;
+    total.partial += res.partial;
+    total.partial_expected += res.partial_expected;
+    total.none += res.none;
+    total.skipped_external += res.skipped_external;
+    total.errors.push(...res.errors);
+    total.next_cursor = res.next_cursor;
+    cursor = res.next_cursor;
+    if (!cursor) { total.stopped_reason = "completed"; break; }
+    if (i === maxBatches - 1) total.stopped_reason = all ? "batch_cap" : "single_batch";
+  }
+
+  // ⚠️ `total.ok` é o CONTADOR de demandas convergidas, e colide com o `ok: true` do
+  // envelope de resposta. Espalhar depois (`{ok:true, ...total}`) fazia o contador
+  // sobrescrever o booleano — o chamador passaria a ler `ok: 7`. Ordem invertida de
+  // propósito: o envelope vence, e o contador continua legível em `ok_count`.
+  return new Response(
+    JSON.stringify({ ...total, ok_count: total.ok, ok: true }),
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
 }
 
 async function getDemandOperatorIds(supabase: any, demand_id: string): Promise<string[]> {
@@ -791,11 +1005,13 @@ Deno.serve(async (req: Request) => {
       return await provisionStructure(supabase, apiKey, cfg);
     }
 
-    // Modo lote (manual, não-cron): varre demandas com clickup_task_id e popula
-    // clickup_assignee_sync/detail comparando com o estado real no ClickUp (mesma
-    // classificação por guest de createTask/updateTask). Só LÊ o ClickUp — não
-    // escreve assignees (isso é papel do create/updateTask). Paginado (v14): passe
-    // {limit, after} para continuar de onde parou (next_cursor da resposta anterior).
+    // Modo lote: varre demandas com clickup_task_id e popula clickup_assignee_sync/
+    // detail comparando com o estado real no ClickUp (mesma classificação por guest de
+    // createTask/updateTask). Só LÊ o ClickUp — não escreve assignees (isso é papel do
+    // create/updateTask). Paginado (v14): {limit, after} continua de onde parou.
+    // v15: {all:true} encadeia os lotes internamente — é como o cron diário
+    // 'reconcile-assignees' (migration 090, 04:00 UTC) chama. Demandas em 'external_*'
+    // são PULADAS (skipped_external) para não desfazer o split do webhook.
     if (body.action === "reconcile_assignees") {
       return await reconcileAssignees(supabase, apiKey, cfg, body);
     }

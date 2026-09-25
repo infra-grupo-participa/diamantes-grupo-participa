@@ -484,6 +484,29 @@ export default function DemandDetailModal({
                     vigente é manter guest — não é necessário agir.
                   </small>
                 )}
+                {/* Explicação por estado external (migration 089). O badge diz O QUE
+                    aconteceu; esta nota diz se é preciso AGIR. Sem ela, os três
+                    estados pareciam igualmente urgentes — que era o problema do
+                    rótulo único 'external'. */}
+                {syncState === 'external_loss' && (
+                  <small className={styles.syncNote}>
+                    Alguém foi removido dos responsáveis direto no ClickUp e ninguém entrou no lugar — a demanda pode
+                    estar sem dono. Reaplique para devolver os responsáveis do portal ao ClickUp, ou aceite o estado de
+                    lá se a remoção foi intencional.
+                  </small>
+                )}
+                {syncState === 'external_reassigned' && (
+                  <small className={styles.syncNote}>
+                    Os responsáveis foram trocados direto no ClickUp (saiu gente e entrou gente). Registro, não
+                    pendência — só aja se a troca não foi intencional.
+                  </small>
+                )}
+                {syncState === 'external_added' && (
+                  <small className={styles.syncNote}>
+                    Entraram responsáveis a mais direto no ClickUp, sem ninguém sair. Registro, não pendência — aceite o
+                    estado do ClickUp para refletir o reforço aqui no portal.
+                  </small>
+                )}
               </div>
 
               {confirmAccept && (

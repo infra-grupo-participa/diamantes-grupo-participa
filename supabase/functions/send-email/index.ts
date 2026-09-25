@@ -8,9 +8,12 @@
 //   • _retry_failed_emails (cron 5min) → { type:'retry_failed' }
 //   • clickup-webhook (taskAssigneeUpdated, migration 086)
 //                                      → { type:'divergencia_assignee', demand_id, before, after }
-//                                        alerta a TODOS os admins aprovados quando o ClickUp
-//                                        diverge do portal nos responsáveis da demanda. Só na
-//                                        divergência NOVA (o webhook não reenvia se já sabia).
+//                                        alerta quando o ClickUp diverge do portal nos
+//                                        responsáveis da demanda. Destino: portal.clickup_config
+//                                        key='assignee_alert_to' (e-mail único ou lista separada
+//                                        por vírgula, migration 088) — sem a chave (ausente/vazia),
+//                                        volta ao comportamento antigo (todos os admins aprovados).
+//                                        Só na divergência NOVA (o webhook não reenvia se já sabia).
 //   • _notify_demanda_atribuida_guest (trigger AFTER INSERT em demand_operators,
 //     migration 087) → { type:'demanda_atribuida_guest', demand_id, operator_id }
 //                       operador GUEST no ClickUp (clickup_notifiable=false) foi
@@ -34,6 +37,13 @@ const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 const FROM       = "Diamantes <nao-responder@diamantes.grupoparticipa.app.br>";
 const PORTAL_URL = "https://diamantes.grupoparticipa.app.br";
+
+// Achado de pentest (Kirad, BAIXO, 24/09): clickup_config.assignee_alert_to não tem
+// allowlist de domínio — o alerta carrega título de demanda de cliente. Não descarta
+// (descartar em silêncio esconde o problema e é pior que avisar) — só sinaliza no
+// log quando um destinatário sai do domínio interno esperado, para o admin notar se
+// a chave for preenchida errado.
+const ALERT_ALLOWED_DOMAIN = "advmais.com";
 
 const C = {
   bg: "#f7f4fc", surface: "#ffffff", text: "#1a1430", muted: "#6b6584",
@@ -81,6 +91,16 @@ async function getSecret(supabase: any, name: string): Promise<string> {
   return data || "";
 }
 
+// Leitura mínima de portal.clickup_config (12 linhas — Seq Scan é o plano correto,
+// ver EXPLAIN do plano de 24/09). Só a(s) chave(s) que esta edge precisa; não é o
+// getConfig completo de clickup-sync (arquivo fora do escopo desta mudança).
+async function getConfigValue(supabase: any, key: string): Promise<string> {
+  const { data, error } = await supabase.schema("portal")
+    .from("clickup_config").select("value").eq("key", key).maybeSingle();
+  if (error) { console.error(`clickup_config.${key}: ${error.message}`); return ""; }
+  return data?.value || "";
+}
+
 async function sendViaProvider(apiKey: string, to: string, subject: string, html: string): Promise<{ ok: boolean; id?: string; error?: string }> {
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -113,14 +133,35 @@ async function resolveClientRecipient(supabase: any, entity: any): Promise<{ ema
   return null;
 }
 
-// Admins aprovados (destino do alerta de divergência). Exclui contas de teste
-// (@*.test) — alerta operacional real, não deve poluir inbox de fixture de E2E.
+// Admins aprovados (fallback do alerta de divergência, quando clickup_config.
+// assignee_alert_to está ausente/vazia). Exclui contas de teste (@*.test) — alerta
+// operacional real, não deve poluir inbox de fixture de E2E.
 async function resolveAdminRecipients(supabase: any): Promise<Array<{ email: string; name: string }>> {
   const { data } = await supabase.schema("portal").from("users")
     .select("email, name").eq("role", "admin").eq("status", "approved").not("email", "is", null);
   return ((data || []) as any[])
     .filter((u) => u.email && !/@[^.]+\.test$/i.test(u.email))
     .map((u) => ({ email: u.email, name: u.name || "" }));
+}
+
+// Destinatários do alerta de divergência (decisão do Marcio, 24/09: 1 dono em vez de
+// fan-out para os 11 admins — 165 e-mails/30 dias, 0 resolvidos). Lê
+// clickup_config.assignee_alert_to: e-mail único ou lista separada por vírgula, sem
+// nome (usa "Equipe" no saudação). Chave ausente/vazia/sem e-mail válido → volta ao
+// comportamento antigo (todos os admins aprovados) — nunca deixa o alerta sem
+// destinatário por config faltando.
+async function resolveDivergenceAlertRecipients(supabase: any): Promise<Array<{ email: string; name: string }>> {
+  const raw = await getConfigValue(supabase, "assignee_alert_to");
+  const emails = raw.split(",").map((s) => s.trim()).filter((s) => s && s.includes("@"));
+  if (emails.length) {
+    for (const email of emails) {
+      if (!email.toLowerCase().endsWith(`@${ALERT_ALLOWED_DOMAIN}`)) {
+        console.warn(`assignee_alert_to fora do domínio esperado (@${ALERT_ALLOWED_DOMAIN}): ${email} — enviando mesmo assim, conferir a chave em clickup_config`);
+      }
+    }
+    return emails.map((email) => ({ email, name: "Equipe" }));
+  }
+  return resolveAdminRecipients(supabase);
 }
 
 // Operadores da demanda (têm e-mail @ — não têm login no portal; CTA aponta ao ClickUp).
@@ -266,9 +307,14 @@ async function composeSpecs(supabase: any, type: string, payload: any): Promise<
     }];
   }
 
-  // Divergência de responsáveis (ClickUp x portal) → avisa TODOS os admins.
+  // Divergência de responsáveis (ClickUp x portal) → avisa o(s) destinatário(s) de
+  // clickup_config.assignee_alert_to (1 dono, decisão do Marcio de 24/09); sem a
+  // chave, cai no fallback de todos os admins aprovados (resolveDivergenceAlertRecipients).
   // Dois emissores, mesmo type, diferenciados por payload.context:
-  //   • context:'webhook' (clickup-webhook, estado 'external'): before=esperado pelo
+  //   • context:'webhook' (clickup-webhook, migration 089 — o antigo estado único
+  //     'external' virou três: 'external_loss' (único que ALERTA por e-mail — perda
+  //     real, banco pediu mais do que a task tem), 'external_reassigned' e
+  //     'external_added' (troca/adição deliberada, não alertam): before=esperado pelo
   //     portal, after=o que o ClickUp tem agora (mudança feita direto lá, fora do portal).
   //   • context:'sync' (clickup-sync, estados 'partial'/'partial_expected'/'none', só na
   //     1ª detecção — ver persistAssigneeSync): before=quem FOI assignee de fato,
@@ -282,8 +328,8 @@ async function composeSpecs(supabase: any, type: string, payload: any): Promise<
     const { data: d } = await supabase.schema("portal").from("demands")
       .select("id, title, client_slug").eq("id", demand_id).maybeSingle();
     if (!d) return [];
-    const admins = await resolveAdminRecipients(supabase);
-    if (!admins.length) return [];
+    const recipients = await resolveDivergenceAlertRecipients(supabase);
+    if (!recipients.length) return [];
     const before: string[] = Array.isArray(payload.before) ? payload.before : [];
     const after: string[] = Array.isArray(payload.after) ? payload.after : [];
     const beforeTxt = before.length ? esc(before.join(", ")) : "<em>nenhum</em>";
@@ -292,13 +338,13 @@ async function composeSpecs(supabase: any, type: string, payload: any): Promise<
     const beforeLabel = isSync ? "Foi para o ClickUp" : "Portal esperava";
     const afterLabel = isSync ? "Ficou de fora (não virou assignee)" : "ClickUp tem";
     const dedupStamp = stamp || new Date().toISOString().slice(0, 10); // 1 alerta/demanda/dia no máximo
-    return admins.map((admin) => ({
-      to: admin.email, name: admin.name,
-      dedupKey: `divergencia_assignee:${demand_id}:${dedupStamp}:${admin.email}`,
+    return recipients.map((r) => ({
+      to: r.email, name: r.name,
+      dedupKey: `divergencia_assignee:${demand_id}:${dedupStamp}:${r.email}`,
       refType: "demand", refId: demand_id,
       subject: `Divergência de responsáveis: ${d.title}`,
       html: baseLayout({ title: "Responsáveis divergentes no ClickUp ⚠️",
-        intro: `Olá${firstName(admin.name)}, a demanda <strong>${esc(d.title)}</strong> tem responsáveis diferentes entre o portal e o ClickUp. Revise e resolva pelo painel de demandas.`,
+        intro: `Olá${firstName(r.name)}, a demanda <strong>${esc(d.title)}</strong> tem responsáveis diferentes entre o portal e o ClickUp. Revise e resolva pelo painel de demandas.`,
         bodyHtml: `<p style="margin:0 0 16px;font-size:14px;color:${C.muted};"><strong>${esc(beforeLabel)}:</strong> ${beforeTxt}<br><strong>${esc(afterLabel)}:</strong> ${afterTxt}</p>`,
         ctaLabel: "Resolver divergência", ctaHref: `${PORTAL_URL}/admin/demandas?d=${demand_id}` }),
     }));

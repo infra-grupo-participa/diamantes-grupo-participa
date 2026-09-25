@@ -1,4 +1,4 @@
-// clickup-webhook v4 — sync reversa: task updates + comentários + assignees.
+// clickup-webhook v5 — sync reversa: task updates + comentários + assignees.
 // ClickUp → (webhook) → esta função → portal.demands / portal.demand_messages.
 //
 // v3 (migration 086): ramo taskAssigneeUpdated ANTES do bloco genérico de task field
@@ -33,14 +33,37 @@
 //     antiga com prefixo residual continuaria sincronizando o nome errado se
 //     removêssemos sem mais checagem).
 //
+// v5 (089/090/091, 2026-09-24 — plano definitivo de atribuição de responsáveis):
+//   - SPLIT de 'external' em três estados, porque o rótulo único misturava PERDA de
+//     responsável (alguém removido no ClickUp — acionável, dói) com TROCA deliberada
+//     feita pela equipe lá (o normal do dia a dia). Medição de 24/09: 12 demandas
+//     'external', só 4 eram perda real — 8 alertas de e-mail eram ruído puro.
+//       external_loss       missing>0 && extra==0  → entra na fila + ALERTA por e-mail
+//       external_reassigned missing>0 && extra>0   → só registra (troca deliberada)
+//       external_added      missing==0 && extra>0  → só registra (reforço de equipe)
+//     `detail` agora leva missing_names/extra_names além de before/after — sem isso o
+//     painel não consegue dizer QUEM saiu e QUEM entrou, só que "divergiu".
+//   - RECONCILIAÇÃO AUTOMÁTICA member→member (decisão 4 do Marcio, 24/09): quando a
+//     troca no ClickUp é 100% entre operadores CADASTRADOS e ATIVOS, e nenhum lado é
+//     guest, o portal aplica sozinho via portal.apply_clickup_assignees (migration
+//     091) em vez de deixar na fila do admin. "O ClickUp manda" — é o que se fazia à
+//     mão. Fora desse escopo estrito, cai no split acima e o admin decide.
+//     🔴 Este é o ÚNICO caminho automático que escreve em demand_operators a partir
+//     de fonte externa (reabre o caminho do bug destrutivo de 03/09). A validação
+//     mora DENTRO da RPC, em transação: valida TODOS os ids ANTES de qualquer DELETE.
+//     Aqui em cima há uma 2ª barreira (elegibilidade), mas a barreira que vale é a da
+//     RPC — o webhook não é fonte de confiança.
+//   - last_synced_from_clickup_at carimbado nos DOIS UPDATEs deste ramo (passo 6 do
+//     plano): antes só taskDeleted/field-update carimbavam, e as demandas 'external'
+//     ficavam com NULL para sempre — impossível saber quando o ClickUp foi lido.
+//
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
 //
-// ⚠️ EDIÇÃO 2026-09-03 (086/087, v4): feita SOBRE A CÓPIA DO REPO, sem confirmação
-// contra o remoto (supabase functions download indisponível neste ambiente — sem
-// SUPABASE_ACCESS_TOKEN). NÃO FAÇA DEPLOY sem antes diffar este arquivo contra
-// `supabase functions download clickup-webhook` a partir de uma máquina autenticada —
-// ver supabase/functions/README.md, seção "Primeiro deploy".
+// ✅ DIFF CONTRA O REMOTO FEITO EM 2026-09-24: a v4 em produção foi baixada e
+// conferida idêntica a esta cópia do repo antes da edição da v5. O aviso "NÃO FAÇA
+// DEPLOY sem diffar" que vivia aqui desde 03/09 foi removido por estar cumprido —
+// ver supabase/functions/README.md.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { notifyAdminDivergence as notifyAdminDivergenceShared } from "../_shared/notify-admin-divergence.ts";
@@ -130,15 +153,63 @@ async function notifyAdminDivergence(supabase: any, cfg: any, demand_id: string,
   await notifyAdminDivergenceShared(supabase, SUPABASE_URL, getSecret, cfg, demand_id, "webhook", before, after);
 }
 
+// Classifica a divergência a partir das duas contagens. Um rótulo só para os três
+// casos era o bug de desenho do plano (passo 2): 8 das 12 demandas 'external' de
+// 24/09 eram troca/reforço deliberado da equipe, não perda.
+//   external_loss       = sumiu gente e não entrou ninguém → o portal esperava alguém
+//                          que o ClickUp não tem mais. É o único ACIONÁVEL (fila +
+//                          e-mail): responsável removido é trabalho sem dono.
+//   external_reassigned = sumiu gente E entrou gente → troca deliberada no ClickUp.
+//   external_added      = só entrou gente → reforço. Ninguém perdeu nada.
+// Só 'external_loss' entra no índice parcial idx_demands_assignee_pending (089) e em
+// PENDING_ASSIGNEE_STATES (lib/api/admin-demandas.ts) — as três pontas têm que casar
+// caractere a caractere, senão o planner troca Index Scan por Seq Scan em silêncio.
+function classifyExternal(missingCount: number, extraCount: number): string {
+  if (missingCount > 0 && extraCount === 0) return "external_loss";
+  if (missingCount > 0 && extraCount > 0) return "external_reassigned";
+  return "external_added"; // missing==0 && extra>0 (o chamador só entra aqui se divergiu)
+}
+
+// Lê o cache de guests do workspace (clickup_config.guest_clickup_ids_cache), mantido
+// por clickup-sync#getTeamRoles a partir do GET /team. Devolve null quando o cache não
+// dá para confiar (ausente, vazio, corrompido) — e null aqui significa NÃO AUTO-APLICAR.
+//
+// ⚠️ O webhook NÃO revalida esse cache (não vai buscar o /team): revalidar aqui
+// significaria uma chamada extra ao ClickUp em todo evento de assignee, e o dono da
+// revalidação é o clickup-sync. Cache frio = auto-reconciliação desligada nesse
+// evento, e a demanda cai no split (o admin decide). Degradar para o caminho manual é
+// sempre seguro; o contrário não.
+function guestIdsFromCache(cfg: any): Set<number> | null {
+  const raw = cfg?.guest_clickup_ids_cache || "";
+  if (!raw) return null;
+  try {
+    const cached = JSON.parse(raw);
+    if (!cached || !Array.isArray(cached.ids)) return null;
+    // Set vazio ≠ "não há guests": pode ser um /team que falhou e gravou lista vazia.
+    // Sabemos que HÁ guests neste workspace (3 em 24/09) — lista vazia é suspeita,
+    // então tratamos como cache inutilizável em vez de "ninguém é guest".
+    if (cached.ids.length === 0) return null;
+    return new Set<number>(cached.ids.map((n: any) => Number(n)).filter((n: number) => !isNaN(n)));
+  } catch (_) {
+    return null;
+  }
+}
+
 // ===== taskAssigneeUpdated =====
 // Compara demand_operators (esperado, via operators.clickup_user_id) com os
-// assignees reais da task (ClickUp). NUNCA escreve em demand_operators — só
-// observa e registra (decisão do Marcio: o admin decide manualmente pelo
-// painel, via portal.admin_resolve_assignee_divergence).
+// assignees reais da task (ClickUp).
 //
 // v4: respeita clickup_config.assignee_strategy='legacy' — em modo legacy, o
-// webhook não compara nem grava 'external' (reversão completa; antes só o
+// webhook não compara nem grava nada (reversão completa; antes só o
 // clickup-sync respeitava essa chave).
+//
+// v5: dois caminhos, nesta ordem.
+//   (1) ELEGÍVEL para auto-reconciliação member→member (decisão 4 do Marcio): chama
+//       portal.apply_clickup_assignees e o banco passa a refletir o ClickUp.
+//   (2) Qualquer outro caso: só CLASSIFICA (external_loss/reassigned/added) e deixa
+//       para o admin resolver pelo painel, como sempre foi.
+// O caminho (1) é a única escrita automática em demand_operators a partir do ClickUp
+// que existe no sistema. Tudo que não couber com folga no escopo estrito vai para (2).
 async function handleAssigneeUpdated(supabase: any, apiKey: string, cfg: any, demand: any) {
   if (cfg?.assignee_strategy === "legacy") {
     return { skipped: "legacy_strategy" };
@@ -168,35 +239,150 @@ async function handleAssigneeUpdated(supabase: any, apiKey: string, cfg: any, de
 
   const { data: prevDemand } = await supabase.schema("portal")
     .from("demands").select("clickup_assignee_sync").eq("id", demand.id).maybeSingle();
-  const wasExternal = prevDemand?.clickup_assignee_sync === "external";
+  // v5: wasExternal cobre os três estados do split — com o `=== "external"` antigo,
+  // uma demanda que já estava external_loss e recebesse outro evento de perda seria
+  // tratada como divergência NOVA e mandaria e-mail de novo a cada evento.
+  const prevSync: string = prevDemand?.clickup_assignee_sync || "";
+  const wasExternal = prevSync.startsWith("external");
 
+  const nowIso = new Date().toISOString();
   const beforeNames = expectedOps.map((o) => o.name).filter(Boolean) as string[];
   const afterPayload = currentAssignees.map((a) => ({ id: String(a.id), name: a.name }));
   const afterNames = currentAssignees.map((a) => a.name);
+  // Nomes dos que SAÍRAM (esperados pelo portal, ausentes no ClickUp) e dos que
+  // ENTRARAM (estão no ClickUp, o portal não conhece nesta demanda). Sem isso o painel
+  // só sabe que divergiu, não quem saiu nem quem entrou.
+  const missingNames = expectedOps
+    .filter((o) => o.clickup_user_id !== null && missing.includes(Number(o.clickup_user_id)))
+    .map((o) => o.name)
+    .filter(Boolean) as string[];
+  const extraNames = currentAssignees.filter((a) => extra.includes(a.id)).map((a) => a.name);
 
   if (!diverged) {
     await supabase.schema("portal").from("demands")
-      .update({ clickup_assignee_sync: "ok", clickup_assignee_detail: {} }).eq("id", demand.id);
+      .update({
+        clickup_assignee_sync: "ok",
+        clickup_assignee_detail: {},
+        last_synced_from_clickup_at: nowIso, // passo 6
+      }).eq("id", demand.id);
     return { converged: true };
   }
 
+  // ── Caminho (1): auto-reconciliação member→member ─────────────────────────
+  const auto = await tryAutoReconcile(supabase, cfg, demand.id, missing, extra, currentAssignees);
+  if (auto.applied) {
+    // A RPC já gravou demands (sync='ok', detail={}), demand_operators e audit_log
+    // numa transação só. Aqui sobra o carimbo de leitura do ClickUp.
+    await supabase.schema("portal").from("demands")
+      .update({ last_synced_from_clickup_at: nowIso }).eq("id", demand.id);
+    return { auto_reconciled: true, applied: auto.applied_count ?? null };
+  }
+
+  // ── Caminho (2): só classifica ────────────────────────────────────────────
+  const syncState = classifyExternal(missing.length, extra.length);
+
   await supabase.schema("portal").from("demands").update({
-    clickup_assignee_sync: "external",
-    clickup_assignee_detail: { before: beforeNames, after: afterPayload },
+    clickup_assignee_sync: syncState,
+    clickup_assignee_detail: {
+      before: beforeNames,
+      after: afterPayload,
+      missing_names: missingNames,
+      extra_names: extraNames,
+    },
+    last_synced_from_clickup_at: nowIso, // passo 6
   }).eq("id", demand.id);
 
   await supabase.schema("portal").from("audit_log").insert({
     event: "demand_assignee_divergence_detected",
     user_id: null,
     identifier: demand.id,
-    metadata: { before: beforeNames, after: afterNames, missing_count: missing.length, extra_count: extra.length },
+    metadata: {
+      before: beforeNames, after: afterNames,
+      missing_count: missing.length, extra_count: extra.length,
+      missing_names: missingNames, extra_names: extraNames,
+      sync_state: syncState,
+      auto_reconcile_skipped: auto.reason,
+    },
   });
 
-  // E-mail só na divergência NOVA (não reenvia a cada evento se já estava external).
-  if (!wasExternal) {
+  // E-mail SÓ em external_loss (passo 2): reassigned/added são trabalho normal da
+  // equipe no ClickUp — alertar neles é o ruído que fez 165 e-mails/30 dias com 0
+  // divergências resolvidas. E só na divergência NOVA (não reenvia a cada evento).
+  if (syncState === "external_loss" && !wasExternal) {
     await notifyAdminDivergence(supabase, cfg, demand.id, beforeNames, afterNames);
   }
-  return { diverged: true, missing: missing.length, extra: extra.length };
+  return {
+    diverged: true, sync: syncState,
+    missing: missing.length, extra: extra.length,
+    auto_reconcile_skipped: auto.reason,
+  };
+}
+
+// Decide se a divergência cabe no escopo ESTRITO da decisão 4 do Marcio e, se couber,
+// chama a RPC que aplica. Devolve {applied:false, reason} em todo caso não elegível —
+// o chamador então segue pelo caminho de classificação.
+//
+// Elegível quando TODAS as condições valem:
+//   a) há pelo menos um `extra` (alguém novo no ClickUp). Só-perda (external_loss)
+//      NUNCA é auto-aplicada: aplicar sozinho uma remoção é o caminho do apagão de
+//      03/09 — demanda ficaria sem responsável nenhum sem ninguém decidir isso.
+//   b) TODO `extra` casa com um operators ATIVO e com clickup_user_id cadastrado.
+//      Um único ID sem cadastro (ex. Ramon 234063256 antes do cadastro, ou um ID
+//      fantasma) desqualifica o lote inteiro.
+//   c) NENHUM lado (missing ou extra) é guest. Guest não pode ser assignee, então a
+//      "ausência" dele no ClickUp não é decisão de ninguém — é limitação. Aplicar
+//      apagaria o vínculo de um guest legítimo do banco.
+//   d) o cache de guests é confiável (ver guestIdsFromCache) — sem ele não dá para
+//      afirmar (c), e na dúvida NÃO se escreve.
+async function tryAutoReconcile(
+  supabase: any, cfg: any, demandId: string,
+  missing: number[], extra: number[],
+  currentAssignees: Array<{ id: number; name: string }>,
+): Promise<{ applied: boolean; reason?: string; applied_count?: number }> {
+  if (extra.length === 0) return { applied: false, reason: "no_extra_assignee" };
+
+  const guestIds = guestIdsFromCache(cfg);
+  if (guestIds === null) return { applied: false, reason: "guest_cache_unusable" };
+  if (missing.some((id) => guestIds.has(id))) return { applied: false, reason: "missing_is_guest" };
+  if (extra.some((id) => guestIds.has(id))) return { applied: false, reason: "extra_is_guest" };
+
+  // Todos os extras precisam ser operador ativo cadastrado. Esta é a checagem de
+  // ELEGIBILIDADE — a checagem que VALE (e que impede o DELETE) é a de dentro da RPC,
+  // em transação. Aqui é só para não chamar a RPC sabendo que ela vai dar RAISE.
+  //
+  // ⚠️ operators.clickup_user_id é TEXT (migration 016), não numérico — o `.in()` vai
+  // com strings, senão a comparação depende de coerção implícita do PostgREST. Mesma
+  // convenção do `o.clickup_user_id::text = ANY(...)` da 086.
+  const extraAsText = extra.map((id) => String(id));
+  const { data: matched, error: matchErr } = await supabase.schema("portal")
+    .from("operators").select("id, clickup_user_id")
+    .in("clickup_user_id", extraAsText)
+    .eq("status", "active");
+  if (matchErr) {
+    console.error("tryAutoReconcile match err", demandId, matchErr.message);
+    return { applied: false, reason: "operator_lookup_failed" };
+  }
+  const matchedIds = new Set(
+    (matched || []).map((o: any) => Number(o.clickup_user_id)).filter((n: number) => !isNaN(n)),
+  );
+  if (extra.some((id) => !matchedIds.has(id))) {
+    return { applied: false, reason: "extra_not_registered_operator" };
+  }
+
+  // Aplica o estado do ClickUp inteiro (todos os assignees atuais da task), não só os
+  // extras: a RPC faz INSERT dos novos + DELETE dos ausentes numa transação, sempre
+  // validando antes. Passar só os extras deixaria os removidos no banco.
+  const allClickupIds = currentAssignees.map((a) => a.id);
+  const { data, error } = await supabase.schema("portal")
+    .rpc("apply_clickup_assignees", { p_demand_id: demandId, p_clickup_user_ids: allClickupIds });
+  if (error) {
+    // RAISE da RPC (validação reprovou) ou erro de transporte: NÃO aplicou nada —
+    // a RPC é all-or-nothing. Cai no caminho de classificação, que é o comportamento
+    // correto: o admin decide.
+    console.error("apply_clickup_assignees falhou — caindo para classificação", demandId, error.message);
+    return { applied: false, reason: "rpc_error:" + (error.message || "").slice(0, 120) };
+  }
+  return { applied: true, applied_count: (data as any)?.operators_applied ?? null };
 }
 
 function stripBotPrefix(text: string): string {

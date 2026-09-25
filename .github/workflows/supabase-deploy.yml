@@ -9,8 +9,8 @@ name: Deploy Supabase (migrations + edge functions)
 # supabase/functions/clickup-sync e clickup-webhook dizem que foram editadas
 # sem diff contra o remoto). Rodar este workflow sem checar isso pode
 # SOBRESCREVER correções feitas direto no painel do Supabase. Ver
-# supabase/functions/README.md, seção "Primeiro deploy" — é manual, de propósito
-# não está automatizado aqui.
+# supabase/functions/README.md, seção "Deploy — GitHub Actions" — é manual, de
+# propósito não está automatizado aqui.
 on:
   push:
     branches: [main]

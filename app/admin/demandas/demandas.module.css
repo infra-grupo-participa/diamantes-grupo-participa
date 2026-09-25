@@ -471,10 +471,18 @@
   background: var(--warning-soft);
   color: var(--warning-strong);
 }
+/* Perda de responsável (external_loss) é acionável e dói — mesmo peso visual de
+   .syncNone. Troca/reforço (external_reassigned/external_added) são operação normal
+   da equipe no ClickUp: neutros de propósito, para o vermelho continuar significando
+   alguma coisa. Migration 089. */
 .syncNone,
-.syncExternal {
+.syncExternalLoss {
   background: var(--danger-soft);
   color: var(--danger-strong);
+}
+.syncExternalNeutral {
+  background: var(--neutral-soft);
+  color: var(--neutral-strong);
 }
 
 /* avatar genérico (usado em card, equipe, chat) */

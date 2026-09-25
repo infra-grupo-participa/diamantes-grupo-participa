@@ -1,0 +1,24 @@
+-- 091_down — reverte 091_apply_clickup_assignees
+--
+-- Remove a RPC da reconciliação automática member→member. Depois disto, o webhook v5
+-- passa a receber erro ao chamar apply_clickup_assignees (PGRST202/42883), cai no
+-- caminho de classificação (tryAutoReconcile devolve reason='rpc_error:...') e as
+-- divergências voltam a ser 100% decisão do admin pelo painel — que é o comportamento
+-- anterior à decisão 4 do Marcio.
+--
+-- ✅ Reversão SEGURA e SEM DEPLOY: o webhook já trata a falha da RPC como "não
+-- elegível" e segue classificando (ver tryAutoReconcile em clickup-webhook/index.ts).
+-- Dropar esta função NÃO derruba o webhook nem perde evento — é o botão de desligar a
+-- escrita automática em demand_operators, e é o que se aperta primeiro se a decisão 4
+-- se mostrar errada em produção.
+--
+-- ⚠️ NÃO reverte os vínculos já aplicados: as demandas que a RPC reconciliou
+-- continuam com os responsáveis vindos do ClickUp. Isso é proposital — eram trocas
+-- reais feitas pela equipe. Para auditar ou desfazer caso a caso, o before/after de
+-- cada aplicação está em portal.audit_log:
+--   select created_at, identifier, metadata
+--     from portal.audit_log
+--    where event = 'demand_assignee_auto_reconciled'
+--    order by created_at desc;
+
+DROP FUNCTION IF EXISTS portal.apply_clickup_assignees(uuid, bigint[]);

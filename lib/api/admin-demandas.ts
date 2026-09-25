@@ -25,10 +25,29 @@ export type DemandStatus = 'open' | 'in_progress' | 'review' | 'done' | 'cancele
  *                       corrigir. O painel não deve tratar como pendência acionável nem
  *                       alertar repetidamente (o e-mail ao admin já só dispara 1x).
  *   none             → nenhum operador esperado da demanda está como assignee.
- *   external         → o ClickUp tem assignee(s) que o portal não reconhece (mudança
- *                       feita direto no ClickUp) — populado só pelo webhook.
+ *
+ * Os três estados `external_*` (migration 089, 24/09/2026) substituíram o antigo
+ * `external` único. Todos vêm de mudança feita DIRETO no ClickUp e são populados só
+ * pelo webhook. O rótulo único misturava perda com operação normal: das 12 demandas
+ * `external` de 24/09, só 4 eram perda — as outras 8 geravam alerta por e-mail à toa.
+ *   external_loss       → sumiu responsável e nenhum novo entrou. ÚNICO acionável:
+ *                          entra na fila de pendências e dispara e-mail.
+ *   external_reassigned → troca (saiu gente E entrou gente). Registro, não pendência.
+ *   external_added      → reforço (só entrou gente). Registro, não pendência.
+ *
+ * ⚠️ `external_loss` tem que casar CARACTERE A CARACTERE com o WHERE do índice parcial
+ * idx_demands_assignee_pending (migration 089) e com PENDING_ASSIGNEE_STATES mais
+ * abaixo. Mudar um sem o outro não dá erro — só faz o planner abandonar o índice.
  */
-export type AssigneeSyncState = 'ok' | 'partial' | 'partial_expected' | 'none' | 'external' | null;
+export type AssigneeSyncState =
+  | 'ok'
+  | 'partial'
+  | 'partial_expected'
+  | 'none'
+  | 'external_loss'
+  | 'external_reassigned'
+  | 'external_added'
+  | null;
 
 /**
  * Item de `clickup_assignee_detail.missing[]` (estados partial/partial_expected/none).
@@ -601,8 +620,13 @@ export const clickupTaskUrl = (taskId: string) => `https://app.clickup.com/t/${t
 /**
  * Rótulo + classe CSS do badge de sincronização de responsáveis (card e lista).
  * `partial_expected` é NEUTRO por decisão de produto (guest permanente, não é
- * erro) — só `partial`/`none`/`external` são acionáveis (âmbar/vermelho).
+ * erro) — só `partial`/`none`/`external_loss` são acionáveis (âmbar/vermelho).
  * `null`/`ok` não geram badge (ver `hasSyncBadge`).
+ *
+ * Os rótulos dos três `external_*` (089) são deliberadamente diferentes em TOM, não só
+ * em texto: `external_loss` é vermelho e diz o que doeu ("Responsável removido"),
+ * enquanto `reassigned`/`added` são neutros e descrevem o que a equipe fez. Um rótulo
+ * alarmante para operação normal é como se treina o time a ignorar o badge.
  */
 export const ASSIGNEE_SYNC_BADGE: Record<
   Exclude<AssigneeSyncState, null>,
@@ -612,7 +636,9 @@ export const ASSIGNEE_SYNC_BADGE: Record<
   partial_expected: { cls: 'syncPartialExpected', icon: '–', label: '1+ fora do ClickUp (guest)' },
   partial: { cls: 'syncPartial', icon: '!', label: 'Divergência parcial' },
   none: { cls: 'syncNone', icon: '×', label: 'Nenhum responsável no ClickUp' },
-  external: { cls: 'syncExternal', icon: '⇄', label: 'Alterado direto no ClickUp' },
+  external_loss: { cls: 'syncExternalLoss', icon: '⚠', label: 'Responsável removido no ClickUp' },
+  external_reassigned: { cls: 'syncExternalNeutral', icon: '⇄', label: 'Reatribuída no ClickUp' },
+  external_added: { cls: 'syncExternalNeutral', icon: '+', label: 'Reforço no ClickUp' },
 };
 
 /** `true` quando vale a pena mostrar o badge (oculta 'ok' e null — sem ruído). */
@@ -629,26 +655,30 @@ export function assigneeSyncBadge(state: AssigneeSyncState) {
 
 /**
  * Estados que entram na FILA DE PENDÊNCIAS do painel — precisam de ação do admin.
- * 'partial_expected' fica FORA de propósito (estado esperado permanente enquanto a
- * decisão for manter guest — não é pendência). Esta lista tem que casar CARACTERE A
- * CARACTERE com o WHERE do índice parcial idx_demands_assignee_pending (migration 086)
- * — casamento PROVADO em produção (EXPLAIN de 03/09/2026 colado em
- * docs/specs/pendencias/086-087-explain-pendente.md: Index Scan no índice parcial).
- * Mudar aqui sem mudar lá (ou vice-versa) faz o planner deixar de usar o índice,
- * silenciosamente.
+ * Ficam FORA de propósito:
+ *   'partial_expected'    — estado esperado permanente (guest), não é pendência;
+ *   'external_reassigned' — troca deliberada da equipe no ClickUp (089);
+ *   'external_added'      — reforço deliberado da equipe no ClickUp (089).
+ * Só 'external_loss' entra dos três estados external: perda de responsável é a única
+ * que deixa trabalho sem dono.
+ *
+ * ⚠️ Esta lista tem que casar CARACTERE A CARACTERE com o WHERE do índice parcial
+ * idx_demands_assignee_pending (migration 089 — a 086 cobria 'external', a 089 trocou
+ * por 'external_loss'). Mudar aqui sem mudar lá (ou vice-versa) NÃO dá erro: o planner
+ * simplesmente para de usar o índice e cai em Seq Scan, em silêncio.
+ * EXPLAIN de confirmação da 089: docs/specs/pendencias/089-091-explain-pendente.md.
  */
-const PENDING_ASSIGNEE_STATES: Exclude<AssigneeSyncState, 'ok' | 'partial_expected' | null>[] = [
-  'partial',
-  'none',
-  'external',
-];
+const PENDING_ASSIGNEE_STATES: Exclude<
+  AssigneeSyncState,
+  'ok' | 'partial_expected' | 'external_reassigned' | 'external_added' | null
+>[] = ['partial', 'none', 'external_loss'];
 
 /**
  * Fila de demandas com divergência de responsáveis ACIONÁVEL pelo admin (badge de
  * pendências do painel). Usa o índice parcial idx_demands_assignee_pending
- * (created_at desc) WHERE clickup_assignee_sync IN ('partial','none','external') —
- * MESMA lista de PENDING_ASSIGNEE_STATES acima (EXPLAIN de confirmação executado em
- * 03/09/2026, ver docs/specs/pendencias/086-087-explain-pendente.md). `limit` tem teto:
+ * (created_at desc) WHERE clickup_assignee_sync IN ('partial','none','external_loss') —
+ * MESMA lista de PENDING_ASSIGNEE_STATES acima (EXPLAIN de confirmação da 089 em
+ * docs/specs/pendencias/089-091-explain-pendente.md). `limit` tem teto:
  * sem paginação full-table (egress do Supabase é restrição real) — a fila é
  * operacional, não um relatório histórico, então um teto de 100 é generoso mesmo em
  * pico.
