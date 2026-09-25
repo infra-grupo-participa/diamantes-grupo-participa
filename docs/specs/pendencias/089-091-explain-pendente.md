@@ -176,7 +176,52 @@ ERROR: 22023: Lista de assignees vazia — recusado. Esvaziar os responsáveis d
 CONTEXT: PL/pgSQL function apply_clickup_assignees(uuid,bigint[]) line 8 at RAISE
 ```
 
-(4c) `proacl` — só após aplicar. (5) cron — só após aplicar.
+### (4c) `proacl` pós-aplicação — 24/09/2026 (088–094 aplicadas via MCP `apply_migration`)
+
+```
+apply_clickup_assignees            → {postgres=X/postgres,service_role=X/postgres}                 public_residual=false
+_cron_reconcile_assignees          → {postgres=X/postgres,service_role=X/postgres}                 public_residual=false
+_resync_demand_assignees           → {postgres=X/postgres,service_role=X/postgres}                 public_residual=false
+admin_resolve_assignee_divergence  → {postgres=X,service_role=X,authenticated=X}                   public_residual=false
+admin_add_demand_operator          → {postgres=X,service_role=X,authenticated=X}                   public_residual=false
+admin_remove_demand_operator       → {postgres=X,service_role=X,authenticated=X}                   public_residual=false
+get_schema_drift_status            → {=X/postgres,postgres=X,service_role=X,authenticated=X}       public_residual=TRUE (fora do lote; guard is_admin())
+has_function_privilege('anon', …, 'EXECUTE') = false nas 3 conferidas · 1 sobrecarga por função
+FOR UPDATE presente nas 4 funções · cron.job reconcile-assignees '0 4 * * *' active=true
+sync após backfill: ok 12 · external_loss 3 · external_added 4 · external_reassigned 5 · partial_expected 4 · none 1 · external 0
+```
+
+### (5) cron — wrapper `portal._cron_reconcile_assignees()` disparado à mão, 2×
+
+```
+1ª (01:12 UTC, antes das demandas de teste):
+  {"checked":29,"ok":true,"partial":0,"partial_expected":4,"none":1,"skipped_external":12,"errors":[],"next_cursor":null,"batches":2,"stopped_reason":"completed","ok_count":12}
+2ª (01:16 UTC, com 2 demandas de teste):
+  {"checked":31,"ok":true,"partial":1,"partial_expected":4,"none":1,"skipped_external":13,"errors":[],"next_cursor":null,"batches":2,"stopped_reason":"completed","ok_count":12}
+```
+`skipped_external > 0` nos dois: o cron não desfaz o split. Não reagendei para +2 min —
+o wrapper é exatamente o comando do `cron.job`; a única diferença seria o gatilho do pg_cron.
+
+## E2E em produção — 24/09/2026 (cliente-demo, tudo apagado no fim)
+
+| # | Ação | Resultado | Asserção |
+|---|---|---|---|
+| 1 | INSERT demanda + 3 members (1 transação) | task `86akpg5jj`, `ok`, 3×`delivered` | `GET /task` → 3 assignees |
+| 2 | INSERT + 3 members + Manuela (guest) | task `86akpg5jk`, `partial_expected`, `permanent:true`, 1×`blocked_guest` | `GET /task` → **3** assignees, HTTP 200 (descarte silencioso reproduzido) · e-mail `demanda_atribuida_guest` → manuela · **1** `divergencia_assignee` → joao (não 11) |
+| 3c | ClickUp: +Matheus Vieira na task 1 | webhook em 3 s → **auto-reconciliado**: `added 1`, 4×`delivered`, `ok`, `audit demand_assignee_auto_reconciled`, 0 e-mail | — |
+| 3b | ClickUp: −Guilherme +Ana Vieira (não cadastrada) na task 2 | webhook em 2 s → `external_reassigned`, `last_synced` carimbado, 0 e-mail, auto barrada | — |
+| 3a | ClickUp: −Iromar na task 1 (remoção pura) | **nenhum evento em 2+ min** (repetido com −Guilherme: idem) | — |
+| 5 | wrapper do cron | pegou a perda da task 1: `partial`, Iromar+Guilherme `blocked_other/unknown_rejected`, **1** e-mail → joao | — |
+| 4 | RAISE em `accept_clickup` com ID não cadastrado | não executado em produção (exige `is_admin()` via sessão); 091 provada em rollback (4b) | — |
+
+🔴 **Achado:** o ClickUp **não emite `taskAssigneeUpdated` para remoção pura** (adição e
+troca chegam em 2–3 s). `external_loss` pelo webhook é raro na prática; a perda pura é
+detectada pelo cron diário como `partial/unknown_rejected` → card
+[86akpg5uz](https://app.clickup.com/t/86akpg5uz) para rotular como perda.
+
+Limpeza: 8 `demand_operators`, 3 `email_log`, 2 `audit_log`, 2 `demands` apagados
+**antes** das tasks; os 2 `taskDeleted` caíram em `unknown_task`. Estado final: 29
+demandas, distribuição 12/3/4/5/4/1, `email_log` = 191 (igual ao marco).
 
 ### Pré-checagens do Kirad (24/09)
 
