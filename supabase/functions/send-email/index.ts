@@ -1,4 +1,4 @@
-// send-email v8 — e-mails transacionais do portal (Resend).
+// send-email v9 — e-mails transacionais do portal (Resend).
 // Disparada por triggers pg_net:
 //   • _notify_demanda_criada           → { type:'demanda_criada', demand_id }
 //   • _notify_projeto_criado           → { type:'projeto_criado', project_id }
