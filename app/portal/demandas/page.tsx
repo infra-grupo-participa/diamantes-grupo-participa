@@ -8,12 +8,16 @@ import {
   clientCompleteDemand,
   clientRequestChanges,
   getDemand,
+  getDemandBriefing,
   getDemandMembers,
   getMe,
   isBaseReady,
+  listDemandDue,
   listMyDemands,
   markDemandRead,
   type Demand,
+  type DemandBriefing,
+  type DemandDue,
   type DemandMember,
   type DemandStatus,
   type Me,
@@ -25,6 +29,13 @@ import { errMessage } from '@/lib/errors';
 import { listMyProjects, type Project } from '@/lib/api/projects';
 import { getClientBriefing } from '@/lib/api/briefing';
 import { BRIEFING_SERVICE_LABELS, type BriefingAnswers, type ProjectBriefing } from '@/lib/briefing-templates';
+import {
+  VIDEO_FIELD_LABELS,
+  VIDEO_FIELD_ORDER,
+  VIDEO_SERVICE_TYPE,
+  videoOptionLabel,
+  type VideoBriefingField,
+} from '@/lib/video-briefing';
 import {
   buildGeneralSection,
   buildProjectSections,
@@ -113,25 +124,86 @@ function daysUntilDue(ends_at: string): number | null {
   const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   return Math.round((dueUTC - todayUTC) / 86400000);
 }
-function dueLabel(d: Demand): string {
+
+// ── Prazo (migration 095): due_at tem HORA e vive em fuso de Brasília. Um
+// timestamptz perto da meia-noite pode cair no dia UTC seguinte/anterior —
+// por isso o diff de dias usa o dia-calendário EM SÃO PAULO, não o prefixo
+// YYYY-MM-DD cru do ISO (que já funciona para `ends_at`, que é DATE puro).
+const SP_TZ = 'America/Sao_Paulo';
+function spYMD(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: SP_TZ });
+}
+function fmtTimeSP(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: SP_TZ });
+}
+function fmtDueAt(iso: string, hasTime?: boolean | null): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const datePart = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: SP_TZ });
+  return hasTime ? `${datePart} às ${fmtTimeSP(iso)}` : datePart;
+}
+function daysUntilDueAt(dueAtIso: string): number | null {
+  const d = new Date(dueAtIso);
+  if (isNaN(d.getTime())) return null;
+  const [ty, tm, td] = spYMD(dueAtIso).split('-').map(Number);
+  const [fy, fm, fd] = spYMD(new Date().toISOString()).split('-').map(Number);
+  return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86400000);
+}
+type EffectiveDue = { iso: string; hasTime: boolean };
+// Prazo efetivo: due_at (com hora, migration 095) quando existir; senão ends_at
+// como antes. `due` vem de UMA consulta em lote (listDemandDue) — nunca por card.
+function effectiveDue(d: Demand, due?: DemandDue): EffectiveDue | null {
+  if (due?.due_at) return { iso: due.due_at, hasTime: !!due.due_has_time };
+  if (d.ends_at) return { iso: d.ends_at, hasTime: false };
+  return null;
+}
+function dueDiffDays(eff: EffectiveDue): number | null {
+  return eff.hasTime ? daysUntilDueAt(eff.iso) : daysUntilDue(eff.iso);
+}
+function dueLabel(d: Demand, due?: DemandDue): string {
   if (d.status === 'done') return 'Concluída em ' + fmtDate(d.finalized_at);
   if (d.status === 'canceled') return 'Cancelada';
-  if (!d.ends_at) return 'Sem prazo';
-  const diff = daysUntilDue(d.ends_at);
+  const eff = effectiveDue(d, due);
+  if (!eff) return 'Sem prazo';
+  const diff = dueDiffDays(eff);
   if (diff === null) return 'Sem prazo';
-  if (diff < 0) return 'Atrasada — ' + fmtDate(d.ends_at);
-  if (diff === 0) return 'Vence hoje';
-  if (diff === 1) return 'Vence amanhã';
+  if (diff < 0) return 'Atrasada — ' + fmtDueAt(eff.iso, eff.hasTime);
+  if (diff === 0) return eff.hasTime ? `Vence hoje às ${fmtTimeSP(eff.iso)}` : 'Vence hoje';
+  if (diff === 1) return eff.hasTime ? `Vence amanhã às ${fmtTimeSP(eff.iso)}` : 'Vence amanhã';
   return 'Vence em ' + diff + ' dias';
 }
 // Urgência do prazo p/ colorir na lista: vermelho (atrasada) / âmbar (vence hoje/amanhã).
-function dueUrgency(d: Demand): 'late' | 'soon' | '' {
-  if (d.status === 'done' || d.status === 'canceled' || !d.ends_at) return '';
-  const diff = daysUntilDue(d.ends_at);
+function dueUrgency(d: Demand, due?: DemandDue): 'late' | 'soon' | '' {
+  if (d.status === 'done' || d.status === 'canceled') return '';
+  const eff = effectiveDue(d, due);
+  if (!eff) return '';
+  const diff = dueDiffDays(eff);
   if (diff === null) return '';
   if (diff < 0) return 'late';
   if (diff <= 1) return 'soon';
   return '';
+}
+// "Prazo sugerido" (vídeo, nunca remarcado) / "Prazo remarcado pela equipe"
+// (já teve due_previous_at) — nenhum outro caso ganha rótulo.
+function dueOriginLabel(d: Demand, due?: DemandDue): string | null {
+  if (!due) return null;
+  if (due.due_previous_at) return 'Prazo remarcado pela equipe';
+  if (d.service_type === VIDEO_SERVICE_TYPE && !due.due_changed_at) return 'Prazo sugerido';
+  return null;
+}
+// Rótulo pt-BR de um valor do briefing de vídeo (somente leitura no detalhe).
+function renderBriefingValue(field: VideoBriefingField, value: unknown): string {
+  if (Array.isArray(value)) {
+    if (field === 'formatos' || field === 'arquivo') {
+      return value.map((v) => videoOptionLabel(field, String(v))).join(', ');
+    }
+    return value.map(String).join(', ');
+  }
+  if (field === 'peca' && typeof value === 'string') return videoOptionLabel('peca', value);
+  return typeof value === 'string' ? value : String(value);
+}
+function isHttpsLink(value: unknown): value is string {
+  return typeof value === 'string' && /^https:\/\//i.test(value.trim());
 }
 const DEMAND_READ_KEY = 'diamantes.demandRead';
 function categoryOf(members?: DemandMember[]): string {
@@ -189,6 +261,14 @@ export default function DemandasPage() {
   // Briefing Básico (acessos) do cliente logado (1 fetch cacheado por sessão).
   const [projectsById, setProjectsById] = useState<Record<string, Project>>({});
   const [basicAccess, setBasicAccess] = useState<Record<string, BriefingAnswers>>({});
+  // Prazo + remarcação (migration 095) de TODAS as demandas listadas — UMA
+  // consulta em lote por carga da lista (listDemandDue), nunca por card/aba.
+  const [dueMap, setDueMap] = useState<Record<string, DemandDue>>({});
+  // Briefing de vídeo (somente leitura) — carregado sob demanda ao abrir o
+  // detalhe de uma demanda editor-video (getDemandBriefing), 1 fetch por id.
+  const [briefingByDemand, setBriefingByDemand] = useState<Record<string, DemandBriefing | null>>({});
+  const briefingLoadedRef = useRef<Set<string>>(new Set());
+  const briefingInflightRef = useRef<Set<string>>(new Set());
   // Filtro por projeto (via ?projeto=<id>, vindo do card de Projetos).
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   useEffect(() => {
@@ -251,10 +331,30 @@ export default function DemandasPage() {
         if (prev && list.some((d) => d.id === prev)) return prev; // ?d válido ou seleção atual
         return list.length > 0 ? list[0].id : null;
       });
+      // Prazo/remarcação de TODA a lista numa única ida (nunca 1 consulta por card).
+      void listDemandDue(list.map((d) => d.id))
+        .then(setDueMap)
+        .catch((e) => console.error('listDemandDue', e));
       return list;
     } catch (e) {
       setLoadError(errMessage(e));
       return [];
+    }
+  }, []);
+
+  // Carrega o briefing de vídeo de UMA demanda (cache por id; só editor-video).
+  const ensureBriefing = useCallback(async (demandId: string, serviceType?: string | null) => {
+    if (serviceType !== VIDEO_SERVICE_TYPE) return;
+    if (briefingInflightRef.current.has(demandId) || briefingLoadedRef.current.has(demandId)) return;
+    briefingInflightRef.current.add(demandId);
+    try {
+      const b = await getDemandBriefing(demandId);
+      briefingLoadedRef.current.add(demandId);
+      setBriefingByDemand((prev) => ({ ...prev, [demandId]: b }));
+    } catch (e) {
+      console.error('ensureBriefing', e);
+    } finally {
+      briefingInflightRef.current.delete(demandId);
     }
   }, []);
 
@@ -413,6 +513,13 @@ export default function DemandasPage() {
         const fresh = await getDemand(id);
         await ensureMembers(id, true);
         if (fresh) setDemands((prev) => prev.map((x) => (x.id === id ? fresh : x)));
+        // A demanda pode ter sido remarcada (ClickUp) — atualiza só o prazo dela.
+        try {
+          const due = await listDemandDue([id]);
+          if (due[id]) setDueMap((prev) => ({ ...prev, [id]: due[id] }));
+        } catch (e) {
+          console.error('listDemandDue (onDemandUpdate)', e);
+        }
       },
     });
 
@@ -554,6 +661,14 @@ export default function DemandasPage() {
   const currentMsgs = currentId ? messages[currentId] || [] : [];
   const currentMembers = currentId ? members[currentId] || [] : [];
   const operators = currentMembers.filter((m) => m.role === 'operator');
+  const currentDue = currentId ? dueMap[currentId] : undefined;
+  const currentDueOrigin = current ? dueOriginLabel(current, currentDue) : null;
+  const currentBriefing = currentId ? briefingByDemand[currentId] : undefined;
+
+  // Briefing de vídeo: carrega só quando o service_type da demanda aberta é conhecido.
+  useEffect(() => {
+    if (currentId && current?.service_type) void ensureBriefing(currentId, current.service_type);
+  }, [currentId, current?.service_type, ensureBriefing]);
 
   // Pessoas envolvidas = operadores ATRIBUÍDOS + quem da equipe/externo já RESPONDEU
   // no chat (autores não-cliente). Dedup por nome.
@@ -749,8 +864,9 @@ export default function DemandasPage() {
   function dueClass(): string {
     if (!current) return '';
     if (current.status === 'done') return styles.onTime;
-    if (current.ends_at) {
-      const diff = daysUntilDue(current.ends_at);
+    const eff = effectiveDue(current, currentDue);
+    if (eff) {
+      const diff = dueDiffDays(eff);
       if (diff !== null) {
         if (diff < 0) return styles.late;
         if (diff <= 3) return styles.dueSoon;
@@ -785,6 +901,17 @@ export default function DemandasPage() {
           </div>,
         );
         lastDay = day;
+      }
+      // Mensagens do sistema (ex.: remarcação de prazo pelo ClickUp) são um selo
+      // centralizado neutro — sem autor/avatar e sem ações de editar/apagar/responder.
+      if (m.origin === 'system') {
+        nodes.push(
+          <div key={m._localKey || m.id} className={styles.msgSystem} role="status">
+            <span className={styles.msgSystemBadge}>{m.content}</span>
+            <span className={styles.msgSystemTime}>{fmtTime(m.created_at)}</span>
+          </div>,
+        );
+        continue;
       }
       const mine = !!me && m.user_id === me.id;
       const role = mine ? 'cliente' : m.author_role === 'operator' ? 'equipe' : m.author_role || 'equipe';
@@ -834,7 +961,8 @@ export default function DemandasPage() {
 
   // Item da lista (reusado no modo plano e dentro das pastas por projeto).
   const renderDemandItem = (d: Demand) => {
-    const urg = dueUrgency(d);
+    const due = dueMap[d.id];
+    const urg = dueUrgency(d, due);
     const unread = isUnread(d);
     return (
       <button
@@ -869,7 +997,7 @@ export default function DemandasPage() {
                     : undefined
               }
             >
-              {dueLabel(d)}
+              {dueLabel(d, due)}
             </span>
           </span>
           {d.last_message_preview ? (
@@ -1216,6 +1344,22 @@ export default function DemandasPage() {
             </div>
           ) : (
             <>
+              {currentDue?.due_previous_at && (
+                <div className={styles.detailSection}>
+                  <div className={styles.dueBanner} role="note">
+                    <span className={styles.dueBannerIcon} aria-hidden="true">↻</span>
+                    <div>
+                      <strong className={styles.dueBannerTitle}>
+                        A equipe remarcou a entrega de {fmtDueAt(currentDue.due_previous_at, currentDue.due_previous_has_time)} para{' '}
+                        {currentDue.due_at ? fmtDueAt(currentDue.due_at, currentDue.due_has_time) : '—'}.
+                      </strong>
+                      <p className={styles.dueBannerText}>
+                        O editor ajusta o prazo pela agenda de produção — o trabalho continua, só a data mudou.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className={styles.detailSection}>
                 <h3>Sobre essa demanda</h3>
                 <div className={styles.infoRow}>
@@ -1232,13 +1376,52 @@ export default function DemandasPage() {
                 </div>
                 <div className={styles.infoRow}>
                   <span className={styles.lbl}>Prazo</span>
-                  <span className={`${styles.val} ${dueClass()}`}>{dueLabel(current)}</span>
+                  <span className={`${styles.val} ${dueClass()}`}>
+                    {dueLabel(current, currentDue)}
+                    {currentDueOrigin && <span className={styles.dueOriginTag}> · {currentDueOrigin}</span>}
+                  </span>
                 </div>
                 <div className={styles.infoRow}>
                   <span className={styles.lbl}>Categoria</span>
                   <span className={styles.val}>{categoryOf(currentMembers)}</span>
                 </div>
               </div>
+
+              {current.service_type === VIDEO_SERVICE_TYPE && (
+                <div className={styles.detailSection}>
+                  <h3>Briefing do vídeo</h3>
+                  {currentBriefing === undefined ? (
+                    <div className="muted" style={{ fontSize: '0.84rem' }}>
+                      Carregando briefing…
+                    </div>
+                  ) : !currentBriefing?.briefing ? (
+                    <div className="muted" style={{ fontSize: '0.84rem' }}>
+                      Sem briefing registrado.
+                    </div>
+                  ) : (
+                    VIDEO_FIELD_ORDER.map((field) => {
+                      const raw = (currentBriefing.briefing as Record<string, unknown>)[field];
+                      if (raw === undefined || raw === null || raw === '' || (Array.isArray(raw) && raw.length === 0)) {
+                        return null;
+                      }
+                      return (
+                        <div key={field} className={styles.infoRow}>
+                          <span className={styles.lbl}>{VIDEO_FIELD_LABELS[field]}</span>
+                          <span className={styles.val}>
+                            {isHttpsLink(raw) ? (
+                              <a href={raw} target="_blank" rel="noopener noreferrer">
+                                {raw}
+                              </a>
+                            ) : (
+                              renderBriefingValue(field, raw)
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
 
               <div className={styles.detailSection}>
                 <h3>Etapas da entrega</h3>
@@ -1323,7 +1506,12 @@ export default function DemandasPage() {
       </div>
 
       {showNew && (
-        <NewDemandModal userId={me?.id ?? null} onClose={() => setShowNew(false)} onCreated={(d) => void onDemandCreated(d)} />
+        <NewDemandModal
+          userId={me?.id ?? null}
+          clientSlug={me?.client_slug ?? null}
+          onClose={() => setShowNew(false)}
+          onCreated={(d) => void onDemandCreated(d)}
+        />
       )}
 
       {lightbox && (

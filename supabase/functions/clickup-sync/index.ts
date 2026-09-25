@@ -68,6 +68,18 @@
 //   - persistAssigneeSync: `sync !== "external"` virou `!sync.startsWith("external")`
 //     — com o split, o literal deixava os 3 estados novos dispararem e-mail por aqui.
 //
+// v16 (migration 095, 2026-09-25 — briefing de vídeo + prazo remarcável no ClickUp):
+//   - CRIAÇÃO: demanda editor-video com briefing → `markdown_content` = texto do
+//     cliente + portal.video_briefing_markdown(briefing, due_suggested_at) (tudo do
+//     briefing no card). due_date vem de due_at (com hora: due_date_time); demanda
+//     antiga sem due_at continua pelo ends_at ao meio-dia UTC.
+//   - ATUALIZAÇÃO: NÃO manda mais due_date/start_date (após criada, o prazo é do
+//     ClickUp — a equipe remarca lá) nem description de demanda com briefing (o card é
+//     o markdown gerado; mandar demands.description apagaria o briefing do card).
+//   - VARREDURA (reconcile_assignees, cron 04:00): reaproveita o GET /task que já
+//     fazia e, se o prazo do ClickUp difere de due_at, chama
+//     portal.apply_clickup_due_change (source 'sweep'). Zero chamada extra ao ClickUp.
+//
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
 //
@@ -520,15 +532,49 @@ function taskName(demand: any): string {
   return demand.title || "Demanda";
 }
 
-function buildCreatePayload(demand: any, assignees: number[]) {
+// Demanda com briefing estruturado (095: hoje só editor-video). Em produção
+// demands.briefing é jsonb NOT NULL DEFAULT '{}' — `{}` é truthy em JS e marcaria TODA
+// demanda como "com briefing" (desligando o sync de description). Só conta objeto
+// com chaves.
+function hasBriefing(demand: any): boolean {
+  const b = demand?.briefing;
+  return !!b && typeof b === "object" && !Array.isArray(b) && Object.keys(b).length > 0;
+}
+
+// Card da criação: texto livre do cliente + briefing renderizado NO BANCO
+// (portal.video_briefing_markdown — mesma fonte de chaves/rótulos da validação).
+// Falha aqui não pode impedir a criação da task: cai para a description pura e loga.
+async function buildCreateMarkdown(supabase: any, demand: any): Promise<string | null> {
+  if (!hasBriefing(demand) || demand.service_type !== "editor-video") return null;
+  const { data, error } = await supabase.schema("portal").rpc("video_briefing_markdown", {
+    p: demand.briefing,
+    p_due: demand.due_suggested_at || demand.due_at || null,
+  });
+  if (error || typeof data !== "string" || !data) {
+    console.error("video_briefing_markdown falhou — card sem briefing", demand.id, error?.message);
+    return null;
+  }
+  const text = String(demand.description || "").trim();
+  return text ? `${text}\n\n---\n\n${data}` : data;
+}
+
+function buildCreatePayload(demand: any, assignees: number[], markdown: string | null = null) {
   const p: any = {
     name: taskName(demand),
     description: demand.description || "",
     status: mapStatus(demand.status),
     assignees,
   };
+  // ClickUp: com markdown_content E description, vale o markdown_content.
+  if (markdown) p.markdown_content = markdown;
   if (demand.starts_at) p.start_date = new Date(demand.starts_at + "T12:00:00Z").getTime();
-  if (demand.ends_at)   p.due_date   = new Date(demand.ends_at   + "T12:00:00Z").getTime();
+  if (demand.due_at) {
+    // 095: prazo com hora (fonte da verdade). due_date_time liga a exibição da hora.
+    p.due_date = Date.parse(demand.due_at);
+    p.due_date_time = demand.due_has_time !== false;
+  } else if (demand.ends_at) {
+    p.due_date = new Date(demand.ends_at + "T12:00:00Z").getTime();
+  }
   return p;
 }
 
@@ -547,11 +593,14 @@ function assigneeIdsFromTask(task: any): number[] {
 function buildUpdatePayload(demand: any, addAssignees: number[], remAssignees: number[]) {
   const p: any = {
     name: taskName(demand),
-    description: demand.description || "",
     status: mapStatus(demand.status),
   };
-  if (demand.starts_at) p.start_date = new Date(demand.starts_at + "T12:00:00Z").getTime();
-  if (demand.ends_at)   p.due_date   = new Date(demand.ends_at   + "T12:00:00Z").getTime();
+  // 095: com briefing, o card é o markdown gerado na criação — demands.description
+  // (só o texto livre) o sobrescreveria, apagando o briefing do card.
+  if (!hasBriefing(demand)) p.description = demand.description || "";
+  // 095: SEM start_date/due_date na atualização. Depois de criada, o prazo é do
+  // ClickUp (a equipe remarca lá; o portal só reflete via apply_clickup_due_change).
+  // Mandar aqui desfaria a remarcação da equipe a cada update de status/título.
   if (addAssignees.length || remAssignees.length) {
     p.assignees = { add: addAssignees, rem: remAssignees };
   }
@@ -612,10 +661,17 @@ async function createListUnique(apiKey: string, folderId: string, baseName: stri
 }
 
 // Garante a LISTA do projeto (projects.cu_list_id) dentro da pasta do aluno.
-async function ensureProjectList(supabase: any, apiKey: string, folderId: string, project_id: string): Promise<string> {
+// 095 (kirad, baixo): `expectedClientSlug` = client_slug da DEMANDA. Projeto de outro
+// cliente (project_id forjado) → loga e devolve "" — o chamador cai na lista do
+// próprio cliente, em vez de criar/usar a lista do projeto alheio.
+async function ensureProjectList(supabase: any, apiKey: string, folderId: string, project_id: string, expectedClientSlug?: string): Promise<string> {
   const { data: project } = await supabase.schema("portal")
-    .from("projects").select("id, title, cu_list_id").eq("id", project_id).maybeSingle();
+    .from("projects").select("id, title, cu_list_id, client_slug").eq("id", project_id).maybeSingle();
   if (!project) return "";
+  if (expectedClientSlug !== undefined && project.client_slug !== expectedClientSlug) {
+    console.error("ensureProjectList: projeto de outro cliente — usando a lista do cliente", project_id, project.client_slug, expectedClientSlug);
+    return "";
+  }
   let listId = String(project.cu_list_id || "").trim();
   if (!listId) {
     listId = await createListUnique(apiKey, folderId, (project.title || "Projeto").trim());
@@ -641,7 +697,7 @@ async function resolveDestinationList(supabase: any, apiKey: string, cfg: any, d
   if (!ensured) return await legacyClientList(supabase, demand.client_slug, cfg);
   const { folderId, client } = ensured;
   if (demand.project_id) {
-    const lid = await ensureProjectList(supabase, apiKey, folderId, demand.project_id);
+    const lid = await ensureProjectList(supabase, apiKey, folderId, demand.project_id, demand.client_slug);
     if (lid) return lid;
   }
   return await ensureInboxList(supabase, apiKey, folderId, client);
@@ -688,6 +744,35 @@ async function provisionStructure(supabase: any, apiKey: string, cfg: any): Prom
   return new Response(JSON.stringify({ ok: true, ...out }), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
+// 095: "o prazo do ClickUp difere do gravado?" — mesma regra de
+// portal.apply_clickup_due_change, no fuso America/Sao_Paulo:
+//   - sem hora (due_has_time !== true, ou a task diz due_date_time === false) →
+//     compara só a DATA em SP;
+//   - com hora → compara até o MINUTO em SP.
+// GET /task não traz due_date_time; quando vier (payload), false força "só data".
+// due_at nulo = nunca semeado → difere (a RPC semeia sem aviso).
+const SP_MINUTE_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+function spParts(ms: number): { date: string; minute: string } {
+  const p = Object.fromEntries(SP_MINUTE_FMT.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  const date = `${p.year}-${p.month}-${p.day}`;
+  return { date, minute: `${date}T${p.hour}:${p.minute}` };
+}
+function dueDiffersSP(
+  dueAtIso: string | null | undefined, dueHasTime: boolean | null | undefined,
+  taskDueDateTime: boolean | null | undefined, clickupDueMs: number,
+): boolean {
+  if (!Number.isFinite(clickupDueMs)) return false;
+  if (!dueAtIso) return true;
+  const storedMs = Date.parse(dueAtIso);
+  if (!Number.isFinite(storedMs)) return true;
+  const withTime = dueHasTime === true && taskDueDateTime !== false;
+  const a = spParts(storedMs), b = spParts(clickupDueMs);
+  return withTime ? a.minute !== b.minute : a.date !== b.date;
+}
+
 const RECONCILE_DEFAULT_LIMIT = 25;
 const RECONCILE_MAX_LIMIT = 100;
 
@@ -705,7 +790,7 @@ const RECONCILE_MAX_LIMIT = 100;
 // processa até `limit` demandas e devolve `next_cursor` para o chamador continuar.
 type ReconcileBatchResult = {
   checked: number; ok: number; partial: number; partial_expected: number; none: number;
-  skipped_external: number; errors: string[]; next_cursor: string | null;
+  skipped_external: number; due_changes: number; errors: string[]; next_cursor: string | null;
 };
 
 async function reconcileAssigneesBatch(
@@ -713,14 +798,14 @@ async function reconcileAssigneesBatch(
 ): Promise<ReconcileBatchResult | { error: string }> {
   const out = {
     checked: 0, ok: 0, partial: 0, partial_expected: 0, none: 0,
-    skipped_external: 0,
+    skipped_external: 0, due_changes: 0,
     errors: [] as string[], next_cursor: null as string | null,
   };
 
   // v15: lê clickup_assignee_sync junto — é o que permite PULAR as demandas em
   // 'external_*' logo abaixo.
   let q = supabase.schema("portal")
-    .from("demands").select("id, clickup_task_id, created_at, clickup_assignee_sync")
+    .from("demands").select("id, clickup_task_id, created_at, clickup_assignee_sync, due_at, due_has_time")
     .not("clickup_task_id", "is", null)
     .order("created_at", { ascending: true })
     .limit(limit);
@@ -756,6 +841,24 @@ async function reconcileAssigneesBatch(
       const { sync, detail, perOperator } = buildAssigneeSyncState(expected, actual, guestIds, memberIds, multiAllowed);
 
       await persistAssigneeSync(supabase, cfg, d.id, sync, detail, perOperator);
+      // 095: prazo — reaproveita o MESMO task (sem GET extra). Só chama a RPC quando o
+      // prazo do ClickUp difere de due_at PELA MESMA REGRA DA RPC (fuso de SP): sem hora
+      // → compara só a data; com hora → compara até o minuto. Comparar em ms dava
+      // "diferente" todo dia nas demandas sem hora (o ClickUp normaliza data sem hora
+      // para outro horário) = 1 FOR UPDATE + 1 no_change por demanda legada, por dia.
+      // Isolado em try próprio: falha no prazo não pode apagar a contagem de assignees.
+      try {
+        const dueMs = task?.due_date ? Number(task.due_date) : NaN;
+        if (Number.isFinite(dueMs) && dueDiffersSP(d.due_at, d.due_has_time, task?.due_date_time, dueMs)) {
+          const { data: dueRes, error: dueErr } = await supabase.schema("portal").rpc("apply_clickup_due_change", {
+            p_demand_id: d.id, p_due_at: new Date(dueMs).toISOString(), p_has_time: null, p_source: "sweep",
+          });
+          if (dueErr) out.errors.push(`${d.id}: due ${dueErr.message}`);
+          else if ((dueRes as any)?.result && (dueRes as any).result !== "no_change") out.due_changes++;
+        }
+      } catch (e) {
+        out.errors.push(`${d.id}: due ${String((e as any)?.message || e)}`);
+      }
       if (sync === "ok") out.ok++;
       else if (sync === "partial") out.partial++;
       else if (sync === "partial_expected") out.partial_expected++;
@@ -795,7 +898,7 @@ async function reconcileAssignees(supabase: any, apiKey: string, cfg: any, body:
 
   const total: ReconcileBatchResult & { batches: number; stopped_reason: string } = {
     checked: 0, ok: 0, partial: 0, partial_expected: 0, none: 0, skipped_external: 0,
-    errors: [], next_cursor: null, batches: 0, stopped_reason: "",
+    due_changes: 0, errors: [], next_cursor: null, batches: 0, stopped_reason: "",
   };
 
   const maxBatches = all ? RECONCILE_MAX_BATCHES : 1;
@@ -817,6 +920,7 @@ async function reconcileAssignees(supabase: any, apiKey: string, cfg: any, body:
     total.partial_expected += res.partial_expected;
     total.none += res.none;
     total.skipped_external += res.skipped_external;
+    total.due_changes += res.due_changes;
     total.errors.push(...res.errors);
     total.next_cursor = res.next_cursor;
     cursor = res.next_cursor;
@@ -899,12 +1003,13 @@ async function reconcileFromResponse(
 async function createTask(supabase: any, apiKey: string, listId: string, cfg: any, demand: any, members: any[], requester: string) {
   const legacy = cfg.assignee_strategy === "legacy";
   const assignees = assigneesFor(members);
+  const markdown = await buildCreateMarkdown(supabase, demand);
 
   let task;
   try {
     task = await clickupRequest(apiKey, `/list/${listId}/task`, {
       method: "POST",
-      body: JSON.stringify(buildCreatePayload(demand, assignees)),
+      body: JSON.stringify(buildCreatePayload(demand, assignees, markdown)),
     });
   } catch (e) {
     const msg = String((e as any)?.message || e);
@@ -918,7 +1023,7 @@ async function createTask(supabase: any, apiKey: string, listId: string, cfg: an
       console.warn("ITEM_417 — espaço single-assignee, recriando com 1 responsável");
       task = await clickupRequest(apiKey, `/list/${listId}/task`, {
         method: "POST",
-        body: JSON.stringify(buildCreatePayload(demand, assignees.slice(0, 1))),
+        body: JSON.stringify(buildCreatePayload(demand, assignees.slice(0, 1), markdown)),
       });
     } else if (assignees.length && msg.includes("ITEM_087")) {
       // Responsáveis sem acesso à pasta (ITEM_087, pasta recém-criada/privada):
@@ -928,7 +1033,7 @@ async function createTask(supabase: any, apiKey: string, listId: string, cfg: an
       console.warn("ITEM_087 — responsáveis sem acesso à pasta, criando sem responsáveis");
       task = await clickupRequest(apiKey, `/list/${listId}/task`, {
         method: "POST",
-        body: JSON.stringify(buildCreatePayload(demand, [])),
+        body: JSON.stringify(buildCreatePayload(demand, [], markdown)),
       });
     } else {
       throw e;

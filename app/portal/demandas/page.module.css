@@ -954,6 +954,63 @@
   animation: skShimmer 1.3s ease-in-out infinite;
 }
 
+/* Faixa de remarcação de prazo (migration 095): ícone + texto, nunca só cor. */
+.dueBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning-strong);
+  border-radius: 10px;
+  background: var(--warning-soft);
+}
+.dueBannerIcon {
+  font-size: 1rem;
+  line-height: 1.3;
+  color: var(--warning-strong);
+  flex-shrink: 0;
+}
+.dueBannerTitle {
+  display: block;
+  font-size: 0.86rem;
+  color: var(--warning-strong);
+  font-weight: 700;
+}
+.dueBannerText {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--warning-strong);
+}
+.dueOriginTag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Mensagem de sistema no chat: selo centralizado, sem autor/avatar/ações. */
+.msgSystem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  margin: 2px auto;
+}
+.msgSystemBadge {
+  background: var(--hero-tint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+}
+.msgSystemTime {
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+
 /* ── Chat: botão "novas mensagens" (aparece quando o usuário rolou p/ cima) ── */
 .chatJump {
   position: absolute;

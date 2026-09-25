@@ -116,6 +116,7 @@ export type DemandMessage = {
   author_name: string | null;
   author_role: string | null;
   avatar_url: string | null;
+  origin: string | null;
   [key: string]: unknown;
 };
 
@@ -279,7 +280,7 @@ export async function getDemandFullDetails(demandId: string): Promise<{
         .eq('demand_id', demandId),
       supabase
         .from('demand_messages')
-        .select('id, demand_id, user_id, content, created_at, clickup_author')
+        .select('id, demand_id, user_id, content, created_at, clickup_author, origin')
         .eq('demand_id', demandId)
         .order('created_at'),
     ]);
@@ -361,10 +362,45 @@ export async function getDemandFullDetails(demandId: string): Promise<{
       author_name: (u.name as string) ?? (m.clickup_author as string) ?? null,
       author_role: (u.role as string) ?? (m.clickup_author ? 'operator' : null),
       avatar_url: (meta?.avatar_url as string) ?? null,
+      origin: (m.origin as string) ?? null,
     };
   });
 
   return { demand: demand as Demand, members: memb, messages: msgs };
+}
+
+/** Prazo com hora, remarcação e briefing de vídeo (colunas da migration 095). */
+export type AdminDemandDueBriefing = {
+  id: string;
+  service_type: string | null;
+  briefing: Record<string, unknown> | null;
+  due_at: string | null;
+  due_has_time: boolean | null;
+  due_suggested_at: string | null;
+  due_previous_at: string | null;
+  due_previous_has_time: boolean | null;
+  due_changed_at: string | null;
+  due_changed_source: string | null;
+};
+
+const ADMIN_DUE_BRIEFING_COLS =
+  'id, service_type, briefing, due_at, due_has_time, due_suggested_at, due_previous_at, due_previous_has_time, due_changed_at, due_changed_source';
+
+/**
+ * Prazo com hora + histórico de remarcação + briefing de vídeo de UMA demanda
+ * (modal admin de detalhe). Lê direto de `portal.demands` (RLS admin), NÃO de
+ * `v_demands` — a view tem colunas explícitas e não expõe as da migration 095.
+ * Chamada só ao abrir o modal, uma vez, junto com `getDemandFullDetails`.
+ */
+export async function getAdminDemandDueAndBriefing(demandId: string): Promise<AdminDemandDueBriefing | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('demands')
+    .select(ADMIN_DUE_BRIEFING_COLS)
+    .eq('id', demandId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as unknown as AdminDemandDueBriefing) || null;
 }
 
 // ── Operadores da demanda (responsáveis reais — tabela demand_operators) ──────

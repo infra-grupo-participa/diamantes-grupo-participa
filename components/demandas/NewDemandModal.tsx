@@ -1,18 +1,37 @@
 'use client';
 
-// Modal Nova Demanda — wizard 2 steps (simples × projeto).
+// Modal Nova Demanda — wizard 3 passos: Tipo → Vínculo (simples × projeto) → Detalhes.
 // Port de buildNewDemandModal()/ndGoStep2()/ndForm de portal/demandas.html.
 // Gate-aware: o caller só abre se isBaseReady().
+// Tipo 'editor-video' troca a descrição livre pelo briefing obrigatório e o prazo
+// passa a ter hora (p_due_at, sugerido — o editor remarca no ClickUp).
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
+  CreateDemandError,
   createDemand,
+  listMyContractedTypes,
   listMyProjects,
   listOperatorsForClient,
+  type ContractedType,
   type Demand,
   type Operator,
   type Project,
 } from '@/lib/api/demandas';
+import {
+  OTHER_SERVICE_TYPE,
+  VIDEO_FIELD_ORDER,
+  VIDEO_SERVICE_TYPE,
+  buildVideoBriefing,
+  emptyVideoBriefing,
+  isDueError,
+  parseBriefingErrorKeys,
+  spDateTimeToIso,
+  validateVideoBriefing,
+  type VideoBriefingDraft,
+  type VideoBriefingErrors,
+} from '@/lib/video-briefing';
+import VideoBriefingForm, { videoFieldId } from './VideoBriefingForm';
 import {
   ACCEPT_ATTR,
   CHAT_CONFIG,
@@ -51,6 +70,7 @@ const IconFile = () => (
 // Mínimo = turnaround realista que a equipe consegue cumprir; sugestão = prazo confortável.
 const MIN_LEAD_BD = 2; // prazo final mínimo (dias úteis a partir de hoje)
 const SUGGESTED_LEAD_BD = 5; // sugestão pré-preenchida (dias úteis)
+const DEFAULT_DUE_TIME = '18:00'; // hora pré-preenchida do prazo com hora (editor-video)
 
 function toYMD(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -70,17 +90,36 @@ function fmtBR(ymd: string): string {
   return `${d}/${m}/${y}`;
 }
 
+/** Foca por id depois do próximo paint (o campo pode ter acabado de aparecer). */
+function focusLater(id: string) {
+  requestAnimationFrame(() => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.focus();
+      el.scrollIntoView({ block: 'center' });
+    }
+  });
+}
+
 export default function NewDemandModal({
   onClose,
   onCreated,
   userId,
+  clientSlug,
 }: {
   onClose: () => void;
   onCreated: (demand: Demand) => void;
   /** portal.users.id do cliente logado — necessário para postar os anexos no chat. */
   userId: number | null;
+  /** portal.users.client_slug do logado. Opcional: sem ele o modal resolve via getMe (1 SELECT a mais). */
+  clientSlug?: string | null;
 }) {
-  const [step, setStep] = useState<1 | 2>(1);
+  const uid = useId();
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [serviceType, setServiceType] = useState<string | null>(null);
+  const [types, setTypes] = useState<ContractedType[] | null>(null);
+  const [typesError, setTypesError] = useState<string | null>(null);
+  const [typesReload, setTypesReload] = useState(0);
   const [mode, setMode] = useState<Mode | null>(null);
   const [projectId, setProjectId] = useState<string>('');
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -97,6 +136,10 @@ export default function NewDemandModal({
   const [desc, setDesc] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  const [dueTime, setDueTime] = useState(DEFAULT_DUE_TIME);
+  const [video, setVideo] = useState<VideoBriefingDraft>(emptyVideoBriefing);
+  const [videoErrors, setVideoErrors] = useState<VideoBriefingErrors>({});
+  const [dueError, setDueError] = useState<string | null>(null);
   const [files, setFiles] = useState<PickedFile[]>([]);
   const [dragover, setDragover] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +165,56 @@ export default function NewDemandModal({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  // Tipos contratados: 1 RPC por abertura do modal (o modal não desmonta entre passos).
+  useEffect(() => {
+    let cancel = false;
+    setTypesError(null);
+    listMyContractedTypes(clientSlug)
+      .then((rows) => {
+        if (!cancel) setTypes(rows);
+      })
+      .catch((e) => {
+        if (cancel) return;
+        // Falha não trava: "Outro" continua disponível.
+        setTypesError(errMessage(e));
+        setTypes([]);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [clientSlug, typesReload]);
+
+  // Ao trocar de passo, foco no primeiro controle do passo (teclado/leitor de tela).
+  const firstStepRender = useRef(true);
+  useEffect(() => {
+    if (firstStepRender.current) {
+      firstStepRender.current = false;
+      return;
+    }
+    const target =
+      step === 1
+        ? `${uid}-type-${Math.max(0, typeIndexRef.current)}`
+        : step === 2
+          ? `${uid}-mode-${modeRef.current ?? 'simple'}`
+          : `${uid}-title`;
+    focusLater(target);
+  }, [step, uid]);
+
+  const isVideo = serviceType === VIDEO_SERVICE_TYPE;
+  const typeOptions = useMemo(() => {
+    const list = (types ?? [])
+      .filter((t) => t.position_slug !== OTHER_SERVICE_TYPE)
+      .map((t) => ({ value: t.position_slug, label: t.position_name || t.position_slug }));
+    list.push({ value: OTHER_SERVICE_TYPE, label: 'Outro' });
+    return list;
+  }, [types]);
+  const typeLabel = typeOptions.find((o) => o.value === serviceType)?.label ?? '';
+  // Refs para o efeito de foco devolver o cliente à opção que ele já tinha escolhido.
+  const typeIndexRef = useRef(-1);
+  typeIndexRef.current = typeOptions.findIndex((o) => o.value === serviceType);
+  const modeRef = useRef<Mode | null>(null);
+  modeRef.current = mode;
 
   // Libera as thumbs (object URLs) ao desmontar.
   const filesRef = useRef<PickedFile[]>([]);
@@ -227,14 +320,14 @@ export default function NewDemandModal({
 
   const canNext = mode === 'simple' || (mode === 'project' && !!projectId);
 
-  async function goStep2() {
+  async function goStep3() {
     if (!canNext) return;
-    setStep(2);
+    setStep(3);
     // Sugestão de prazo: pré-preenche o prazo final se o cliente ainda não escolheu.
     if (!endsAt) setEndsAt(dateHints.suggestedEnds);
     if (operators === null) {
       try {
-        const ops = await listOperatorsForClient();
+        const ops = await listOperatorsForClient(clientSlug);
         setOperators(ops);
         // A equipe pré-definida do cliente já vem TODA selecionada (notifica todo
         // mundo no ClickUp); o cliente pode desmarcar quem não deve participar.
@@ -255,31 +348,71 @@ export default function NewDemandModal({
     });
   }
 
+  const ids = {
+    title: `${uid}-title`,
+    desc: `${uid}-desc`,
+    op0: `${uid}-op-0`,
+    starts: `${uid}-starts`,
+    ends: `${uid}-ends`,
+    dueTime: `${uid}-due-time`,
+    dueNote: `${uid}-due-note`,
+    dueErr: `${uid}-due-err`,
+  };
+
+  /** Mostra o erro geral e leva o foco ao campo culpado. */
+  function fail(msg: string, fieldId?: string) {
+    setError(msg);
+    if (fieldId) focusLater(fieldId);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setDueError(null);
+    setVideoErrors({});
     const t = title.trim();
     const operator_ids = [...selectedOps];
     if (!t) {
-      setError('Informe um título.');
+      fail('Informe um título.', ids.title);
       return;
     }
+    if (isVideo) {
+      const vErr = validateVideoBriefing(video);
+      const first = VIDEO_FIELD_ORDER.find((k) => vErr[k]);
+      if (first) {
+        setVideoErrors(vErr);
+        fail('Revise os campos destacados do briefing.', videoFieldId(uid, first));
+        return;
+      }
+    }
     if (operator_ids.length === 0) {
-      setError('Selecione pelo menos um operador.');
+      fail('Selecione pelo menos um operador.', operators && operators.length ? ids.op0 : undefined);
       return;
     }
     // Validação de datas (comparação por dia-calendário YYYY-MM-DD; inputs date já vêm nesse formato).
     const { todayStr, minEnds } = dateHints;
     if (startsAt && startsAt < todayStr) {
-      setError('A data de início não pode estar no passado.');
+      fail('A data de início não pode estar no passado.', ids.starts);
+      return;
+    }
+    if (isVideo && !endsAt) {
+      setDueError('Informe a data do prazo sugerido.');
+      fail('Informe a data do prazo sugerido.', ids.ends);
+      return;
+    }
+    if (isVideo && !/^\d{2}:\d{2}$/.test(dueTime)) {
+      setDueError('Informe a hora do prazo sugerido.');
+      fail('Informe a hora do prazo sugerido.', ids.dueTime);
       return;
     }
     if (endsAt && endsAt < minEnds) {
-      setError(`O prazo final mínimo é ${fmtBR(minEnds)} (${MIN_LEAD_BD} dias úteis) — tempo mínimo para a equipe entregar com qualidade.`);
+      const msg = `O prazo final mínimo é ${fmtBR(minEnds)} (${MIN_LEAD_BD} dias úteis) — tempo mínimo para a equipe entregar com qualidade.`;
+      if (isVideo) setDueError(msg);
+      fail(msg, ids.ends);
       return;
     }
     if (startsAt && endsAt && endsAt < startsAt) {
-      setError('O prazo final deve ser igual ou posterior à data de início.');
+      fail('O prazo final deve ser igual ou posterior à data de início.', ids.ends);
       return;
     }
     setBusy(true);
@@ -288,15 +421,34 @@ export default function NewDemandModal({
     try {
       created = await createDemand({
         title: t,
-        description: desc.trim() || null,
+        description: isVideo ? null : desc.trim() || null,
         operator_ids,
         project_id: mode === 'project' ? projectId : null,
         starts_at: startsAt || null,
-        ends_at: endsAt || null,
+        // editor-video: o prazo vai com hora em due_at; o banco deriva ends_at.
+        ends_at: isVideo ? null : endsAt || null,
+        service_type: serviceType,
+        briefing: isVideo ? buildVideoBriefing(video) : null,
+        due_at: isVideo ? spDateTimeToIso(endsAt, dueTime) : null,
       });
     } catch (ex) {
-      setError(ex instanceof Error ? ex.message : String(ex));
+      const msg = ex instanceof Error ? ex.message : String(ex);
       setBusy(false);
+      // Mapeia o erro do servidor para o campo (briefing → chaves; prazo → data).
+      const keys = isVideo && ex instanceof CreateDemandError ? parseBriefingErrorKeys(msg) : [];
+      if (keys.length) {
+        const vErr: VideoBriefingErrors = {};
+        keys.forEach((k) => (vErr[k] = 'Obrigatório ou inválido — confira este campo.'));
+        setVideoErrors(vErr);
+        fail('O servidor recusou o briefing: revise os campos destacados.', videoFieldId(uid, keys[0]));
+        return;
+      }
+      if (ex instanceof CreateDemandError && isDueError(msg)) {
+        setDueError(msg);
+        fail(msg, ids.ends);
+        return;
+      }
+      fail(msg);
       return;
     }
     await uploadPickedFiles(created.id);
@@ -309,9 +461,13 @@ export default function NewDemandModal({
       <div className={styles.dialog} role="dialog" aria-modal="true" aria-label="Nova demanda" tabIndex={-1} ref={dialogRef}>
         <div className={styles.head}>
           <div>
-            <h3>{step === 1 ? 'Nova demanda' : mode === 'project' ? '📁 Chamado de projeto' : '⚡ Chamado simples'}</h3>
+            <h3>{step < 3 ? 'Nova demanda' : mode === 'project' ? '📁 Chamado de projeto' : '⚡ Chamado simples'}</h3>
             <div className={styles.stepLabel}>
-              {step === 1 ? 'Passo 1 de 2 — Modo do chamado' : 'Passo 2 de 2 — Detalhes e equipe'}
+              {step === 1
+                ? 'Passo 1 de 3 — Tipo da demanda'
+                : step === 2
+                  ? `Passo 2 de 3 — Modo do chamado · ${typeLabel}`
+                  : `Passo 3 de 3 — Detalhes e equipe · ${typeLabel}`}
             </div>
           </div>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Fechar">
@@ -321,12 +477,74 @@ export default function NewDemandModal({
 
         {step === 1 ? (
           <div className={styles.body}>
+            {types === null ? (
+              <div
+                className="muted"
+                style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.84rem', padding: 10 }}
+              >
+                <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                Carregando tipos de serviço…
+              </div>
+            ) : (
+              <fieldset className={styles.fieldset}>
+                <legend className={styles.label}>Que tipo de serviço você precisa?</legend>
+                <div className={styles.typeList}>
+                  {typeOptions.map((o, i) => (
+                    <label key={o.value} className={styles.typeItem}>
+                      <input
+                        id={`${uid}-type-${i}`}
+                        type="radio"
+                        name={`${uid}-type`}
+                        value={o.value}
+                        checked={serviceType === o.value}
+                        onChange={() => setServiceType(o.value)}
+                      />
+                      {o.label}
+                    </label>
+                  ))}
+                </div>
+                {typesError ? (
+                  <div className={styles.error} style={{ marginTop: 8 }}>
+                    Não foi possível carregar seus serviços contratados ({typesError}).{' '}
+                    <button
+                      type="button"
+                      className={styles.btnSecondary}
+                      style={{ padding: '2px 8px', marginLeft: 4 }}
+                      onClick={() => {
+                        setTypes(null);
+                        setTypesReload((n) => n + 1);
+                      }}
+                    >
+                      Tentar de novo
+                    </button>
+                  </div>
+                ) : types.length === 0 ? (
+                  <small className={styles.hint}>
+                    Nenhum serviço contratado ativo encontrado — use &quot;Outro&quot; e descreva o pedido.
+                  </small>
+                ) : null}
+              </fieldset>
+            )}
+
+            <div className={styles.actions}>
+              <button type="button" className={styles.btnSecondary} onClick={onClose}>
+                Cancelar
+              </button>
+              <button type="button" className={styles.btnPrimary} onClick={() => setStep(2)} disabled={!serviceType}>
+                Próximo →
+              </button>
+            </div>
+          </div>
+        ) : step === 2 ? (
+          <div className={styles.body}>
             <p className="muted" style={{ marginTop: 0, fontSize: '0.84rem' }}>
               Como você quer abrir esse chamado?
             </p>
             <div className={styles.modeGrid}>
               <button
+                id={`${uid}-mode-simple`}
                 type="button"
+                aria-pressed={mode === 'simple'}
                 className={`${styles.modeCard} ${mode === 'simple' ? styles.selected : ''}`}
                 onClick={() => {
                   setMode('simple');
@@ -339,7 +557,9 @@ export default function NewDemandModal({
               </button>
               <button
                 type="button"
+                aria-pressed={mode === 'project'}
                 className={`${styles.modeCard} ${mode === 'project' ? styles.selected : ''}`}
+                id={`${uid}-mode-project`}
                 onClick={() => setMode('project')}
               >
                 <div className={styles.modeEmoji}>📁</div>
@@ -350,8 +570,11 @@ export default function NewDemandModal({
 
             {mode === 'project' && (
               <div style={{ marginTop: 16 }}>
-                <label className={styles.label}>Projeto (evento)</label>
+                <label className={styles.label} htmlFor={`${uid}-project`}>
+                  Projeto (evento)
+                </label>
                 <select
+                  id={`${uid}-project`}
                   className={styles.select}
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
@@ -394,19 +617,24 @@ export default function NewDemandModal({
             )}
 
             <div className={styles.actions}>
-              <button type="button" className={styles.btnSecondary} onClick={onClose}>
-                Cancelar
+              <button type="button" className={styles.btnSecondary} onClick={() => setStep(1)}>
+                ← Voltar
               </button>
-              <button type="button" className={styles.btnPrimary} onClick={() => void goStep2()} disabled={!canNext}>
+              <button type="button" className={styles.btnPrimary} onClick={() => void goStep3()} disabled={!canNext}>
                 Próximo →
               </button>
             </div>
           </div>
         ) : (
-          <form className={`${styles.body} ${styles.form}`} onSubmit={submit}>
+          // noValidate: a validação é nossa (erro no campo + foco no 1º inválido);
+          // a nativa do navegador brigaria com type="url" e com o briefing.
+          <form className={`${styles.body} ${styles.form}`} onSubmit={submit} noValidate>
             <div>
-              <label className={styles.label}>Título da demanda</label>
+              <label className={styles.label} htmlFor={ids.title}>
+                Título da demanda
+              </label>
               <input
+                id={ids.title}
                 className={styles.input}
                 type="text"
                 required
@@ -415,22 +643,44 @@ export default function NewDemandModal({
                 onChange={(e) => setTitle(e.target.value)}
               />
             </div>
-            <div>
-              <label className={styles.label}>
-                Descrição <span className={styles.opt}>(opcional)</span>
-              </label>
-              <textarea
-                className={styles.textarea}
-                rows={3}
-                placeholder="Contexto adicional, links, referências…"
-                value={desc}
-                onChange={(e) => setDesc(e.target.value)}
+            {isVideo ? (
+              <VideoBriefingForm
+                idPrefix={uid}
+                value={video}
+                errors={videoErrors}
+                disabled={busy}
+                onChange={(patch) => {
+                  setVideo((prev) => ({ ...prev, ...patch }));
+                  // Some com o erro do campo assim que o cliente mexe nele.
+                  const touched = Object.keys(patch) as Array<keyof VideoBriefingErrors>;
+                  if (touched.some((k) => videoErrors[k])) {
+                    setVideoErrors((prev) => {
+                      const next = { ...prev };
+                      touched.forEach((k) => delete next[k]);
+                      return next;
+                    });
+                  }
+                }}
               />
-            </div>
+            ) : (
+              <div>
+                <label className={styles.label} htmlFor={ids.desc}>
+                  Descrição <span className={styles.opt}>(opcional)</span>
+                </label>
+                <textarea
+                  id={ids.desc}
+                  className={styles.textarea}
+                  rows={3}
+                  placeholder="Contexto adicional, links, referências…"
+                  value={desc}
+                  onChange={(e) => setDesc(e.target.value)}
+                />
+              </div>
+            )}
             <div>
-              <label className={styles.label}>
+              <div className={styles.label}>
                 Anexos <span className={styles.opt}>(opcional)</span>
-              </label>
+              </div>
               <input
                 ref={fileRef}
                 type="file"
@@ -510,8 +760,8 @@ export default function NewDemandModal({
                 Até {MAX_FILES} arquivos de {fmtSize(CHAT_CONFIG.MAX_FILE_SIZE)}. Eles abrem a conversa da demanda e vão junto para a equipe.
               </small>
             </div>
-            <div>
-              <label className={styles.label}>Equipe responsável</label>
+            <fieldset className={styles.fieldset}>
+              <legend className={styles.label}>Equipe responsável</legend>
               <div className={styles.operators}>
                 {operators === null ? (
                   <div
@@ -528,11 +778,16 @@ export default function NewDemandModal({
                     Sua equipe ainda não foi montada. Fale com o admin.
                   </div>
                 ) : (
-                  operators.map((o) => {
+                  operators.map((o, i) => {
                     const id = String(o.id);
                     return (
                       <label key={id} className={styles.opRow}>
-                        <input type="checkbox" checked={selectedOps.has(id)} onChange={() => toggleOp(id)} />
+                        <input
+                          id={i === 0 ? ids.op0 : undefined}
+                          type="checkbox"
+                          checked={selectedOps.has(id)}
+                          onChange={() => toggleOp(id)}
+                        />
                         <span
                           className={styles.opAvatar}
                           style={
@@ -555,11 +810,79 @@ export default function NewDemandModal({
                 )}
               </div>
               <small className={styles.hint}>Sua equipe já vem selecionada e será avisada — desmarque quem não deve participar desta demanda.</small>
-            </div>
+            </fieldset>
+            {isVideo ? (
+              <div>
+                <div className={styles.grid2}>
+                  <div>
+                    <label className={styles.label} htmlFor={ids.ends}>
+                      Prazo sugerido — data
+                    </label>
+                    <input
+                      id={ids.ends}
+                      className={styles.input}
+                      type="date"
+                      required
+                      min={dateHints.minEnds}
+                      value={endsAt}
+                      aria-invalid={dueError ? true : undefined}
+                      aria-describedby={`${ids.dueNote}${dueError ? ` ${ids.dueErr}` : ''}`}
+                      onChange={(e) => {
+                        setEndsAt(e.target.value);
+                        setDueError(null);
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className={styles.label} htmlFor={ids.dueTime}>
+                      Hora (Brasília)
+                    </label>
+                    <input
+                      id={ids.dueTime}
+                      className={styles.input}
+                      type="time"
+                      required
+                      step={300}
+                      value={dueTime}
+                      aria-describedby={ids.dueNote}
+                      onChange={(e) => {
+                        setDueTime(e.target.value);
+                        setDueError(null);
+                      }}
+                    />
+                  </div>
+                </div>
+                {dueError && (
+                  <div id={ids.dueErr} className={styles.fieldError}>
+                    {dueError}
+                  </div>
+                )}
+                <div id={ids.dueNote} className={styles.dueNote}>
+                  <strong>Prazo sugerido</strong> — o editor pode remarcar conforme a agenda e você será avisado.
+                  Mínimo: {fmtBR(dateHints.minEnds)} ({MIN_LEAD_BD} dias úteis).
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <label className={styles.label} htmlFor={ids.starts}>
+                    Data de início <span className={styles.opt}>(opcional)</span>
+                  </label>
+                  <input
+                    id={ids.starts}
+                    className={styles.input}
+                    type="date"
+                    min={dateHints.todayStr}
+                    value={startsAt}
+                    onChange={(e) => setStartsAt(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
             <div className={styles.grid2}>
               <div>
-                <label className={styles.label}>Data de início</label>
+                <label className={styles.label} htmlFor={ids.starts}>
+                  Data de início
+                </label>
                 <input
+                  id={ids.starts}
                   className={styles.input}
                   type="date"
                   min={dateHints.todayStr}
@@ -568,8 +891,11 @@ export default function NewDemandModal({
                 />
               </div>
               <div>
-                <label className={styles.label}>Prazo final</label>
+                <label className={styles.label} htmlFor={ids.ends}>
+                  Prazo final
+                </label>
                 <input
+                  id={ids.ends}
                   className={styles.input}
                   type="date"
                   min={dateHints.minEnds}
@@ -581,9 +907,14 @@ export default function NewDemandModal({
                 </small>
               </div>
             </div>
-            {error && <div className={styles.error}>{error}</div>}
+            )}
+            {error && (
+              <div className={styles.error} role="alert">
+                {error}
+              </div>
+            )}
             <div className={styles.actions}>
-              <button type="button" className={styles.btnSecondary} onClick={() => setStep(1)}>
+              <button type="button" className={styles.btnSecondary} onClick={() => setStep(2)}>
                 ← Voltar
               </button>
               <button type="submit" className={styles.btnPrimary} disabled={busy}>

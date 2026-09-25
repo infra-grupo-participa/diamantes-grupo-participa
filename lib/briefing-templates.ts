@@ -763,158 +763,17 @@ export const BRIEFING_TEMPLATES: Record<string, BriefingTemplate> = {
   },
 
   // ═══════════════════════════════════════════════════════════
-  // EDIÇÃO DE VÍDEO
+  // EDIÇÃO DE VÍDEO — SEM template de projeto (2026-09-25).
+  // O briefing de edição agora é por DEMANDA (obrigatório em service_type =
+  // 'editor-video', ver lib/video-briefing.ts), não mais por projeto: medido
+  // no banco (25/09) — 5 projetos com 'edicao_video' em `services`, ZERO com
+  // `briefing->'edicao_video'` preenchido. `edicao_video` continua em
+  // BRIEFING_ACTIVE_SERVICES/BRIEFING_SERVICE_LABELS (serviço selecionável ao
+  // criar um projeto — ver app/portal/novo-projeto/page.tsx), só não tem mais
+  // entrada aqui: getServiceSections('edicao_video', ...) cai no `!tpl` e volta
+  // [], então getProjectSections/getBaseSections ficam vazios e
+  // validateProjectBriefing não exige nada deste serviço.
   // ═══════════════════════════════════════════════════════════
-  edicao_video: {
-    version: 'edicao_video@1.0',
-    label: 'Edição de Vídeo',
-    sections: [
-
-      {
-        id: 'identificacao',
-        title: 'Identificação do Projeto',
-        icon: 'user',
-        fields: [
-          { id: 'expert_name',  label: 'Nome do cliente / expert', type: 'text', priority: 'red', placeholder: 'Ex.: Dr. João Silva' },
-          { id: 'company_name', label: 'Nome do escritório / empresa', type: 'text', priority: 'red', placeholder: 'Ex.: Silva Consultoria' },
-          { id: 'niche',        label: 'Nicho / área de atuação', type: 'text', priority: 'red', placeholder: 'Ex.: Direito Tributário' },
-          { id: 'account_manager', label: 'Responsável', type: 'text', priority: 'yellow', readonly: true, auto: true },
-        ],
-      },
-
-      {
-        id: 'materiais',
-        title: 'Materiais Brutos',
-        icon: 'cpu',
-        hint: 'Compartilhe os materiais brutos via Google Drive. Organize por pasta e nomeie os arquivos claramente.',
-        fields: [
-          {
-            id: 'raw_footage_url',
-            label: 'Link da pasta com os vídeos brutos (Google Drive)',
-            type: 'url',
-            priority: 'red',
-            hint: 'Crie uma pasta no Google Drive com os arquivos de vídeo brutos. Dê acesso "Qualquer pessoa com o link pode visualizar". Nomeie os arquivos com sequência numérica (ex.: cena_01.mp4, cena_02.mp4).',
-            placeholder: 'https://drive.google.com/drive/folders/...',
-          },
-          {
-            id: 'has_script',
-            label: 'Possui roteiro / script para guiar a edição?',
-            type: 'boolean',
-            priority: 'red',
-          },
-          {
-            id: 'script_url',
-            label: 'Link do roteiro / script',
-            type: 'url',
-            priority: 'red',
-            hint: 'Google Docs com o roteiro completo. Inclua os pontos de corte e transições desejadas se souber.',
-            placeholder: 'https://docs.google.com/...',
-            dependsOn: { field: 'has_script', value: true },
-          },
-          {
-            id: 'total_raw_duration',
-            label: 'Duração total aproximada dos vídeos brutos (minutos)',
-            type: 'number',
-            priority: 'yellow',
-            hint: 'Soma de todos os arquivos brutos. Ajuda o editor a estimar o tempo de edição.',
-            placeholder: '30',
-          },
-        ],
-      },
-
-      {
-        id: 'especificacoes',
-        title: 'Especificações Técnicas',
-        icon: 'layers',
-        hint: 'Defina o formato de saída dos vídeos para evitar retrabalho de exportação.',
-        fields: [
-          {
-            id: 'output_format',
-            label: 'Plataforma de destino do vídeo',
-            type: 'select',
-            priority: 'red',
-            options: ['Instagram Reels (9:16)', 'YouTube (16:9)', 'TikTok (9:16)', 'YouTube Shorts (9:16)', 'Múltiplos formatos'],
-          },
-          {
-            id: 'target_duration',
-            label: 'Duração alvo do vídeo editado (segundos ou minutos)',
-            type: 'text',
-            priority: 'red',
-            hint: 'Exemplos: "30–60 seg" para Reels, "8–12 min" para YouTube.',
-            placeholder: 'Ex.: 30–60 seg (Reels) ou 10 min (YouTube)',
-          },
-          {
-            id: 'quantity',
-            label: 'Quantidade de vídeos a editar',
-            type: 'number',
-            priority: 'red',
-            placeholder: '5',
-          },
-          {
-            id: 'needs_captions',
-            label: 'Precisa de legendas?',
-            type: 'boolean',
-            priority: 'red',
-          },
-          {
-            id: 'caption_style',
-            label: 'Estilo das legendas',
-            type: 'select',
-            priority: 'red',
-            options: ['Legenda padrão (branca com contorno)', 'Palavra por palavra (estilo TikTok)', 'Legenda nas cores da marca'],
-            dependsOn: { field: 'needs_captions', value: true },
-          },
-        ],
-      },
-
-      {
-        id: 'estilo',
-        title: 'Estilo, Trilha e Referências',
-        icon: 'bar-chart',
-        fields: [
-          {
-            id: 'has_brand_kit',
-            label: 'Possui kit de marca (vinheta, logo animado, template)?',
-            type: 'boolean',
-            priority: 'yellow',
-          },
-          {
-            id: 'brand_kit_url',
-            label: 'Link do kit de marca',
-            type: 'url',
-            priority: 'yellow',
-            hint: 'Pasta com vinheta de abertura/fechamento, logo em PNG, fontes e eventuais templates de motion.',
-            placeholder: 'https://drive.google.com/...',
-            dependsOn: { field: 'has_brand_kit', value: true },
-          },
-          {
-            id: 'music_preference',
-            label: 'Preferência de trilha sonora',
-            type: 'select',
-            priority: 'yellow',
-            options: ['Sem trilha (voz limpa)', 'Trilha instrumental suave', 'Trilha dinâmica / energética', 'Música indicada pelo cliente'],
-          },
-          {
-            id: 'music_url',
-            label: 'Link da música indicada',
-            type: 'url',
-            priority: 'yellow',
-            hint: 'YouTube, Spotify ou arquivo no Drive. Atenção: use músicas sem direitos autorais (YouTube Audio Library ou Epidemic Sound).',
-            placeholder: 'https://...',
-            dependsOn: { field: 'music_preference', value: 'Música indicada pelo cliente' },
-          },
-          {
-            id: 'reference_videos',
-            label: 'Links de vídeos de referência (estilo desejado)',
-            type: 'text',
-            priority: 'yellow',
-            hint: 'Cole links do YouTube ou Instagram de vídeos com o estilo de edição desejado.',
-            placeholder: 'https://youtube.com/... , https://instagram.com/reel/...',
-          },
-        ],
-      },
-    ],
-  },
 
   // ═══════════════════════════════════════════════════════════
   // SOCIAL MEDIA / COPY
@@ -1395,12 +1254,8 @@ export const BRIEFING_SECTION_SCOPE: Record<string, Record<string, Scope>> = {
     orcamento:     'project',
     camadas:       'project',
   },
-  edicao_video: {
-    identificacao:  'project',
-    materiais:      'project',
-    especificacoes: 'project',
-    estilo:         'project',
-  },
+  // edicao_video: sem template de projeto (ver comentário acima) — sem entrada
+  // aqui, nada a mapear.
   paginas: {
     acessos_plataformas: 'base',
     dominio:             'project',

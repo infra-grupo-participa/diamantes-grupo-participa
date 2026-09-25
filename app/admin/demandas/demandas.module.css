@@ -1158,6 +1158,28 @@
   color: var(--d-muted);
   margin-top: 4px;
 }
+.msgSystem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  margin: 2px auto;
+}
+.msgSystemBadge {
+  background: var(--d-bg);
+  border: 1px solid var(--d-border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--d-text);
+  text-align: center;
+}
+.msgSystemTime {
+  font-size: 0.66rem;
+  color: var(--d-muted);
+}
 .chatEmpty {
   color: var(--d-muted);
   font-size: 0.86rem;

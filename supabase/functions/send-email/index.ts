@@ -19,6 +19,11 @@
 //                       operador GUEST no ClickUp (clickup_notifiable=false) foi
 //                       atribuído a uma demanda — ele não vai virar assignee/watcher
 //                       lá, então recebe o link da task por e-mail.
+//   • portal.apply_clickup_due_change (migration 095) → { type:'demanda_prazo_remarcado',
+//                       demand_id, stamp } — o editor remarcou o prazo no ClickUp (sem
+//                       login no portal); avisa quem criou a demanda com o de/para
+//                       (due_previous_at → due_at). Sem due_previous_at (semeadura, não
+//                       remarcação) não envia.
 //
 // D1: cada e-mail é logado em portal.email_log; falha NÃO se perde (status='failed'
 //     + attempts/next_attempt_at). O retry_failed reenvia em background e atualiza a
@@ -114,6 +119,16 @@ async function sendViaProvider(apiKey: string, to: string, subject: string, html
 }
 
 const firstName = (n?: string | null) => (n ? " " + esc(n.split(" ")[0]) : "");
+
+// dd/mm [às HH:MM] em America/Sao_Paulo — usado por demanda_prazo_remarcado (due_at/
+// due_previous_at são timestamptz; hasTime=false omite o horário, ex. prazo "o dia todo").
+function formatDueDate(iso: string, hasTime: boolean): string {
+  const d = new Date(iso);
+  const datePart = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(d);
+  if (!hasTime) return datePart;
+  const timePart = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
+  return `${datePart} às ${timePart}`;
+}
 
 async function resolveClientRecipient(supabase: any, entity: any): Promise<{ email: string; name: string } | null> {
   if (entity?.client_slug) {
@@ -307,6 +322,36 @@ async function composeSpecs(supabase: any, type: string, payload: any): Promise<
     }];
   }
 
+  // Prazo remarcado pela equipe/editor no ClickUp (migration 095, RPC
+  // portal.apply_clickup_due_change) → avisa quem criou a demanda (mesmo destinatário
+  // de demanda_criada, via resolveClientRecipient). O prazo sugerido pelo cliente é só
+  // um palpite ao abrir a demanda; quem manda na data final é a agenda do editor —
+  // o e-mail existe para o cliente não ser pego de surpresa perto da entrega.
+  // due_previous_at nulo = primeira gravação do prazo (semeadura, não remarcação de
+  // verdade — não há "de" para mostrar) → não envia, só loga o skip.
+  if (type === "demanda_prazo_remarcado") {
+    const { data: d } = await supabase.schema("portal").from("demands")
+      .select("id, title, client_slug, created_by, due_at, due_has_time, due_previous_at, due_previous_has_time")
+      .eq("id", demand_id).maybeSingle();
+    if (!d) return [];
+    if (!d.due_previous_at) {
+      console.log(`demanda_prazo_remarcado: due_previous_at nulo, pulando (demand_id=${demand_id})`);
+      return [];
+    }
+    const to = await resolveClientRecipient(supabase, d); if (!to) return [];
+    const de = formatDueDate(d.due_previous_at, d.due_previous_has_time !== false);
+    const para = formatDueDate(d.due_at, d.due_has_time !== false);
+    return [{
+      to: to.email, name: to.name,
+      dedupKey: `demanda_prazo_remarcado:${demand_id}:${stamp || ""}`,
+      refType: "demand", refId: demand_id,
+      subject: `A entrega de "${d.title}" foi remarcada`,
+      html: baseLayout({ title: "A entrega foi remarcada 📅",
+        intro: `Olá${firstName(to.name)}, a equipe remarcou a entrega de <strong>${esc(d.title)}</strong> de <strong>${esc(de)}</strong> para <strong>${esc(para)}</strong>. O prazo sugerido ao abrir a demanda é um ponto de partida — a data final é ajustada pela agenda do editor responsável.`,
+        bodyHtml: "", ctaLabel: "Ver demanda", ctaHref: `${PORTAL_URL}/portal/demandas?d=${demand_id}` }),
+    }];
+  }
+
   // Divergência de responsáveis (ClickUp x portal) → avisa o(s) destinatário(s) de
   // clickup_config.assignee_alert_to (1 dono, decisão do Marcio de 24/09); sem a
   // chave, cai no fallback de todos os admins aprovados (resolveDivergenceAlertRecipients).
@@ -476,7 +521,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: true, type, ...(res.ok ? { sent: to } : { failed: res.error }) }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    const KNOWN = ["demanda_criada","projeto_criado","demanda_em_revisao","demanda_concluida","demanda_cancelada","demanda_ajustes","nova_mensagem","divergencia_assignee","demanda_atribuida_guest"];
+    const KNOWN = ["demanda_criada","projeto_criado","demanda_em_revisao","demanda_concluida","demanda_cancelada","demanda_ajustes","nova_mensagem","divergencia_assignee","demanda_atribuida_guest","demanda_prazo_remarcado"];
     if (!KNOWN.includes(type)) {
       return new Response(JSON.stringify({ error: `type inválido: ${type}` }), { status: 400, headers: { "Content-Type": "application/json" } });
     }

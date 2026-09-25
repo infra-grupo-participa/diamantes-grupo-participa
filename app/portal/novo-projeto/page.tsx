@@ -193,6 +193,11 @@ export default function NovoProjetoPage() {
                 })
               )}
             </div>
+            {selected.has('edicao_video') && (
+              <p className={styles.subtitle} style={{ marginTop: 8 }}>
+                O briefing de cada vídeo é preenchido ao abrir a demanda de edição.
+              </p>
+            )}
             {serviceError && <p className={styles.error}>Selecione ao menos um serviço.</p>}
             {apiError && <p className={styles.error}>{apiError}</p>}
           </div>

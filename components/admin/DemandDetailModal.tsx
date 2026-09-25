@@ -11,6 +11,7 @@ import {
   addDemandOperator,
   removeDemandOperator,
   resolveAssigneeDivergence,
+  getAdminDemandDueAndBriefing,
   STATUS_BADGE,
   ASSIGNEE_SYNC_BADGE,
   hasSyncBadge,
@@ -24,9 +25,46 @@ import {
   type AssigneeDivergenceAction,
   type MissingAssignee,
   type ClickupDeliveryState,
+  type AdminDemandDueBriefing,
 } from '@/lib/api/admin-demandas';
+import {
+  VIDEO_FIELD_LABELS,
+  VIDEO_FIELD_ORDER,
+  VIDEO_SERVICE_TYPE,
+  videoOptionLabel,
+  type VideoBriefingField,
+} from '@/lib/video-briefing';
 import { errMessage } from '@/lib/errors';
 import styles from '@/app/admin/demandas/demandas.module.css';
+
+// ── Prazo (migration 095): due_at tem hora e vive em fuso de Brasília. Mesma
+// lógica de `app/portal/demandas/page.tsx` (fmtDueAt) — texto e leitor iguais
+// entre a tela do cliente e o modal do admin.
+const SP_TZ = 'America/Sao_Paulo';
+function fmtTimeSP(iso: string): string {
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: SP_TZ });
+}
+function fmtDueAt(iso: string, hasTime?: boolean | null): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const datePart = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: SP_TZ });
+  return hasTime ? `${datePart} às ${fmtTimeSP(iso)}` : datePart;
+}
+// Rótulo pt-BR de um valor do briefing de vídeo (somente leitura), espelho de
+// `renderBriefingValue`/`isHttpsLink` de `app/portal/demandas/page.tsx`.
+function renderBriefingValue(field: VideoBriefingField, value: unknown): string {
+  if (Array.isArray(value)) {
+    if (field === 'formatos' || field === 'arquivo') {
+      return value.map((v) => videoOptionLabel(field, String(v))).join(', ');
+    }
+    return value.map(String).join(', ');
+  }
+  if (field === 'peca' && typeof value === 'string') return videoOptionLabel('peca', value);
+  return typeof value === 'string' ? value : String(value);
+}
+function isHttpsLink(value: unknown): value is string {
+  return typeof value === 'string' && /^https:\/\//i.test(value.trim());
+}
 
 const STATUSES: DemandStatus[] = ['open', 'in_progress', 'review', 'done', 'canceled'];
 
@@ -56,6 +94,8 @@ export default function DemandDetailModal({
   const [selOp, setSelOp] = useState('');
   const [syncBusy, setSyncBusy] = useState(false);
   const [confirmAccept, setConfirmAccept] = useState(false);
+  const [dueBriefing, setDueBriefing] = useState<AdminDemandDueBriefing | null>(null);
+  const [dueBriefingState, setDueBriefingState] = useState<'loading' | 'loaded' | 'error'>('loading');
 
   const load = useCallback(async () => {
     try {
@@ -138,6 +178,27 @@ export default function DemandDetailModal({
   useEffect(() => {
     load();
   }, [load]);
+
+  // Prazo com hora + briefing de vídeo: 1 consulta própria, só ao abrir o modal.
+  // Falha aqui NÃO fecha o modal (é dado complementar) — vira mensagem curta.
+  useEffect(() => {
+    let cancelled = false;
+    setDueBriefingState('loading');
+    setDueBriefing(null);
+    getAdminDemandDueAndBriefing(demandId)
+      .then((data) => {
+        if (cancelled) return;
+        setDueBriefing(data);
+        setDueBriefingState('loaded');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDueBriefingState('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [demandId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -226,6 +287,22 @@ export default function DemandDetailModal({
             <div className={styles.chatEmpty}>Carregando detalhes…</div>
           ) : (
             <>
+              {/* Faixa de remarcação (migration 095) — mesmo texto/lógica de
+                  app/portal/demandas/page.tsx: due_previous_has_time formata o
+                  "de", due_has_time formata o "para". */}
+              {dueBriefingState === 'loaded' && dueBriefing?.due_previous_at && (
+                <div className={styles.driftBanner} role="note">
+                  <span className={styles.driftIcon} aria-hidden="true">↻</span>
+                  <div>
+                    <strong>
+                      A equipe remarcou a entrega de{' '}
+                      {fmtDueAt(dueBriefing.due_previous_at, dueBriefing.due_previous_has_time)} para{' '}
+                      {dueBriefing.due_at ? fmtDueAt(dueBriefing.due_at, dueBriefing.due_has_time) : '—'}.
+                    </strong>
+                  </div>
+                </div>
+              )}
+
               {/* Status */}
               <div>
                 <h4 className={styles.sectionTitle}>Status</h4>
@@ -274,7 +351,18 @@ export default function DemandDetailModal({
                   </div>
                   <div className={styles.metaItem}>
                     <div className={styles.metaLbl}>Prazo</div>
-                    <div className={styles.metaVal}>{fmtDate(d.ends_at)}</div>
+                    <div className={styles.metaVal}>
+                      {dueBriefingState === 'loaded' && dueBriefing?.due_at
+                        ? fmtDueAt(dueBriefing.due_at, dueBriefing.due_has_time)
+                        : fmtDate(d.ends_at)}
+                      {dueBriefingState === 'loaded' &&
+                        !!dueBriefing?.due_at &&
+                        !dueBriefing?.due_changed_at && (
+                          <span style={{ marginLeft: 6, fontWeight: 500, fontSize: '0.72rem', color: 'var(--d-muted)' }}>
+                            · sugerido pelo cliente
+                          </span>
+                        )}
+                    </div>
                   </div>
                   <div className={styles.metaItem}>
                     <div className={styles.metaLbl}>Aberta em</div>
@@ -285,6 +373,48 @@ export default function DemandDetailModal({
                   <div className={styles.descWrap}>{d.description}</div>
                 )}
               </div>
+
+              {/* Briefing do vídeo (somente leitura — service_type='editor-video') */}
+              {d.service_type === VIDEO_SERVICE_TYPE && (
+                <div>
+                  <h4 className={styles.sectionTitle}>Briefing do vídeo</h4>
+                  {dueBriefingState === 'loading' ? (
+                    <div className={styles.chatEmpty}>Carregando briefing…</div>
+                  ) : dueBriefingState === 'error' ? (
+                    <div className={styles.chatEmpty}>Não foi possível carregar o briefing.</div>
+                  ) : !dueBriefing?.briefing ? (
+                    <div className={styles.chatEmpty}>Sem briefing registrado.</div>
+                  ) : (
+                    <div className={styles.metaGrid}>
+                      {VIDEO_FIELD_ORDER.map((field) => {
+                        const raw = (dueBriefing.briefing as Record<string, unknown>)[field];
+                        if (
+                          raw === undefined ||
+                          raw === null ||
+                          raw === '' ||
+                          (Array.isArray(raw) && raw.length === 0)
+                        ) {
+                          return null;
+                        }
+                        return (
+                          <div key={field} className={styles.metaItem}>
+                            <div className={styles.metaLbl}>{VIDEO_FIELD_LABELS[field]}</div>
+                            <div className={styles.metaVal}>
+                              {isHttpsLink(raw) ? (
+                                <a href={raw} target="_blank" rel="noopener noreferrer">
+                                  {raw}
+                                </a>
+                              ) : (
+                                renderBriefingValue(field, raw)
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Equipe */}
               <div>
@@ -589,25 +719,32 @@ export default function DemandDetailModal({
                   {det.messages.length === 0 ? (
                     <div className={styles.chatEmpty}>Sem mensagens ainda.</div>
                   ) : (
-                    det.messages.map((m) => (
-                      <div key={m.id} className={styles.msg}>
-                        <div
-                          className={styles.avatar}
-                          style={
-                            m.avatar_url
-                              ? { backgroundImage: `url('${m.avatar_url}')` }
-                              : undefined
-                          }
-                        >
-                          {m.avatar_url ? '' : initials(m.author_name)}
+                    det.messages.map((m) =>
+                      m.origin === 'system' ? (
+                        <div key={m.id} className={styles.msgSystem} role="status">
+                          <span className={styles.msgSystemBadge}>{m.content}</span>
+                          <span className={styles.msgSystemTime}>{fmtDateTime(m.created_at)}</span>
                         </div>
-                        <div className={styles.msgBody}>
-                          <div className={styles.msgAuthor}>{m.author_name || 'Alguém'}</div>
-                          <div className={styles.msgText}>{m.content || ''}</div>
-                          <div className={styles.msgTime}>{fmtDateTime(m.created_at)}</div>
+                      ) : (
+                        <div key={m.id} className={styles.msg}>
+                          <div
+                            className={styles.avatar}
+                            style={
+                              m.avatar_url
+                                ? { backgroundImage: `url('${m.avatar_url}')` }
+                                : undefined
+                            }
+                          >
+                            {m.avatar_url ? '' : initials(m.author_name)}
+                          </div>
+                          <div className={styles.msgBody}>
+                            <div className={styles.msgAuthor}>{m.author_name || 'Alguém'}</div>
+                            <div className={styles.msgText}>{m.content || ''}</div>
+                            <div className={styles.msgTime}>{fmtDateTime(m.created_at)}</div>
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      ),
+                    )
                   )}
                 </div>
               </div>

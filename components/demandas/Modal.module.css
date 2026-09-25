@@ -284,6 +284,94 @@
   color: var(--danger);
 }
 
+/* Nova demanda — passo Tipo (lista de rádios, sem card) */
+.typeList {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  margin: 0;
+  padding: 4px 8px;
+}
+.typeItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.typeItem:last-child {
+  border-bottom: none;
+}
+.typeItem input,
+.checkItem input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* Briefing de vídeo */
+.vbForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.vbHead {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.fieldset legend {
+  padding: 0;
+}
+.checkRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.checkItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.fieldError {
+  color: var(--danger);
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+.fieldWarn {
+  color: var(--text);
+  font-size: 0.78rem;
+  margin-top: 4px;
+}
+.input[aria-invalid='true'],
+.textarea[aria-invalid='true'],
+.select[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+.dueNote {
+  font-size: 0.8rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  color: var(--text);
+}
+
 /* Rating modal */
 /* Estrelas (avaliação 1-5) */
 .starsRow {

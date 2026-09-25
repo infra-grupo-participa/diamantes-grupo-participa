@@ -5,6 +5,7 @@
 // submit_client_rating / get_client_briefing.
 
 import { createClient } from '@/lib/supabase/client';
+import type { VideoBriefing } from '@/lib/video-briefing';
 
 export type DemandStatus = 'open' | 'in_progress' | 'review' | 'done' | 'canceled';
 
@@ -23,6 +24,8 @@ export type Demand = {
   last_message_preview?: string | null;
   last_message_from?: 'team' | 'client' | null;
   messages_count?: number | null;
+  service_type?: string | null;
+  briefing_status?: string | null;
   [k: string]: unknown;
 };
 
@@ -242,15 +245,20 @@ async function enrichOperators(
  * (O fallback antigo pré-selecionava operadores que a RPC create_demand rejeita,
  *  travando a criação de demanda para clientes sem team_assignments.)
  */
-export async function listOperatorsForClient(): Promise<Operator[]> {
+export async function listOperatorsForClient(clientSlug?: string | null): Promise<Operator[]> {
   const supabase = db();
-  const me = await getMe();
-  if (!me) throw new Error('Sessão expirada.');
+  // Slug já conhecido pelo chamador evita um SELECT em users (getMe).
+  let slug = clientSlug ?? null;
+  if (!slug) {
+    const me = await getMe();
+    if (!me) throw new Error('Sessão expirada.');
+    slug = me.client_slug;
+  }
 
   const { data: assignments, error } = await supabase
     .from('team_assignments')
     .select('operator_id')
-    .eq('client_slug', me.client_slug)
+    .eq('client_slug', slug)
     .not('operator_id', 'is', null);
   if (error) throw error;
 
@@ -271,22 +279,123 @@ export type CreateDemandInput = {
   project_id?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
+  /** position_slug contratado ('editor-video', …) ou 'outro'. */
+  service_type?: string | null;
+  /** Briefing estruturado (hoje só editor-video). */
+  briefing?: VideoBriefing | null;
+  /** Prazo sugerido com hora (ISO timestamptz). Para editor-video substitui ends_at. */
+  due_at?: string | null;
 };
 
-/** Cria demanda via RPC create_demand. */
+/** Erro de create_demand com a mensagem crua do servidor (a UI mapeia para o campo). */
+export class CreateDemandError extends Error {
+  code: string | null;
+  constructor(message: string, code: string | null) {
+    super(message);
+    this.name = 'CreateDemandError';
+    this.code = code;
+  }
+}
+
+/** Cria demanda via RPC create_demand (migration 095: + p_service_type, p_briefing, p_due_at). */
 export async function createDemand(input: CreateDemandInput): Promise<Demand> {
   if (!input.title || !input.title.trim()) throw new Error('Título obrigatório.');
   if (!input.operator_ids || input.operator_ids.length === 0) throw new Error('Selecione pelo menos um operador.');
-  const { data, error } = await db().rpc('create_demand', {
+  const params: Record<string, unknown> = {
     p_title: input.title.trim(),
     p_description: input.description || null,
     p_operators: input.operator_ids,
     p_project_id: input.project_id || null,
     p_starts_at: input.starts_at || null,
     p_ends_at: input.ends_at || null,
-  });
-  if (error) throw error;
+  };
+  // Parâmetros novos só vão quando têm valor: sem eles o PostgREST resolve pelos
+  // defaults null da assinatura nova (ou pela antiga, antes da 095 subir).
+  if (input.service_type) params.p_service_type = input.service_type;
+  if (input.briefing) params.p_briefing = input.briefing;
+  if (input.due_at) params.p_due_at = input.due_at;
+  let { data, error } = await db().rpc('create_demand', params);
+  // Janela de deploy: front no ar antes da 095 → PostgREST não acha a assinatura
+  // nova (PGRST202). Sem briefing/prazo com hora, recria pela antiga (perde só o
+  // service_type). Com briefing NÃO cai para a antiga: seria demanda sem briefing.
+  if (error?.code === 'PGRST202' && params.p_service_type && !params.p_briefing && !params.p_due_at) {
+    console.warn('create_demand: assinatura nova ausente (095?), criando sem service_type');
+    delete params.p_service_type;
+    ({ data, error } = await db().rpc('create_demand', params));
+  }
+  if (error) throw new CreateDemandError(error.message || 'Não foi possível criar a demanda.', error.code ?? null);
   return data as Demand;
+}
+
+/** Tipo de serviço contratado pelo cliente (RPC get_student_contracted_positions). */
+export type ContractedType = {
+  position_id: string;
+  position_slug: string;
+  position_name: string;
+  service_count: number;
+};
+
+/**
+ * Tipos de serviço que o cliente contratou (services active/delinquent → positions).
+ * Lista vazia = nenhum contrato ativo (a tela oferece só "Outro").
+ * Passe o slug se o chamador já o tem — senão custa um SELECT em users (getMe).
+ */
+export async function listMyContractedTypes(clientSlug?: string | null): Promise<ContractedType[]> {
+  let slug = clientSlug ?? null;
+  if (!slug) {
+    const me = await getMe();
+    if (!me) throw new Error('Sessão expirada.');
+    slug = me.client_slug;
+  }
+  if (!slug) return [];
+  const { data, error } = await db().rpc('get_student_contracted_positions', { p_slug: slug });
+  if (error) throw error;
+  return ((data ?? []) as ContractedType[]).filter((r) => !!r.position_slug);
+}
+
+/** Prazo com hora + histórico de remarcação (colunas da migration 095 em portal.demands). */
+export type DemandDue = {
+  id: string;
+  service_type: string | null;
+  due_at: string | null;
+  due_has_time: boolean | null;
+  due_suggested_at: string | null;
+  due_previous_at: string | null;
+  due_previous_has_time: boolean | null;
+  due_changed_at: string | null;
+  due_changed_source: string | null;
+};
+
+export type DemandBriefing = DemandDue & {
+  briefing: VideoBriefing | Record<string, unknown> | null;
+  briefing_status: string | null;
+};
+
+const DUE_COLS =
+  'id, service_type, due_at, due_has_time, due_suggested_at, due_previous_at, due_previous_has_time, due_changed_at, due_changed_source';
+
+/**
+ * Prazo/remarcação de várias demandas numa ida só (lista do portal).
+ * Lê de portal.demands (RLS do cliente), NÃO de v_demands: a view tem colunas
+ * explícitas (086) e só expõe as novas se for recriada. Devolve mapa id → DemandDue.
+ */
+export async function listDemandDue(ids: string[]): Promise<Record<string, DemandDue>> {
+  const uniq = [...new Set(ids.filter(Boolean))];
+  if (uniq.length === 0) return {};
+  const { data, error } = await db().from('demands').select(DUE_COLS).in('id', uniq);
+  if (error) throw error;
+  return Object.fromEntries(((data ?? []) as unknown as DemandDue[]).map((r) => [r.id, r]));
+}
+
+/** Briefing + prazo de UMA demanda (tela de detalhe). */
+export async function getDemandBriefing(id: string): Promise<DemandBriefing | null> {
+  const { data, error } = await db()
+    .from('demands')
+    .select(`${DUE_COLS}, briefing, briefing_status`)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as unknown as DemandBriefing) || null;
 }
 
 /**

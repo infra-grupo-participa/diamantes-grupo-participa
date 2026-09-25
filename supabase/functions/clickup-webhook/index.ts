@@ -57,6 +57,22 @@
 //     plano): antes só taskDeleted/field-update carimbavam, e as demandas 'external'
 //     ficavam com NULL para sempre — impossível saber quando o ClickUp foi lido.
 //
+// v6 (migration 095, 2026-09-25 — briefing de vídeo + prazo remarcável no ClickUp):
+//   - Ramo `taskDueDateUpdated`: GET /task → portal.apply_clickup_due_change (RPC,
+//     service_role). A RPC compara no fuso de SP, grava due_previous_at/due_changed_*,
+//     insere a mensagem 'system' no chat e enfileira o e-mail ao cliente. O webhook não
+//     escreve due_at/ends_at direto em lugar nenhum.
+//   - Bloco genérico: parou de gravar ends_at (a data era calculada em UTC — prazo às
+//     22h de SP virava o dia seguinte). Prazo diferente vai pela MESMA RPC
+//     (source 'webhook_generic'). starts_at continua importado, agora em data de SP.
+//   - Demanda com briefing preenchido: a description do ClickUp NÃO é importada — o
+//     card é o markdown gerado (texto do cliente + briefing), e trazê-lo de volta
+//     sobrescreveria demands.description com o card inteiro.
+//   ⚠️ taskDueDateUpdated só chega se o webhook estiver REGISTRADO com esse evento
+//   (não confirmável por API em 25/09 — ver plano). Sem ele, o bloco genérico ainda
+//   pega a remarcação no próximo evento qualquer da task, e a varredura diária do
+//   clickup-sync pega o resto.
+//
 // ⚠️ Fonte da verdade vive no Supabase (deploy via `supabase functions deploy`).
 // Este arquivo é a cópia versionada — mantenha em sincronia ao editar a função.
 //
@@ -127,6 +143,76 @@ async function fetchCommentsFromClickUp(apiKey: string, taskId: string): Promise
   if (!r.ok) throw new Error(`ClickUp GET comments ${r.status}`);
   const j = await r.json();
   return j.comments || [];
+}
+
+// Data (YYYY-MM-DD) de um timestamp em ms no fuso de São Paulo. O ClickUp manda
+// epoch ms; `toISOString().slice(0,10)` dava a data em UTC (22h SP → dia seguinte).
+function spDateFromMs(ms: number): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(ms));
+}
+
+// Prazo do ClickUp → portal.apply_clickup_due_change (migration 095). `hasTime` null
+// = desconhecido (GET /task não informa due_date_time) → a RPC mantém o atual.
+// Data removida no ClickUp (due_date null) → não chama (a RPC ignoraria de todo jeito).
+async function applyDueChange(
+  supabase: any, demandId: string, dueMs: number | null, hasTime: boolean | null, source: string,
+): Promise<any> {
+  if (dueMs === null || !Number.isFinite(dueMs)) return { result: "ignored_null" };
+  const { data, error } = await supabase.schema("portal").rpc("apply_clickup_due_change", {
+    p_demand_id: demandId,
+    p_due_at: new Date(dueMs).toISOString(),
+    p_has_time: hasTime,
+    p_source: source,
+  });
+  if (error) throw new Error("apply_clickup_due_change: " + error.message);
+  return data;
+}
+
+function dueMsFromTask(task: any): number | null {
+  const raw = task?.due_date;
+  if (raw === null || raw === undefined || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+// history_items do evento de prazo: { field: "due_date", data: { due_date_time: bool } }.
+// Ausente/formato diferente → null (desconhecido).
+function dueHasTimeFromPayload(payload: any): boolean | null {
+  const items: any[] = Array.isArray(payload?.history_items) ? payload.history_items : [];
+  const h = items.find((i) => i?.field === "due_date");
+  const v = h?.data?.due_date_time;
+  return typeof v === "boolean" ? v : null;
+}
+
+// O prazo do ClickUp difere do due_at gravado? Mesma regra de
+// portal.apply_clickup_due_change (e de dueDiffersSP no clickup-sync), fuso SP:
+//   - sem hora (due_has_time !== true, ou a task diz due_date_time === false) → só a DATA;
+//   - com hora → até o MINUTO.
+// Comparar em ms dava "diferente" em todo evento de demanda sem hora (o ClickUp
+// normaliza data sem hora para outro horário) = FOR UPDATE + no_change à toa.
+// due_at nulo = nunca semeado → difere (a RPC semeia sem aviso).
+const SP_MINUTE_FMT = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+function spParts(ms: number): { date: string; minute: string } {
+  const p = Object.fromEntries(SP_MINUTE_FMT.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  const date = `${p.year}-${p.month}-${p.day}`;
+  return { date, minute: `${date}T${p.hour}:${p.minute}` };
+}
+function dueDiffersSP(
+  dueAtIso: string | null | undefined, dueHasTime: boolean | null | undefined,
+  taskDueDateTime: boolean | null | undefined, clickupDueMs: number | null,
+): boolean {
+  if (clickupDueMs === null || !Number.isFinite(clickupDueMs)) return false;
+  if (!dueAtIso) return true;
+  const storedMs = Date.parse(dueAtIso);
+  if (!Number.isFinite(storedMs)) return true;
+  const withTime = dueHasTime === true && taskDueDateTime !== false;
+  const a = spParts(storedMs), b = spParts(clickupDueMs);
+  return withTime ? a.minute !== b.minute : a.date !== b.date;
 }
 
 async function findUserForClickUpUser(supabase: any, cuUser: any): Promise<{ id: string; name: string; role: string } | null> {
@@ -476,9 +562,20 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ ok: true, skipped: "no_task_id" }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
-    const { data: demand } = await supabase.schema("portal")
-      .from("demands").select("id, status, title, description, starts_at, ends_at, clickup_task_id, finalized_at")
-      .eq("clickup_task_id", taskId).maybeSingle();
+    // 095 (kirad #8): .maybeSingle() estourava com 2 demandas na mesma task (vínculo
+    // duplicado/sequestrado) e o evento morria para a demanda legítima. Agora: pega a
+    // MAIS ANTIGA (a original) e loga a duplicidade. A troca direta de clickup_task_id
+    // pelo cliente foi fechada na trigger demands_due_guard.
+    const { data: demandRows, error: lookupErr } = await supabase.schema("portal")
+      .from("demands").select("id, status, title, description, starts_at, ends_at, clickup_task_id, finalized_at, due_at, due_has_time, briefing")
+      .eq("clickup_task_id", taskId)
+      .order("created_at", { ascending: true })
+      .limit(2);
+    if (lookupErr) throw new Error("lookup demand: " + lookupErr.message);
+    if ((demandRows || []).length > 1) {
+      console.error("clickup_task_id duplicado em portal.demands — usando a mais antiga", taskId, (demandRows || []).map((d: any) => d.id));
+    }
+    const demand = (demandRows || [])[0] || null;
     if (!demand) {
       return new Response(JSON.stringify({ ok: true, skipped: "unknown_task", task_id: taskId }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
@@ -490,6 +587,16 @@ Deno.serve(async (req: Request) => {
       const cfg = await getConfig(supabase);
       const res = await handleAssigneeUpdated(supabase, apiKey, cfg, demand);
       return new Response(JSON.stringify({ ok: true, event, demand_id: demand.id, ...res }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    // ===== Prazo remarcado no ClickUp (migration 095) =====
+    if (event === "taskDueDateUpdated") {
+      const apiKey = await getSecret(supabase, "clickup_api_key");
+      const task = await fetchTaskFromClickUp(apiKey, taskId);
+      const res = await applyDueChange(supabase, demand.id, dueMsFromTask(task), dueHasTimeFromPayload(payload), "webhook");
+      await supabase.schema("portal").from("demands")
+        .update({ last_synced_from_clickup_at: new Date().toISOString() }).eq("id", demand.id);
+      return new Response(JSON.stringify({ ok: true, event, demand_id: demand.id, due: res }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
 
     // ===== Comment events =====
@@ -522,27 +629,46 @@ Deno.serve(async (req: Request) => {
     // custo manter (regex é no-op quando não há colchetes no início do nome).
     const cuName = typeof task?.name === "string" ? task.name.replace(/^\s*\[[^\]]*\]\s*/, "").trim() : "";
     if (cuName && cuName !== demand.title) patch.title = cuName;
-    if (typeof task?.description === "string" && (task.description || "") !== (demand.description || "")) patch.description = task.description || "";
+    // 095: demanda com briefing → o card é markdown gerado pelo portal (texto do
+    // cliente + briefing). Importar de volta sobrescreveria demands.description com o
+    // card inteiro. A description dessas demandas é do portal, não do ClickUp.
+    // briefing é NOT NULL DEFAULT '{}' em produção: `{}` não conta (só objeto com chaves).
+    const b = demand.briefing;
+    const hasBriefing = !!b && typeof b === "object" && !Array.isArray(b) && Object.keys(b).length > 0;
+    if (!hasBriefing && typeof task?.description === "string" && (task.description || "") !== (demand.description || "")) patch.description = task.description || "";
     if (task?.start_date) {
-      const ds = new Date(Number(task.start_date)).toISOString().slice(0, 10);
+      // 095: data em SP (antes: UTC). starts_at não dispara mais a saída (a 095 tirou
+      // starts_at/ends_at do demands_clickup_update) — sem eco.
+      const ds = spDateFromMs(Number(task.start_date));
       if (ds !== (demand.starts_at || "")) patch.starts_at = ds;
     }
-    if (task?.due_date) {
-      const dd = new Date(Number(task.due_date)).toISOString().slice(0, 10);
-      if (dd !== (demand.ends_at || "")) patch.ends_at = dd;
-    }
+    // 095: ends_at NÃO é mais escrito aqui (é derivado de due_at pela trigger). Prazo
+    // diferente vai pela RPC, DEPOIS do patch: se o mesmo evento concluiu a demanda, a
+    // RPC já vê status 'done' e remarca sem aviso.
     if (mapped === "done" && !demand.finalized_at) patch.finalized_at = new Date().toISOString();
 
     const keys = Object.keys(patch).filter(k => k !== "last_synced_from_clickup_at");
-    if (keys.length === 0) {
+    const dueMs = dueMsFromTask(task);
+    const dueChanged = dueDiffersSP(demand.due_at, demand.due_has_time, task?.due_date_time, dueMs);
+    if (keys.length === 0 && !dueChanged) {
       return new Response(JSON.stringify({ ok: true, event, demand_id: demand.id, action: "no_change" }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
-    const { error: upErr } = await supabase.schema("portal")
-      .from("demands").update(patch).eq("id", demand.id);
-    if (upErr) throw new Error("update err: " + upErr.message);
+    if (keys.length > 0) {
+      const { error: upErr } = await supabase.schema("portal")
+        .from("demands").update(patch).eq("id", demand.id);
+      if (upErr) throw new Error("update err: " + upErr.message);
+    }
+    let due: any = null;
+    if (dueChanged) {
+      due = await applyDueChange(supabase, demand.id, dueMs, null, "webhook_generic");
+      if (keys.length === 0) {
+        await supabase.schema("portal").from("demands")
+          .update({ last_synced_from_clickup_at: new Date().toISOString() }).eq("id", demand.id);
+      }
+    }
 
     return new Response(JSON.stringify({
-      ok: true, event, demand_id: demand.id, changed: keys,
+      ok: true, event, demand_id: demand.id, changed: keys, due,
       status: patch.status || demand.status,
     }), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch (e) {
